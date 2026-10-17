@@ -186,6 +186,13 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   padding: 0 2px;
 }
 
+.search-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .search-heading {
   display: flex;
   align-items: center;
@@ -253,6 +260,14 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   transition: all 0.2s ease;
 }
 
+.btn-toggle-map.icon-only {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
 .btn-toggle-map:hover {
   border-color: var(--border-subtle);
   color: var(--text-main);
@@ -263,6 +278,18 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   background: var(--brand-bg-subtle);
   border-color: var(--brand-border);
   color: var(--brand-text);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Секція темної карти */
@@ -340,6 +367,41 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   width: 100%;
   z-index: 1;
   background: #0b0f19;
+}
+
+/* OpenStreetMap темний фільтр для темної теми */
+.leaflet-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%);
+}
+
+.leaflet-container {
+  background: #0b0f19 !important;
+}
+
+.leaflet-tile-container img {
+  border: none;
+}
+
+.leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.85) !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #94a3b8 !important;
+  text-decoration: none;
+}
+
+.leaflet-bar a {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #334155 !important;
+  color: #ffffff !important;
 }
 
 /* Стилізація балунів Leaflet для темної теми */

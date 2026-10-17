@@ -114,6 +114,13 @@
       dom.activeServiceTag.textContent = 'Нова пошта';
       dom.searchInput.placeholder = 'Наприклад: 47501, Бережани, Київ, Відділення 1, вул. Хрещатик...';
       dom.mapServiceTitle.textContent = 'Нова пошта';
+
+      // Відновлюємо поштомати для Нової пошти
+      if (dom.btnQuickPostomat) dom.btnQuickPostomat.style.display = '';
+      if (dom.resultsTypeFilters) {
+        const postomatPill = dom.resultsTypeFilters.querySelector('[data-type="postomat"]');
+        if (postomatPill) postomatPill.style.display = '';
+      }
     } else {
       dom.btnUkrposhta.classList.add('active');
       dom.btnUkrposhta.setAttribute('aria-selected', 'true');
@@ -123,6 +130,29 @@
       dom.activeServiceTag.textContent = 'Укрпошта';
       dom.searchInput.placeholder = 'Наприклад: 47501, Бережани, Київ 01001, Львів 79000, вул. Соборна...';
       dom.mapServiceTitle.textContent = 'Укрпошта';
+
+      // Приховуємо кнопку «Поштомат» та фільтр «Поштомати» для Укрпошти (в Укрпошти немає поштоматів)
+      if (dom.btnQuickPostomat) dom.btnQuickPostomat.style.display = 'none';
+      if (dom.resultsTypeFilters) {
+        const postomatPill = dom.resultsTypeFilters.querySelector('[data-type="postomat"]');
+        if (postomatPill) postomatPill.style.display = 'none';
+      }
+
+      // Скидаємо фільтр типів на 'all'
+      state.typeFilter = 'all';
+      updateTypeFilterUI();
+
+      // Для Укрпошти за замовчуванням максимум 5 відділень
+      state.displayLimit = 5;
+      if (dom.limitSelector) {
+        dom.limitSelector.querySelectorAll('.limit-btn').forEach(b => {
+          if (b.getAttribute('data-limit') === '5') {
+            b.classList.add('active');
+          } else {
+            b.classList.remove('active');
+          }
+        });
+      }
     }
 
     // Скидаємо пошук на чистий аркуш при перемиканні служби (виправлення багу збереження результатів іншої служби)
@@ -1043,7 +1073,7 @@
   }
 
   // ==========================================================================
-  // 5. ТЕМНА КАРТА LEAFLET (CARTO DARK MATTER)
+  // 5. ТЕМНА КАРТА LEAFLET (OPENSTREETMAP + DARK MODE CSS)
   // ==========================================================================
   function initMapIfNeeded() {
     if (state.leafletMap) return;
@@ -1051,11 +1081,10 @@
     // Центр України
     state.leafletMap = L.map('branchesMap').setView([48.5, 31.5], 6);
 
-    // Темні тайли CartoDB Dark Matter (ідеально для очей у Dark Theme)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Стандартні відкриті тайли OpenStreetMap без обмежень та вотермарок
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd',
-      attribution: '&copy; OpenStreetMap &copy; CARTO'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
     }).addTo(state.leafletMap);
 
     state.markersGroup = L.layerGroup().addTo(state.leafletMap);
@@ -1067,8 +1096,10 @@
     if (state.isMapVisible) {
       dom.mapSection.classList.remove('hidden');
       dom.btnToggleMap.classList.add('active');
-      dom.mapBtnText.textContent = 'Сховати карту';
+      if (dom.mapBtnText) dom.mapBtnText.textContent = 'Сховати карту';
       dom.btnToggleMap.setAttribute('aria-expanded', 'true');
+      dom.btnToggleMap.setAttribute('title', 'Сховати карту');
+      dom.btnToggleMap.setAttribute('aria-label', 'Сховати карту');
 
       initMapIfNeeded();
       
@@ -1082,8 +1113,10 @@
     } else {
       dom.mapSection.classList.add('hidden');
       dom.btnToggleMap.classList.remove('active');
-      dom.mapBtnText.textContent = 'Показати карту';
+      if (dom.mapBtnText) dom.mapBtnText.textContent = 'Показати карту';
       dom.btnToggleMap.setAttribute('aria-expanded', 'false');
+      dom.btnToggleMap.setAttribute('title', 'Показати карту');
+      dom.btnToggleMap.setAttribute('aria-label', 'Показати карту');
     }
   }
 
@@ -1507,25 +1540,28 @@
       }
     });
 
-    // Швидкий режим поштоматів
+    // Швидкий режим поштоматів (вставка слова «поштомат» без зайвого міста «Київ»)
     if (dom.btnQuickPostomat) {
       dom.btnQuickPostomat.addEventListener('click', () => {
         let val = dom.searchInput.value.trim();
         if (!val) {
-          dom.searchInput.value = 'Київ поштомат №';
-        } else if (!val.toLowerCase().includes('поштомат')) {
-          dom.searchInput.value = `${val} поштомат №`;
+          dom.searchInput.value = 'поштомат ';
+        } else if (!/(?:поштомат|почтомат|пм)/i.test(val)) {
+          dom.searchInput.value = `${val} поштомат `;
         }
         dom.btnClearSearch.classList.remove('hidden');
         dom.searchInput.focus();
+        const len = dom.searchInput.value.length;
+        dom.searchInput.setSelectionRange(len, len);
 
         // Активуємо фільтр поштоматів
         state.typeFilter = 'postomat';
         updateTypeFilterUI();
-        if (state.currentResults.length > 0) {
-          renderSearchResults(state.currentResults, dom.searchInput.value, null);
-        } else {
+
+        if (val.length > 0) {
           executeSearch(dom.searchInput.value, true);
+        } else {
+          dom.searchInput.dispatchEvent(new Event('input'));
         }
       });
     }
