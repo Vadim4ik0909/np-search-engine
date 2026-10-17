@@ -1413,14 +1413,18 @@
         const accentColor = isNP ? '#fb7185' : '#ffd200';
         const btnTextColor = isNP ? '#ffffff' : '#0b0f19';
 
+        const lpCopyStr = formatLpCrmCopyString(b);
         const popupContent = `
-          <div style="font-family: var(--font-main); min-width: 220px; padding: 4px;">
+          <div style="font-family: var(--font-main); min-width: 240px; padding: 4px;">
             ${isTarget ? '<div style="font-size:11px; font-weight:700; color:' + accentColor + '; text-transform:uppercase; margin-bottom:4px;">⭐ Вибране відділення</div>' : ''}
             <strong style="color: ${accentColor}; font-size: 14.5px; display: block; margin-bottom: 4px;">${escapeHtml(b.name)}</strong>
             <p style="margin: 4px 0; font-size: 12.5px; color: #cbd5e1;">📍 <strong>${escapeHtml(b.city)}</strong>, ${escapeHtml(b.address || b.street)}</p>
             <p style="margin: 4px 0; font-size: 11.5px; color: #94a3b8;">🕒 ${escapeHtml(b.schedule || 'Пн-Пт 08:00-19:00')}</p>
-            <div style="margin-top: 10px;">
-              <a href="${gmapsLink}" target="_blank" style="display: inline-block; background: ${accentColor}; color: ${btnTextColor}; padding: 5px 12px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: 700;">🚗 Прокласти маршрут</a>
+            <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button type="button" class="btn-popup-copy" data-copy="${escapeHtml(lpCopyStr)}">
+                📋 Скопіювати
+              </button>
+              <a href="${gmapsLink}" target="_blank" style="display: inline-block; background: ${accentColor}; color: ${btnTextColor}; padding: 6px 12px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: 700;">🚗 Маршрут</a>
             </div>
           </div>
         `;
@@ -1908,8 +1912,30 @@
     dom.btnCloseVersionModal.addEventListener('click', () => dom.versionModal.close());
     dom.btnDismissVersionModal.addEventListener('click', () => dom.versionModal.close());
     dom.versionModal.addEventListener('click', e => {
-      if (e.target === dom.versionModal) dom.versionModal.close();
+      const rect = dom.versionModal.getBoundingClientRect();
+      const isInDialog = (
+        rect.top <= e.clientY &&
+        e.clientY <= rect.bottom &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.right
+      );
+      if (!isInDialog || e.target === dom.versionModal) {
+        dom.versionModal.close();
+      }
     });
+
+    // Делегований обробник копіювання з попапів карти
+    if (dom.branchesMap) {
+      dom.branchesMap.addEventListener('click', e => {
+        const copyBtn = e.target.closest('.btn-popup-copy');
+        if (copyBtn) {
+          const text = copyBtn.getAttribute('data-copy');
+          if (text) {
+            copyTextToClipboard(text, copyBtn, 'Скопійовано!');
+          }
+        }
+      });
+    }
 
     // Модалка API (якщо присутня у версії з панеллю)
     if (dom.btnApiSettings && dom.apiModal) {

@@ -418,6 +418,45 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   border: 1px solid #2d3b55 !important;
 }
 
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  padding: 8px !important;
+  font-size: 16px !important;
+  transition: color 0.15s ease, transform 0.15s ease !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #ffffff !important;
+  transform: scale(1.1);
+}
+
+.btn-popup-copy {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.btn-popup-copy:hover {
+  background: #334155;
+  border-color: #475569;
+  color: #ffffff;
+}
+
+.btn-popup-copy.copied {
+  background: rgba(34, 197, 94, 0.2) !important;
+  color: #4ade80 !important;
+  border-color: #22c55e !important;
+}
+
 /* Підсвічування вибраного відділення на карті */
 .custom-leaflet-marker.highlighted-marker {
   z-index: 1000 !important;
@@ -1170,6 +1209,20 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .toast-notification.hide {
   animation: toastOut 0.2s ease-in forwards;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+@media (max-width: 600px) {
+  .toast-notification {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    max-width: calc(100vw - 32px);
+    justify-content: center;
+    box-sizing: border-box;
+    text-align: center;
+  }
 }
 
 @keyframes toastIn {
@@ -1179,7 +1232,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 @keyframes toastOut {
   from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(12px); }
+  to { opacity: 0; transform: translateY(12px); visibility: hidden; }
 }
 
 /* ==========================================================================
@@ -1475,20 +1528,42 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
    ========================================================================== */
 .app-modal {
   border: none;
+  outline: none;
   border-radius: var(--radius-lg);
   padding: 0;
   background: transparent;
-  max-width: 620px;
+  max-width: 640px;
   width: 92%;
   margin: auto;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
   z-index: 1000;
+}
+
+.app-modal[open] {
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .app-modal::backdrop {
   background: rgba(5, 7, 12, 0.75);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal-card {
@@ -1556,6 +1631,23 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   color: var(--text-main);
   max-height: 65vh;
   overflow-y: auto;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 .changelog-item {
