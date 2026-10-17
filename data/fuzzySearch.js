@@ -616,52 +616,79 @@
   }
 
   // 7. LP-CRM ІНТЕРАКТИВНИЙ АВТОКОМПЛІТ (Підказки під час введення)
-  function getAutocompleteSuggestions(query, currentService) {
+  function getAutocompleteSuggestions(query, currentService, liveCityBranches = null) {
     if (!query || query.trim().length < 2) return [];
     const q = fixKeyboardLayout(query.trim()).toLowerCase();
     const suggestions = [];
     const seen = new Set();
 
-    // 1. Пошук населених пунктів (Формат LP-CRM: Смига (Дубенський р-н, Рівненська обл.))
+    // Перевіряємо, чи користувач ввів назву конкретного міста
+    let detectedCityName = null;
     for (let s of UKRAINE_SETTLEMENTS) {
       const sLower = s.name.toLowerCase();
-      const matchName = sLower.startsWith(q) || sLower.includes(q);
-      const matchAlias = s.aliases && s.aliases.some(a => a.startsWith(q) || a.includes(q));
-
-      if (matchName || matchAlias) {
-        if (!seen.has(sLower)) {
-          seen.add(sLower);
-          const raionPart = s.raion && s.raion !== s.name + 'ський' ? `${s.raion} р-н, ` : '';
-          const subtitle = `${raionPart}${s.oblast} обл.`;
-          suggestions.push({
-            type: s.type || 'місто',
-            title: s.name,
-            subtitle: subtitle,
-            value: s.name,
-            textToFill: s.name,
-            badge: s.type || 'місто',
-            icon: '📍'
-          });
-        }
+      if (q.startsWith(sLower) || q.includes(sLower)) {
+        detectedCityName = s.name;
+        break;
       }
-      if (suggestions.length >= 8) break;
+      if (s.aliases && s.aliases.some(a => q.startsWith(a) || q.includes(a))) {
+        detectedCityName = s.name;
+        break;
+      }
+    }
+
+    // 1. Пошук населених пунктів (якщо користувач тільки починає писати назву міста без номерів)
+    const hasBranchNumber = /\d+/.test(q);
+    if (!hasBranchNumber) {
+      for (let s of UKRAINE_SETTLEMENTS) {
+        const sLower = s.name.toLowerCase();
+        const matchName = sLower.startsWith(q) || sLower.includes(q);
+        const matchAlias = s.aliases && s.aliases.some(a => a.startsWith(q) || a.includes(q));
+
+        if (matchName || matchAlias) {
+          if (!seen.has(sLower)) {
+            seen.add(sLower);
+            const raionPart = s.raion && s.raion !== s.name + 'ський' ? `${s.raion} р-н, ` : '';
+            const subtitle = `${raionPart}${s.oblast} обл.`;
+            suggestions.push({
+              type: s.type || 'місто',
+              title: s.name,
+              subtitle: subtitle,
+              value: s.name,
+              textToFill: s.name,
+              badge: s.type || 'місто',
+              icon: '📍'
+            });
+          }
+        }
+        if (suggestions.length >= 6) break;
+      }
     }
 
     // 2. Якщо введено цифри або ключове слово "поштомат"
     const digitMatch = q.match(/\d+/);
     const isQueryPostomat = q.includes('поштомат') || q.includes('почтомат');
-    if (digitMatch || isQueryPostomat || q.includes('відділ')) {
-      const allBranches = (window.BRANCHES_DATA && window.BRANCHES_DATA[currentService]) || [];
-      const numQuery = digitMatch ? digitMatch[0] : '';
 
-      for (let b of allBranches) {
-        const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат'));
+    if (digitMatch || isQueryPostomat || q.includes('відділ')) {
+      const numQuery = digitMatch ? digitMatch[0] : '';
+      const pool = (Array.isArray(liveCityBranches) && liveCityBranches.length > 0)
+        ? liveCityBranches
+        : ((window.BRANCHES_DATA && window.BRANCHES_DATA[currentService]) || []);
+
+      for (let b of pool) {
+        const bCityLower = (b.city || '').toLowerCase();
+        // КРИТИЧНО: Якщо в запиті визначено місто (наприклад, Ужгород) — суворо відхиляємо будь-які інші міста (Київ, Львів тощо)
+        if (detectedCityName && !bCityLower.includes(detectedCityName.toLowerCase())) {
+          continue;
+        }
+
+        const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')) || b.typeClass === 'poshtomat';
         if (isQueryPostomat && !isPost) continue;
 
-        const matchNum = numQuery ? b.number.toString().includes(numQuery) : true;
-        const matchCity = q.includes(b.city.toLowerCase());
+        const bNum = (b.number || '').toString();
+        const matchNum = numQuery ? (bNum === numQuery || bNum.startsWith(numQuery)) : true;
+        const matchCity = detectedCityName ? true : (!numQuery || numQuery.length < 2 || q.includes(bCityLower));
 
-        if (matchNum && (matchCity || numQuery.length >= 2 || q.includes('поштомат'))) {
+        if (matchNum && matchCity) {
           const key = `${b.city}-${b.number}-${isPost ? 'p' : 'b'}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -676,11 +703,11 @@
             });
           }
         }
-        if (suggestions.length >= 10) break;
+        if (suggestions.length >= 8) break;
       }
     }
 
-    return suggestions.slice(0, 8);
+    return suggestions.slice(0, 6);
   }
 
   // 7. ДОВІДНИК ПЕРЕЙМЕНОВАНИХ ВУЛИЦЬ ТА МІСТ (ЗВІРКА З LP-CRM ТА ДЕКОМУНІЗАЦІЯ)

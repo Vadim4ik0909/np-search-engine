@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.5.3">
+  <link rel="stylesheet" href="styles.css?v=8.5.4">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.5.3</span>
+          <span class="version-tag">v8.5.4</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,25 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.5.3 -->
+        <!-- Версія 8.5.4 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.5.4</span>
+            <span class="version-state">Глобальна швидкодія та точний пошук відділень</span>
+            <span class="version-date">17 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Пріоритет точного номера відділення:</strong> запити на кшталт «Ужгород 11», «Київ 1», «Смига 1» тепер 100% першим результатом показують саме шукане відділення.</li>
+            <li><strong>Ізоляція автокомпліту від чужих міст:</strong> ліквідовано показ відділень Києва чи Івано-Франківська при пошуку відділень в Ужгороді.</li>
+            <li><strong>Прямий швидкісний API на GitHub Pages:</strong> прибрано зайвий мережевий 404-запит до локального проксі, що скоротило час відповіді на 300-500мс.</li>
+            <li><strong>2-рівневий кеш (RAM + SessionStorage):</strong> повторні запити за тим самим містом виконуються за 0 мс без звернення до мережі.</li>
+            <li><strong>AbortController переривання запитів:</strong> відсутність підвисань при швидкому наборі тексту завдяки скасуванню застарілих мережевих запитів.</li>
+            <li><strong>Прискорений інпут (200мс):</strong> відчутно швидший відгук інтерфейсу без затримок.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.5.3 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.5.3</span>
             <span class="version-state">Чистий суцільний рядок для Split View</span>
@@ -358,12 +375,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.5.3"></script>
+  <script src="data/branches.js?v=8.5.4"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.5.3"></script>
+  <script src="data/fuzzySearch.js?v=8.5.4"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.5.3"></script>
+  <script src="app.js?v=8.5.4"></script>
 </body>
 </html>

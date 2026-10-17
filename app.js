@@ -323,8 +323,10 @@
     novaposhta: new Map()
   };
 
-  // Прямий запит до офіційного API Нової пошти (через локальний проксі або прямий CORS API)
-  async function queryNovaPoshtaApi(modelName, calledMethod, methodProperties) {
+  let activeSearchAbortController = null;
+
+  // Прямий запит до офіційного API Нової пошти (через локальний проксі на localhost або прямий CORS API на хостингу)
+  async function queryNovaPoshtaApi(modelName, calledMethod, methodProperties, signal = null) {
     const requestPayload = {
       apiKey: state.apiKeyNP || '',
       modelName: modelName,
@@ -333,33 +335,39 @@
     };
 
     let rawData = null;
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-    // 1. Спроба через бекенд-проксі (якщо працює локальний server.py)
-    try {
-      const response = await fetch('/api/novaposhta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestPayload)
-      });
-      if (response.ok) {
-        rawData = await response.json();
-      }
-    } catch (e) {
-      // Локальний бекенд недоступний
-    }
-
-    // 2. Якщо проксі не відповів (наприклад, хостинг GitHub Pages) — викликаємо офіційний CORS API
-    if (!rawData || !rawData.success) {
+    // 1. Якщо локальний dev (localhost) — використовуємо серверний проксі server.py
+    if (isLocal) {
       try {
-        const response = await fetch('https://api.novaposhta.ua/v2.0/json/', {
+        const response = await fetch('/api/novaposhta', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
+          body: JSON.stringify(requestPayload),
+          signal: signal
         });
         if (response.ok) {
           rawData = await response.json();
         }
       } catch (e) {
+        if (e.name === 'AbortError') return null;
+      }
+    }
+
+    // 2. Якщо хостинг (GitHub Pages тощо) або локальний проксі не відповів — викликаємо прямий CORS API Нової пошти миттєво!
+    if (!rawData || !rawData.success) {
+      try {
+        const response = await fetch('https://api.novaposhta.ua/v2.0/json/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload),
+          signal: signal
+        });
+        if (response.ok) {
+          rawData = await response.json();
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') return null;
         console.warn('Прямий виклик API Нової пошти не вдався:', e);
       }
     }
@@ -370,8 +378,8 @@
     return null;
   }
 
-  // Отримання повного списку відділень для будь-якого населеного пункту України
-  async function fetchLiveNovaPoshta(cityName) {
+  // Отримання повного списку відділень для будь-якого населеного пункту України (з 2-рівневим кешуванням RAM + SessionStorage)
+  async function fetchLiveNovaPoshta(cityName, signal = null) {
     if (!cityName) return null;
     let normalizedCity = cityName.trim();
     if (window.SmartSearchEngine) {
@@ -384,23 +392,37 @@
     }
 
     const cacheKey = normalizedCity.toLowerCase();
+    
+    // Рівень 1: Швидкісний RAM Cache (0 ms)
     if (liveWarehousesCache.novaposhta.has(cacheKey)) {
       return liveWarehousesCache.novaposhta.get(cacheKey);
     }
 
-    // Крок 1: Запитуємо всі відділення міста (Limit 300, БЕЗ FindByString для чистого списку)
+    // Рівень 2: Швидкісний SessionStorage Cache (0 ms, зберігається між оновленнями сторінки)
+    try {
+      const sessKey = 'np_cache_' + encodeURIComponent(cacheKey);
+      const cachedStr = sessionStorage.getItem(sessKey);
+      if (cachedStr) {
+        const parsedCached = JSON.parse(cachedStr);
+        if (Array.isArray(parsedCached) && parsedCached.length > 0) {
+          liveWarehousesCache.novaposhta.set(cacheKey, parsedCached);
+          return parsedCached;
+        }
+      }
+    } catch (e) {}
+
+    // Крок 1: Запитуємо всі відділення міста (Limit 300)
     let rawWarehouses = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
       CityName: normalizedCity,
       Limit: '300'
-    });
+    }, signal);
 
-    // Крок 2: Якщо за CityName не знайдено (наприклад село, смт або складний запит),
-    // шукаємо Settlement через Address.searchSettlements
+    // Крок 2: Якщо за CityName не знайдено (наприклад село чи смт), шукаємо через Address.searchSettlements
     if (!rawWarehouses || rawWarehouses.length === 0) {
       const settlementData = await queryNovaPoshtaApi('Address', 'searchSettlements', {
         CityName: normalizedCity,
         Limit: '5'
-      });
+      }, signal);
 
       if (settlementData && settlementData.length > 0 && settlementData[0].Addresses && settlementData[0].Addresses.length > 0) {
         const addr = settlementData[0].Addresses[0];
@@ -409,7 +431,7 @@
           rawWarehouses = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
             CityRef: cityRef,
             Limit: '300'
-          });
+          }, signal);
         }
       }
     }
@@ -475,6 +497,11 @@
     });
 
     liveWarehousesCache.novaposhta.set(cacheKey, branches);
+    try {
+      const sessKey = 'np_cache_' + encodeURIComponent(cacheKey);
+      sessionStorage.setItem(sessKey, JSON.stringify(branches));
+    } catch (e) {}
+
     return branches;
   }
 
@@ -493,6 +520,13 @@
   async function executeSearch(query, shouldRecordAnalytics = true) {
     const rawQuery = (query || '').trim();
     if (!rawQuery) return;
+
+    // Скасовуємо попередній незавершений запит для миттєвої швидкодії
+    if (activeSearchAbortController) {
+      activeSearchAbortController.abort();
+    }
+    activeSearchAbortController = new AbortController();
+    const currentSignal = activeSearchAbortController.signal;
 
     state.searchQuery = rawQuery;
     if (dom.searchInput.value.trim() !== rawQuery) {
@@ -538,68 +572,73 @@
       }
 
       if (searchCity) {
-        const liveData = await fetchLiveNovaPoshta(searchCity);
+        const liveData = await fetchLiveNovaPoshta(searchCity, currentSignal);
         if (liveData && liveData.length > 0) {
           allCityBranches = liveData;
 
-          // 1. Пошук за адресою / вулицею у знайденому місті (пріоритет, якщо користувач вказав вулицю)
+          // Очищаємо слова пошуку від назви міста, стоп-слів та числових номерів для виявлення назви вулиці
+          const cityWordsRegex = new RegExp('^(місто|село|селище|смт|відділення|відділ|поштомат|почтомат|поштове|вантажне|склад|номер|№|вулиця|вул|просп|проспект|пров|провулок|бульв|бульвар|район|р-н|область|обл|' + escapeRegex(searchCity.toLowerCase()) + (parsed.matchedSettlement ? '|' + escapeRegex(parsed.matchedSettlement.name.toLowerCase()) : '') + ')$', 'i');
+
           const streetWords = rawQuery.toLowerCase().split(/[,.\s]+/).filter(w =>
-            w.length > 2 &&
-            !/^(місто|село|селище|смт|київ|переяслав|смига|березнегувате|бучач|відділення|поштомат|поштове|склад|номер|район|область)$/i.test(w)
+            w.length >= 2 && !cityWordsRegex.test(w) && !/^\d+$/.test(w)
           );
 
+          const targetNum = parsed.targetBranchNumber ? parsed.targetBranchNumber.toString() : null;
+
+          let primary = [];
+          let secondary = [];
+
+          // 1. ПРЯМИЙ ПОШУК ЗА НОМЕРОМ ВІДДІЛЕННЯ (наприклад: «Ужгород 11», «Київ 1», «Смига 1»)
+          if (targetNum) {
+            const exactMatches = liveData.filter(b => b.number && b.number.toString() === targetNum);
+            if (exactMatches.length > 0) {
+              // Пріоритет: якщо користувач шукає поштомат — поштомати вперед, якщо ні — вантажні/поштові відділення вперед
+              exactMatches.sort((a, b) => {
+                const aIsPost = (a.typeClass === 'poshtomat' || a.typeName === 'Поштомат') ? 1 : 0;
+                const bIsPost = (b.typeClass === 'poshtomat' || b.typeName === 'Поштомат') ? 1 : 0;
+                return parsed.isPostomat ? (bIsPost - aIsPost) : (aIsPost - bIsPost);
+              });
+              primary = exactMatches;
+              // Решту відділень цього міста додаємо нижче для швидкого огляду
+              secondary = liveData.filter(b => !b.number || b.number.toString() !== targetNum);
+            }
+          }
+
+          // 2. ПОШУК ЗА ВУЛИЦЕЮ (наприклад: «Київ Хрещатик», «Ужгород Другетів 111»)
           if (streetWords.length > 0) {
-            const scored = liveData.map(b => {
+            const poolToScore = primary.length > 0 ? primary : liveData;
+            const scored = poolToScore.map(b => {
               const fullText = ((b.street || '') + ' ' + (b.address || '') + ' ' + (b.name || '')).toLowerCase();
               let score = 0;
               for (const w of streetWords) {
                 if (fullText.includes(w)) {
                   score += 30;
-                  if (new RegExp('\\b' + w + '\\b', 'i').test(fullText)) {
+                  if (new RegExp('\\b' + escapeRegex(w) + '\\b', 'i').test(fullText)) {
                     score += 20;
                   }
                 }
               }
-              // Якщо номер також збігається з номером відділення
-              if (parsed.targetBranchNumber && b.number && b.number.toString() === parsed.targetBranchNumber.toString()) {
-                score += (score > 0 ? 30 : 15);
-              }
-              if (parsed.isPostomat && (b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')))) {
-                score += 30;
+              if (targetNum && b.number && b.number.toString() === targetNum) {
+                score += 35;
               }
               return { branch: b, score };
             }).filter(item => item.score > 0);
 
             scored.sort((a, b) => b.score - a.score);
             if (scored.length > 0) {
-              results = scored.map(s => s.branch);
+              primary = scored.map(s => s.branch);
+              const matchedIds = new Set(primary.map(b => b.id || (b.city + '-' + b.number)));
+              secondary = liveData.filter(b => !matchedIds.has(b.id || (b.city + '-' + b.number)));
             }
           }
 
-          // 2. Якщо вулицю не вказано або збігів немає, шукаємо за точним номером відділення/поштомату
-          if (results.length === 0 && parsed.targetBranchNumber) {
-            const targetNum = parsed.targetBranchNumber.toString();
-            const exactMatches = liveData.filter(b => {
-              if (b.number && b.number.toString() === targetNum) {
-                if (parsed.isPostomat) {
-                  return b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат'));
-                }
-                return true;
-              }
-              return false;
-            });
-
-            if (exactMatches.length > 0) {
-              results = exactMatches;
-            }
-          }
-
-          // Якщо ні за вулицею, ні за номером не знайдено:
-          if (results.length === 0) {
-            if (parsed.targetBranchNumber) {
-              const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
-              didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${cityName} не знайдено. Доступні відділення:`;
-            }
+          if (primary.length > 0) {
+            results = primary.concat(secondary);
+          } else if (targetNum) {
+            const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
+            didYouMeanText = `⚠️ Відділення або поштомат №${targetNum} у м. ${cityName} не знайдено. Доступні відділення:`;
+            results = liveData;
+          } else {
             results = liveData;
           }
         }
@@ -727,6 +766,7 @@
     }
 
     state.currentResults = results;
+    closeAutocomplete();
     renderSearchResults(results, rawQuery, didYouMeanText);
 
     // Запис у найчастіші запити та історію
@@ -1675,7 +1715,7 @@
       executeSearch(dom.searchInput.value, true);
     });
 
-    // Автодоповнення та миттєвий живий пошук при введенні
+    // Автодоповнення та миттєвий живий пошук при введенні (200мс надшвидкий відгук)
     dom.searchInput.addEventListener('input', () => {
       const val = dom.searchInput.value.trim();
       if (val.length > 0) {
@@ -1686,18 +1726,24 @@
       }
 
       if (val.length >= 2 && window.SmartSearchEngine) {
-        const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService);
+        // Отримуємо кешовані відділення міста (якщо вже завантажувалися у сесії)
+        let cityPool = null;
+        const candidate = val.split(/[, ]+/)[0].toLowerCase();
+        if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
+          cityPool = liveWarehousesCache.novaposhta.get(candidate);
+        }
+        const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
         renderAutocomplete(suggestions, val);
       } else {
         closeAutocomplete();
       }
 
-      // Живий пошук при введенні номера або запиту (350мс)
+      // Живий пошук при введенні номера або запиту (200мс)
       clearTimeout(liveSearchDebounceTimer);
       if (val.length >= 2) {
         liveSearchDebounceTimer = setTimeout(() => {
           executeSearch(val, false);
-        }, 350);
+        }, 200);
       }
     });
 
