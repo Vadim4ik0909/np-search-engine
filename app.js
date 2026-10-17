@@ -318,10 +318,8 @@
     }
   };
 
-  // Запит до офіційного API Нової пошти через локальний проксі
+  // Запит до офіційного API Нової пошти (через локальний проксі або прямий CORS API)
   async function fetchLiveNovaPoshta(cityName, searchPart) {
-    if (!state.apiKeyNP && !state.hasServerKey) return null;
-
     let normalizedCity = cityName;
     if (normalizedCity && window.SmartSearchEngine) {
       normalizedCity = window.SmartSearchEngine.normalizeLocativeCase(normalizedCity);
@@ -333,149 +331,109 @@
     }
 
     const methodProperties = {
-      Limit: '50'
+      Limit: '100'
     };
     if (normalizedCity) methodProperties.CityName = normalizedCity;
     if (searchPart) methodProperties.FindByString = searchPart.toString();
 
+    const requestPayload = {
+      apiKey: state.apiKeyNP || '',
+      modelName: 'AddressGeneral',
+      calledMethod: 'getWarehouses',
+      methodProperties: methodProperties
+    };
+
+    let rawData = null;
+
+    // 1. Спроба через бекенд-проксі (якщо працює локальний server.py)
     try {
       const response = await fetch('/api/novaposhta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: state.apiKeyNP,
-          modelName: 'AddressGeneral',
-          calledMethod: 'getWarehouses',
-          methodProperties: methodProperties
-        })
+        body: JSON.stringify(requestPayload)
       });
-
-      const data = await response.json();
-      if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
-        return data.data.map(item => {
-          const maxWeight = parseFloat(item.TotalMaxWeightAllowed) || 30;
-          const desc = item.Description || '';
-          const isPostomat = item.CategoryOfWarehouse === 'Postomat' || desc.toLowerCase().includes('поштомат');
-          const isCargo = maxWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
-          const isPickup = maxWeight <= 10 || desc.toLowerCase().includes('приймання-видачі');
-
-          let typeName, typeBadge, typeClass;
-          if (isPostomat) {
-            typeName = 'Поштомат';
-            typeBadge = 'Поштомат (до 20 кг)';
-            typeClass = 'poshtomat';
-          } else if (isCargo) {
-            typeName = 'Вантажне(ий)';
-            typeBadge = `Вантажне (до ${maxWeight || 1100} кг)`;
-            typeClass = 'cargo';
-          } else if (isPickup) {
-            typeName = 'Пункт приймання-видачі';
-            typeBadge = `Пункт приймання-видачі (до ${maxWeight || 10} кг)`;
-            typeClass = 'pickup';
-          } else {
-            typeName = 'Поштове';
-            typeBadge = `Поштове (до ${maxWeight || 30} кг)`;
-            typeClass = 'post';
-          }
-
-          // Виділення чистої вулиці
-          let street = '';
-          if (desc.includes(':')) {
-            street = desc.split(':')[1].trim();
-          } else if (item.ShortAddress) {
-            street = item.ShortAddress.replace(new RegExp(`^${item.CityDescription || cityName}[,\\s]*`, 'i'), '').trim();
-          } else {
-            street = desc;
-          }
-
-          return {
-            id: 'np-live-' + item.Ref,
-            city: item.CityDescription || cityName,
-            settlementType: item.SettlementTypeDescription || 'місто',
-            oblast: item.SettlementAreaDescription || '',
-            raion: item.SettlementRegionsDescription || '',
-            postalCode: item.PostalCodeUA || '',
-            number: item.Number,
-            name: desc,
-            street: street,
-            address: item.ShortAddress || street,
-            maxWeight: maxWeight,
-            typeName: typeName,
-            typeText: typeBadge,
-            typeClass: typeClass,
-            lat: parseFloat(item.Latitude) || 50.4501,
-            lng: parseFloat(item.Longitude) || 30.5234,
-            isLiveApi: true
-          };
-        });
+      if (response.ok) {
+        rawData = await response.json();
       }
     } catch (e) {
-      console.warn('API запит не вдався, використовуємо швидку локальну базу:', e);
+      // Локальний бекенд недоступний
     }
+
+    // 2. Якщо проксі не відповів (наприклад, хостинг GitHub Pages) — викликаємо офіційний CORS API
+    if (!rawData || !rawData.success) {
+      try {
+        const response = await fetch('https://api.novaposhta.ua/v2.0/json/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload)
+        });
+        if (response.ok) {
+          rawData = await response.json();
+        }
+      } catch (e) {
+        console.warn('Прямий виклик API Нової пошти не вдався:', e);
+      }
+    }
+
+    if (rawData && rawData.success && Array.isArray(rawData.data) && rawData.data.length > 0) {
+      return rawData.data.map(item => {
+        const maxWeight = parseFloat(item.TotalMaxWeightAllowed) || 30;
+        const desc = item.Description || '';
+        const isPostomat = item.CategoryOfWarehouse === 'Postomat' || desc.toLowerCase().includes('поштомат');
+        const isCargo = maxWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
+        const isPickup = maxWeight <= 10 || desc.toLowerCase().includes('приймання-видачі');
+
+        let typeName, typeBadge, typeClass;
+        if (isPostomat) {
+          typeName = 'Поштомат';
+          typeBadge = 'Поштомат (до 20 кг)';
+          typeClass = 'poshtomat';
+        } else if (isCargo) {
+          typeName = 'Вантажне(ий)';
+          typeBadge = `Вантажне (до ${maxWeight || 1100} кг)`;
+          typeClass = 'cargo';
+        } else if (isPickup) {
+          typeName = 'Пункт приймання-видачі';
+          typeBadge = `Пункт приймання-видачі (до ${maxWeight || 10} кг)`;
+          typeClass = 'pickup';
+        } else {
+          typeName = 'Поштове';
+          typeBadge = `Поштове (до ${maxWeight || 30} кг)`;
+          typeClass = 'post';
+        }
+
+        let street = '';
+        if (desc.includes(':')) {
+          street = desc.split(':')[1].trim();
+        } else if (item.ShortAddress) {
+          street = item.ShortAddress.replace(new RegExp(`^${item.CityDescription || cityName}[,\\s]*`, 'i'), '').trim();
+        } else {
+          street = desc;
+        }
+
+        return {
+          id: 'np-live-' + item.Ref,
+          city: item.CityDescription || normalizedCity || cityName,
+          settlementType: item.SettlementTypeDescription || 'місто',
+          oblast: item.SettlementAreaDescription || '',
+          raion: item.SettlementRegionsDescription || '',
+          postalCode: item.PostalCodeUA || '',
+          number: item.Number,
+          name: desc,
+          street: street,
+          address: item.ShortAddress || street,
+          maxWeight: maxWeight,
+          typeName: typeName,
+          typeText: typeBadge,
+          typeClass: typeClass,
+          lat: parseFloat(item.Latitude) || 50.4501,
+          lng: parseFloat(item.Longitude) || 30.5234,
+          isLiveApi: true
+        };
+      });
+    }
+
     return null;
-  }
-
-  // Синтез відділення для будь-якого населеного пункту України
-  function synthesizeBranch(settlement, branchNum, isNP, isPostomat = false, customStreet = null) {
-    const sName = settlement.name || 'Київ';
-    const numInt = parseInt(branchNum) || 1;
-    let streetName = customStreet;
-
-    if (!streetName) {
-      const streets = settlement.streets && settlement.streets.length > 0
-        ? settlement.streets
-        : ['вул. Центральна, 1', 'вул. Незалежності, 15', 'вул. Соборна, 8', 'вул. Шевченка, 22', 'вул. Грушевського, 4'];
-      const streetIndex = (numInt - 1) % streets.length;
-      streetName = streets[streetIndex];
-    }
-
-    let typeName, typeBadge, typeClass, maxWeight;
-    if (isPostomat || numInt >= 1000) {
-      typeName = isNP ? "Поштомат 'Нова Пошта'" : 'Поштомат';
-      maxWeight = 20;
-      typeBadge = 'Поштомат (до 20 кг)';
-      typeClass = 'poshtomat';
-    } else if (numInt === 1 && isNP) {
-      typeName = 'Вантажне(ий)';
-      maxWeight = 1100;
-      typeBadge = 'Вантажне (до 1100 кг)';
-      typeClass = 'cargo';
-    } else if (numInt >= 80 && isNP) {
-      typeName = 'Пункт приймання-видачі';
-      maxWeight = 10;
-      typeBadge = 'Пункт приймання-видачі (до 10 кг)';
-      typeClass = 'pickup';
-    } else {
-      typeName = 'Поштове';
-      maxWeight = 30;
-      typeBadge = isNP ? 'Поштове (до 30 кг)' : 'Поштове відділення';
-      typeClass = 'post';
-    }
-
-    const sType = settlement.type || 'місто';
-    const raion = settlement.raion || '';
-    const oblast = settlement.oblast || '';
-    const postalCode = settlement.postalCodes && settlement.postalCodes[0] ? settlement.postalCodes[0] : '';
-
-    return {
-      id: `${isNP ? 'np' : 'up'}-${sName.toLowerCase()}-${branchNum}`,
-      city: sName,
-      settlementType: sType,
-      oblast: oblast,
-      raion: raion,
-      postalCode: postalCode,
-      number: branchNum.toString(),
-      name: `${typeName} №${branchNum}: ${streetName}`,
-      street: streetName,
-      address: streetName,
-      maxWeight: maxWeight,
-      typeName: typeName,
-      typeText: typeBadge,
-      typeClass: typeClass,
-      lat: +(settlement.lat).toFixed(5),
-      lng: +(settlement.lng).toFixed(5),
-      isSynthesized: true
-    };
   }
 
   // Утиліта фокусування поля пошуку з встановленням курсору в самий кінець (після назви міста/слова)
@@ -519,10 +477,16 @@
 
     const isNP = state.currentService === 'novaposhta';
     let results = [];
-    const didYouMeanText = parsed.didYouMeanText;
+    let didYouMeanText = parsed.didYouMeanText;
 
-    // 1. Запит до онлайн API Нової пошти, якщо збережено API-ключ (у браузері або на сервері в .env)
-    if (isNP && (state.apiKeyNP || state.hasServerKey)) {
+    // Скидаємо блокування поштоматів, якщо користувач шукає звичайне відділення або не вказав 'поштомат'
+    if (/(?:відділення|відділ|вд|склад)/i.test(rawQuery) || (!/(?:поштомат|почтомат|пм)/i.test(rawQuery) && state.typeFilter === 'postomat')) {
+      state.typeFilter = 'all';
+      updateTypeFilterUI();
+    }
+
+    // 1. Запит до онлайн API Нової пошти (офіційний CORS API або локальний проксі)
+    if (isNP) {
       const searchCity = parsed.matchedSettlement ? parsed.matchedSettlement.name : '';
       const searchTarget = parsed.targetBranchNumber || '';
       if (searchCity || searchTarget) {
@@ -533,7 +497,21 @@
       }
     }
 
-    // 2. Локальний пошук у базі даних
+    // Якщо онлайн API повернуло дані і користувач шукав конкретний номер:
+    if (results.length > 0 && parsed.targetBranchNumber) {
+      const targetNum = parsed.targetBranchNumber.toString();
+      const exactMatches = results.filter(b => b.number && b.number.toString() === targetNum);
+      if (exactMatches.length > 0) {
+        results = exactMatches;
+      } else {
+        // Такого номера не існує в цьому місті! Чесно попереджаємо:
+        const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : '';
+        didYouMeanText = `⚠️ Відділення №${targetNum} у ${cityName ? 'м. ' + cityName : 'цьому місті'} не існує. Доступні відділення:`;
+        results = results.filter(b => b.number && b.number.toString() !== targetNum);
+      }
+    }
+
+    // 2. Локальний пошук у базі даних (для Укрпошти або якщо API не дало результату)
     if (results.length === 0) {
       const allBranches = getAllCurrentServiceBranches();
 
@@ -553,7 +531,7 @@
         }
       }
 
-      // 2.1. Пошук за точним поштовим індексом (наприклад: 47501)
+      // 2.1. Пошук за точним поштовим індексом (наприклад: 47501, 47500)
       if (results.length === 0 && parsed.postalCode) {
         results = allBranches.filter(b => b.postalCode === parsed.postalCode);
       }
@@ -563,39 +541,28 @@
         const sName = parsed.matchedSettlement.name.toLowerCase();
         const oblName = parsed.matchedSettlement.oblast ? parsed.matchedSettlement.oblast.toLowerCase() : '';
 
-        // Фільтруємо відділення за назвою міста або області
-        results = allBranches.filter(b => {
+        // Фільтруємо дійсні відділення за назвою міста або області
+        const cityBranches = allBranches.filter(b => {
           const matchCity = b.city && b.city.toLowerCase() === sName;
           const matchRegion = oblName && b.region && b.region.toLowerCase().includes(oblName);
-          if (parsed.targetBranchNumber) {
-            return (matchCity || matchRegion) && b.number && b.number.toString() === parsed.targetBranchNumber;
-          }
           return matchCity || (matchRegion && b.address && b.address.toLowerCase().includes(sName));
         });
 
-        // 2.3. СИНТЕЗ ВІДДІЛЕНЬ ДЛЯ МІКРОЗАПИТІВ:
-        // Якщо користувач ввів конкретний номер або точкову вулицю:
-        if (parsed.targetBranchNumber || parsed.detectedStreet) {
-          const targetNum = parsed.targetBranchNumber || '1';
-          const hasExact = results.some(b => b.number && b.number.toString() === targetNum);
-          if (!hasExact || parsed.detectedStreet) {
-            const synth = synthesizeBranch(parsed.matchedSettlement, targetNum, isNP, parsed.isPostomat, parsed.detectedStreet);
-            results.unshift(synth);
-            // Додаємо також інші відділення з цього міста
-            const others = allBranches.filter(b => b.city && b.city.toLowerCase() === sName && b.number !== targetNum);
-            results.push(...others.slice(0, 4));
+        if (parsed.targetBranchNumber) {
+          const exact = cityBranches.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber);
+          if (exact.length > 0) {
+            results = exact;
+          } else {
+            // Відділення з таким номером немає в цьому місті (НЕ вигадуємо фейкове!)
+            didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${parsed.matchedSettlement.name} не існує. Доступні відділення:`;
+            results = cityBranches;
           }
-        } else if (results.length === 0) {
-          // Якщо для цього СМТ чи села взагалі ще немає записів у базовому статичному переліку:
-          results.push(
-            synthesizeBranch(parsed.matchedSettlement, '1', isNP, false, parsed.detectedStreet),
-            synthesizeBranch(parsed.matchedSettlement, '2', isNP, false),
-            synthesizeBranch(parsed.matchedSettlement, '101', isNP, true)
-          );
+        } else {
+          results = cityBranches;
         }
       }
 
-      // 2.4. Пошук за токенами (вулиця, назва, район тощо)
+      // 2.3. Пошук за токенами (вулиця, назва, район тощо)
       if (results.length === 0) {
         const cleanTokens = parsed.cleanQuery ? parsed.cleanQuery.split(/\s+/).filter(t => t.length > 1) : [];
         if (cleanTokens.length > 0) {
@@ -610,7 +577,7 @@
         }
       }
 
-      // 2.5. FUZZY РЕЙТИНГ (Захист від 0 результатів при будь-яких помилках/одруківках)
+      // 2.4. FUZZY РЕЙТИНГ (Захист від 0 результатів при одруківках)
       if (results.length === 0 && engine) {
         const scored = allBranches.map(b => {
           const sText = `${b.city} ${b.region || ''} ${b.number} ${b.address} ${b.name}`.toLowerCase();
@@ -636,12 +603,25 @@
       recordSearchHistory(rawQuery, results.length);
     }
 
-    // Оновлення карти з фокусуванням на потрібних координатах
+    // Оновлення карти: показуємо ВСІ відділення знайденого міста, а шукане відділення виділяємо!
     if (state.isMapVisible && state.leafletMap) {
-      updateMapMarkers(results.length > 0 ? results : getAllCurrentServiceBranches());
-      if (results.length > 0 && results[0].lat && results[0].lng) {
-        state.leafletMap.flyTo([results[0].lat, results[0].lng], 13, { duration: 1.2 });
-      } else if (parsed.matchedSettlement) {
+      const allBranches = getAllCurrentServiceBranches();
+      let mapBranches = [];
+      let targetBranch = results.length === 1 ? results[0] : (results.length > 0 ? results[0] : null);
+
+      if (parsed.matchedSettlement) {
+        const sName = parsed.matchedSettlement.name.toLowerCase();
+        mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName);
+      }
+
+      if (mapBranches.length === 0) {
+        mapBranches = results.length > 0 ? results : allBranches;
+      }
+
+      updateMapMarkers(mapBranches, targetBranch);
+      if (targetBranch && targetBranch.lat && targetBranch.lng) {
+        state.leafletMap.flyTo([targetBranch.lat, targetBranch.lng], 14, { duration: 1.2 });
+      } else if (parsed.matchedSettlement && parsed.matchedSettlement.lat) {
         state.leafletMap.flyTo([parsed.matchedSettlement.lat, parsed.matchedSettlement.lng], 13, { duration: 1.2 });
       }
     }
@@ -1135,10 +1115,22 @@
       
       setTimeout(() => {
         state.leafletMap.invalidateSize();
-        const branchesToDisplay = state.currentResults.length > 0 
-          ? state.currentResults 
-          : getAllCurrentServiceBranches();
-        updateMapMarkers(branchesToDisplay);
+        const allBranches = getAllCurrentServiceBranches();
+        let mapBranches = [];
+        let targetBranch = state.currentResults.length === 1 ? state.currentResults[0] : (state.currentResults.length > 0 ? state.currentResults[0] : null);
+
+        if (state.searchQuery && window.SmartSearchEngine) {
+          const parsed = window.SmartSearchEngine.parseQuery(state.searchQuery);
+          if (parsed && parsed.matchedSettlement) {
+            const sName = parsed.matchedSettlement.name.toLowerCase();
+            mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName);
+          }
+        }
+        if (mapBranches.length === 0) {
+          mapBranches = state.currentResults.length > 0 ? state.currentResults : allBranches;
+        }
+
+        updateMapMarkers(mapBranches, targetBranch);
       }, 150);
     } else {
       dom.mapSection.classList.add('hidden');
@@ -1150,25 +1142,34 @@
     }
   }
 
-  function createCustomPin(isNP) {
-    const pinColor = isNP ? '#e11d48' : '#ffd200';
+  function createCustomPin(isNP, isHighlighted = false) {
+    const pinColor = isNP ? (isHighlighted ? '#ff003c' : '#e11d48') : (isHighlighted ? '#ffe600' : '#ffd200');
     const centerColor = isNP ? '#ffffff' : '#0b0f19';
+    const width = isHighlighted ? 36 : 28;
+    const height = isHighlighted ? 46 : 36;
+    const glow = isHighlighted 
+      ? `filter: drop-shadow(0 0 10px ${isNP ? 'rgba(255, 0, 60, 0.95)' : 'rgba(255, 230, 0, 0.95)'});` 
+      : 'filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));';
+
     const svgIcon = `
-      <svg width="30" height="38" viewBox="0 0 30 38" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M15 0C6.716 0 0 6.716 0 15C0 26.25 15 38 15 38C15 38 30 26.25 30 15C30 6.716 23.284 0 15 0Z" fill="${pinColor}"/>
-        <circle cx="15" cy="15" r="7.5" fill="${centerColor}"/>
-      </svg>
+      <div style="${glow} display: flex; align-items: center; justify-content: center;">
+        <svg width="${width}" height="${height}" viewBox="0 0 30 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 0C6.716 0 0 6.716 0 15C0 26.25 15 38 15 38C15 38 30 26.25 30 15C30 6.716 23.284 0 15 0Z" fill="${pinColor}"/>
+          <circle cx="15" cy="15" r="7.5" fill="${centerColor}"/>
+          ${isHighlighted ? '<circle cx="15" cy="15" r="4" fill="' + pinColor + '"/>' : ''}
+        </svg>
+      </div>
     `;
     return L.divIcon({
       html: svgIcon,
-      className: 'custom-leaflet-marker',
-      iconSize: [30, 38],
-      iconAnchor: [15, 38],
-      popupAnchor: [0, -34]
+      className: isHighlighted ? 'custom-leaflet-marker highlighted-marker' : 'custom-leaflet-marker',
+      iconSize: [width, height],
+      iconAnchor: [width / 2, height],
+      popupAnchor: [0, -height + 4]
     });
   }
 
-  function updateMapMarkers(branches) {
+  function updateMapMarkers(branches, highlightedBranch = null) {
     if (!state.leafletMap || !state.markersGroup) return;
 
     state.markersGroup.clearLayers();
@@ -1177,21 +1178,33 @@
     if (branches.length === 0) return;
 
     const isNP = state.currentService === 'novaposhta';
-    const pin = createCustomPin(isNP);
+    const regularPin = createCustomPin(isNP, false);
+    const highlightedPin = createCustomPin(isNP, true);
     const bounds = [];
+    let targetMarker = null;
 
     branches.forEach(b => {
       if (b.lat && b.lng) {
-        const marker = L.marker([b.lat, b.lng], { icon: pin });
+        const isTarget = highlightedBranch && (
+          (highlightedBranch.id && b.id === highlightedBranch.id) ||
+          (highlightedBranch.number && b.number && b.number.toString() === highlightedBranch.number.toString() && (b.city || '').toLowerCase() === (highlightedBranch.city || '').toLowerCase())
+        );
+
+        const marker = L.marker([b.lat, b.lng], {
+          icon: isTarget ? highlightedPin : regularPin,
+          zIndexOffset: isTarget ? 1000 : 0
+        });
+
         const gmapsLink = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`;
         const accentColor = isNP ? '#fb7185' : '#ffd200';
         const btnTextColor = isNP ? '#ffffff' : '#0b0f19';
 
         const popupContent = `
           <div style="font-family: var(--font-main); min-width: 220px; padding: 4px;">
+            ${isTarget ? '<div style="font-size:11px; font-weight:700; color:' + accentColor + '; text-transform:uppercase; margin-bottom:4px;">⭐ Вибране відділення</div>' : ''}
             <strong style="color: ${accentColor}; font-size: 14.5px; display: block; margin-bottom: 4px;">${escapeHtml(b.name)}</strong>
-            <p style="margin: 4px 0; font-size: 12.5px; color: #cbd5e1;">📍 <strong>м. ${escapeHtml(b.city)}</strong>, ${escapeHtml(b.address)}</p>
-            <p style="margin: 4px 0; font-size: 11.5px; color: #94a3b8;">🕒 ${escapeHtml(b.schedule)}</p>
+            <p style="margin: 4px 0; font-size: 12.5px; color: #cbd5e1;">📍 <strong>${escapeHtml(b.city)}</strong>, ${escapeHtml(b.address || b.street)}</p>
+            <p style="margin: 4px 0; font-size: 11.5px; color: #94a3b8;">🕒 ${escapeHtml(b.schedule || 'Пн-Пт 08:00-19:00')}</p>
             <div style="margin-top: 10px;">
               <a href="${gmapsLink}" target="_blank" style="display: inline-block; background: ${accentColor}; color: ${btnTextColor}; padding: 5px 12px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: 700;">🚗 Прокласти маршрут</a>
             </div>
@@ -1201,11 +1214,25 @@
         marker.bindPopup(popupContent);
         state.markersGroup.addLayer(marker);
         bounds.push([b.lat, b.lng]);
+
+        if (isTarget) {
+          targetMarker = marker;
+        }
       }
     });
 
+    if (targetMarker) {
+      setTimeout(() => {
+        targetMarker.openPopup();
+      }, 250);
+    }
+
     if (bounds.length > 0) {
-      state.leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      if (highlightedBranch && highlightedBranch.lat && highlightedBranch.lng) {
+        state.leafletMap.setView([highlightedBranch.lat, highlightedBranch.lng], 14, { animate: true });
+      } else {
+        state.leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      }
     }
   }
 
@@ -1215,13 +1242,12 @@
     }
     setTimeout(() => {
       if (state.leafletMap && branch.lat && branch.lng) {
+        const allBranches = getAllCurrentServiceBranches();
+        const cityBranches = branch.city 
+          ? allBranches.filter(b => b.city && b.city.toLowerCase() === branch.city.toLowerCase())
+          : [branch];
+        updateMapMarkers(cityBranches.length > 0 ? cityBranches : [branch], branch);
         state.leafletMap.setView([branch.lat, branch.lng], 15, { animate: true });
-        state.markersGroup.eachLayer(layer => {
-          const latLng = layer.getLatLng();
-          if (Math.abs(latLng.lat - branch.lat) < 0.0001 && Math.abs(latLng.lng - branch.lng) < 0.0001) {
-            layer.openPopup();
-          }
-        });
         dom.mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 200);
@@ -1273,54 +1299,44 @@
   }
 
   // ==========================================================================
-  // 6. ЧЕСНИЙ ЛІЧИЛЬНИК ОНЛАЙН (1 НА LOCALHOST, СИНХРОНІЗАЦІЯ ВКЛАДОК)
+  // 6. ЧЕСНИЙ ЛІЧИЛЬНИК ОНЛАЙН (СИНХРОНІЗАЦІЯ ВКЛАДОК ОПЕРАТОРА)
   // ==========================================================================
   function initHonestOnlineCounter() {
-    const isLocalhost = window.location.hostname === 'localhost' || 
-                        window.location.hostname === '127.0.0.1' || 
-                        window.location.hostname === '';
+    let currentTabCount = 1;
 
-    if (isLocalhost) {
-      // Чесний лічильник локальних вкладок через BroadcastChannel
-      try {
-        const tabChannel = new BroadcastChannel('postal_search_tabs_channel');
-        let currentTabCount = 1;
+    try {
+      const tabChannel = new BroadcastChannel('postal_search_tabs_channel');
 
-        // Повідомляємо іншим вкладкам про відкриття
-        tabChannel.postMessage({ type: 'tab_opened' });
+      tabChannel.postMessage({ type: 'tab_opened' });
 
-        tabChannel.onmessage = (event) => {
-          if (event.data.type === 'tab_opened') {
-            currentTabCount += 1;
-            tabChannel.postMessage({ type: 'tab_count_sync', count: currentTabCount });
-            updateOnlineBadge(currentTabCount, true);
-          } else if (event.data.type === 'tab_count_sync') {
-            currentTabCount = Math.max(currentTabCount, event.data.count);
-            updateOnlineBadge(currentTabCount, true);
-          }
-        };
+      tabChannel.onmessage = (event) => {
+        if (event.data.type === 'tab_opened') {
+          currentTabCount += 1;
+          tabChannel.postMessage({ type: 'tab_count_sync', count: currentTabCount });
+          updateOnlineBadge(currentTabCount);
+        } else if (event.data.type === 'tab_count_sync') {
+          currentTabCount = Math.max(currentTabCount, event.data.count);
+          updateOnlineBadge(currentTabCount);
+        } else if (event.data.type === 'tab_closed') {
+          currentTabCount = Math.max(1, currentTabCount - 1);
+          updateOnlineBadge(currentTabCount);
+        }
+      };
 
-        window.addEventListener('beforeunload', () => {
-          tabChannel.postMessage({ type: 'tab_closed' });
-        });
+      window.addEventListener('beforeunload', () => {
+        tabChannel.postMessage({ type: 'tab_closed' });
+      });
 
-        updateOnlineBadge(1, true);
-      } catch (e) {
-        updateOnlineBadge(1, true);
-      }
-    } else {
-      // Для віддаленого продакшн-сервера
-      dom.onlineUsersCount.textContent = '34';
+      updateOnlineBadge(1);
+    } catch (e) {
+      updateOnlineBadge(1);
     }
   }
 
-  function updateOnlineBadge(count, isLocal) {
-    if (isLocal) {
-      dom.onlineUsersCount.textContent = count === 1 ? '1' : `${count}`;
-      dom.onlineUsersCount.title = `Локальний сервер: ${count} відкрита(-і) вкладка(-и)`;
-    } else {
-      dom.onlineUsersCount.textContent = count;
-    }
+  function updateOnlineBadge(count) {
+    if (!dom.onlineUsersCount) return;
+    dom.onlineUsersCount.textContent = `${count}`;
+    dom.onlineUsersCount.title = `Активних вкладок: ${count}`;
   }
 
   // ==========================================================================
@@ -1497,13 +1513,6 @@
         b.classList.remove('active');
       }
     });
-    if (dom.btnQuickPostomat) {
-      if (state.typeFilter === 'postomat') {
-        dom.btnQuickPostomat.classList.add('active');
-      } else {
-        dom.btnQuickPostomat.classList.remove('active');
-      }
-    }
   }
 
   // ==========================================================================
@@ -1589,9 +1598,10 @@
       }
     });
 
-    // Швидкий режим поштоматів (вставка слова «поштомат» без зайвого міста «Київ»)
+    // Швидкий режим поштоматів (разовий швидкий шорткат вставки слова «поштомат», без блокування фільтра)
     if (dom.btnQuickPostomat) {
-      dom.btnQuickPostomat.addEventListener('click', () => {
+      dom.btnQuickPostomat.addEventListener('click', (e) => {
+        e.preventDefault();
         let val = dom.searchInput.value.trim();
         if (!val) {
           dom.searchInput.value = 'поштомат ';
@@ -1599,13 +1609,8 @@
           dom.searchInput.value = `${val} поштомат `;
         }
         dom.btnClearSearch.classList.remove('hidden');
-        dom.searchInput.focus();
-        const len = dom.searchInput.value.length;
-        dom.searchInput.setSelectionRange(len, len);
-
-        // Активуємо фільтр поштоматів
-        state.typeFilter = 'postomat';
-        updateTypeFilterUI();
+        focusSearchInputAtEnd(true);
+        setTimeout(() => focusSearchInputAtEnd(true), 25);
 
         if (val.length > 0) {
           executeSearch(dom.searchInput.value, true);
