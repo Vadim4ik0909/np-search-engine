@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.6.0">
+  <link rel="stylesheet" href="styles.css?v=8.7.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.6.0</span>
+          <span class="version-tag">v8.7.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.6.0 -->
+        <!-- Версія 8.7.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.7.0</span>
+            <span class="version-state">CI/CD синхронізація та універсальний нормалізований індекс</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Єдине поле універсального пошуку:</strong> одночасний пошук відділень за назвою населеного пункту, назвою вулиці/адресою та номером відділення у будь-якій комбінації.</li>
+            <li><strong>CI/CD автоматична синхронізація:</strong> викачування населених пунктів та відділень з API Нової пошти у статичні файли проекту на етапі CI/CD для запобігання перенавантаження API.</li>
+            <li><strong>Попередня нормалізація (normalizedSearchText):</strong> кожне відділення має попередньо згенерований пошуковий рядок з формами міста, вулицею, категорією та варіаціями номера відділення (наприклад, <code>«київ відділення 15 хрещатик»</code>).</li>
+            <li><strong>Універсальний токен-фільтр (0 мс затримки):</strong> будь-яке значення запиту (<code>«київ»</code>, <code>«15»</code>, <code>«хрещатик»</code>, <code>«15 хрещатик»</code>, <code>«київ 15»</code>) миттєво фільтрує базу з нульовим навантаженням на API.</li>
+            <li><strong>Динамічний фолбек:</strong> для неіндексованих мікро-сіл автоматично підключається онлайн API Нової пошти з миттєвою нормалізацією результатів.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.6.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.6.0</span>
             <span class="version-state">Одноколонковий LP-CRM пошук та вибір адрес</span>
@@ -420,12 +436,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.6.0"></script>
+  <script src="data/branches.js?v=8.7.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.6.0"></script>
+  <script src="data/fuzzySearch.js?v=8.7.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.6.0"></script>
+  <script src="app.js?v=8.7.0"></script>
 </body>
 </html>

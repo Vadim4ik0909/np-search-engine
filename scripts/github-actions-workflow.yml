@@ -1,0 +1,55 @@
+name: Sync Nova Poshta Data
+
+on:
+  schedule:
+    # Запуск щоночі о 03:00 UTC (06:00 за київським часом)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      sync_pages:
+        description: 'Кількість сторінок для викачування (по 500 відділень на сторінку)'
+        required: false
+        default: '15'
+  push:
+    paths:
+      - 'scripts/sync_nova_poshta.js'
+      - '.github/workflows/sync-data.yml'
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync and pre-normalize Nova Poshta warehouses
+        env:
+          SYNC_PAGES: ${{ github.event.inputs.sync_pages || '15' }}
+          NP_API_KEY: ${{ secrets.NP_API_KEY }}
+        run: |
+          node scripts/sync_nova_poshta.js
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/branches.js data/branches_registry.json
+          if git diff --staged --quiet; then
+            echo "Змін у даних відділень немає. Пропуск коміту."
+          else
+            git commit -m "chore(data): Auto-sync and pre-normalize Nova Poshta warehouses from API [skip ci]"
+            git push origin main
+            git push origin main:gh-pages --force
+          fi

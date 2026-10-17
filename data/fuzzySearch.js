@@ -811,6 +811,150 @@
     return null;
   }
 
+  // 8. ПОПЕРЕДНЯ НОРМАЛІЗАЦІЯ І МАПІНГ ПОШУКОВОГО ЗНАЧЕННЯ КОЖНОГО ВІДДІЛЕННЯ
+  function buildNormalizedSearchText(item) {
+    if (!item) return '';
+    const parts = [];
+
+    // 1. Місто та відмінкові форми
+    if (item.city) {
+      parts.push(item.city);
+      const c = item.city.toLowerCase();
+      if (c.endsWith('ів')) parts.push(c.slice(0, -2) + 'ові', c.slice(0, -2) + 'єві');
+      if (c.endsWith('ці')) parts.push(c.slice(0, -2) + 'цях');
+      if (c.endsWith('а')) parts.push(c.slice(0, -1) + 'і', c.slice(0, -1) + 'у');
+      if (c === 'буковель') parts.push('поляниця');
+      if (c === 'поляниця') parts.push('буковель');
+    }
+
+    // 2. Область і район
+    if (item.oblast) {
+      parts.push(item.oblast, item.oblast.replace(/ська$/i, ''));
+    }
+    if (item.raion) {
+      parts.push(item.raion, item.raion.replace(/ський$/i, ''));
+    }
+    if (item.settlementType) {
+      parts.push(item.settlementType);
+    }
+
+    // 3. Номер та варіації запису відділення
+    if (item.number) {
+      parts.push(
+        'відділення ' + item.number,
+        'відділ ' + item.number,
+        'вд ' + item.number,
+        '№' + item.number,
+        '#' + item.number,
+        item.number
+      );
+    }
+
+    // 4. Категорія відділення
+    const isPost = item.typeClass === 'poshtomat' || item.type === 'poshtomat' || (item.name && item.name.toLowerCase().includes('поштомат'));
+    if (isPost) {
+      parts.push('поштомат', 'почтомат', 'пм');
+    } else {
+      parts.push('відділення', 'поштове', 'вантажне', 'склад');
+    }
+
+    if (item.typeName) parts.push(item.typeName);
+
+    // 5. Вулиця та адреса
+    if (item.street) parts.push(item.street);
+    if (item.address) parts.push(item.address);
+    if (item.name) parts.push(item.name);
+    if (item.postalCode) parts.push(item.postalCode);
+
+    return parts
+      .join(' ')
+      .toLowerCase()
+      .replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // 9. УНІВЕРСАЛЬНИЙ ФІЛЬТР ЗА ПОШУКОВИМ ЗНАЧЕННЯМ (ЄДИНЕ ПОЛЕ ДЛЯ МІСТА, ВУЛИЦІ ТА НОМЕРА)
+  function filterBranchesByNormalizedSearch(rawQuery, branches) {
+    if (!rawQuery || !Array.isArray(branches) || branches.length === 0) return [];
+
+    let clean = fixKeyboardLayout(rawQuery.trim());
+    // Розклеюємо літери та цифри (наприклад "київ15" -> "київ 15", "підгайці1" -> "підгайці 1")
+    clean = clean.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
+                 .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
+
+    const normalizedQuery = clean.toLowerCase().replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (!normalizedQuery) return [];
+
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+
+    const matched = [];
+
+    for (let i = 0; i < branches.length; i++) {
+      const b = branches[i];
+      let searchTarget = b.normalizedSearchText;
+      if (!searchTarget) {
+        searchTarget = buildNormalizedSearchText(b);
+        b.normalizedSearchText = searchTarget;
+      }
+
+      // Перевіряємо задоволення ВСІХ пошукових токенів (AND-пошук)
+      let matchesAll = true;
+      for (let t = 0; t < tokens.length; t++) {
+        const tok = tokens[t];
+        // Для числових токенів (номер відділення або будинку) шукаємо з межами цифр
+        if (/^\d+$/.test(tok)) {
+          const isExactNum = (b.number && b.number.toString() === tok);
+          const hasDigitInTarget = new RegExp('(?<!\\d)' + tok + '(?!\\d)', 'u').test(searchTarget);
+          if (!isExactNum && !hasDigitInTarget) {
+            matchesAll = false;
+            break;
+          }
+        } else {
+          if (!searchTarget.includes(tok)) {
+            matchesAll = false;
+            break;
+          }
+        }
+      }
+
+      if (matchesAll) {
+        // Ранжування за релевантністю
+        let score = 0;
+        const bCity = (b.city || '').toLowerCase();
+        const bStreet = (b.street || '').toLowerCase();
+        const bNum = (b.number || '').toString();
+
+        for (let t = 0; t < tokens.length; t++) {
+          const tok = tokens[t];
+          if (/^\d+$/.test(tok) && bNum === tok) {
+            score += 120; // Найвищий пріоритет для точного номера відділення
+          }
+          if (bCity === tok) {
+            score += 70; // Точний збіг міста
+          } else if (bCity.startsWith(tok)) {
+            score += 35;
+          }
+          if (bStreet.includes(tok)) {
+            score += 45; // Збіг назви вулиці
+          }
+          if (b.oblast && b.oblast.toLowerCase().includes(tok)) {
+            score += 25; // Збіг області
+          }
+          if (b.raion && b.raion.toLowerCase().includes(tok)) {
+            score += 20; // Збіг району
+          }
+        }
+
+        matched.push({ branch: b, score });
+      }
+    }
+
+    matched.sort((a, b) => b.score - a.score);
+    return matched.map(m => m.branch);
+  }
+
   // Експорт у глобальну область видимості
   window.SmartSearchEngine = {
     fixKeyboardLayout,
@@ -823,6 +967,8 @@
     detectRenaming,
     parseQuery,
     getAutocompleteSuggestions,
+    buildNormalizedSearchText,
+    filterBranchesByNormalizedSearch,
     OBLASTS,
     UKRAINE_SETTLEMENTS,
     RENAMED_REGISTRY
