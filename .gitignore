@@ -1,0 +1,28 @@
+# Секретні ключі та змінні оточення (НІКОЛИ не публікувати на GitHub)
+.env
+.env.*
+!.env.example
+*.key
+*.token
+
+# Системні файли macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Редактори та IDE
+.idea/
+.vscode/
+*.swp
+*.swo
