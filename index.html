@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.5.1">
+  <link rel="stylesheet" href="styles.css?v=8.5.2">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.5.1</span>
+          <span class="version-tag">v8.5.2</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.5.1 -->
+        <!-- Версія 8.5.2 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.5.2</span>
+            <span class="version-state">Однорядковий ергономічний формат для LP-CRM</span>
+            <span class="version-date">17 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Все в один рядок (Пріоритет 1):</strong> повний суцільний рядок <code>місто Київ · Відділення №1 · 📍 вул. Пирогівський шлях, 135</code> без розривів.</li>
+            <li><strong>Контрастний населений пункт (Пріоритет 2):</strong> великий читабельний шрифт 14px (<code>Населений пункт: місто Київ, Київський район, Київська область</code>) без потреби придивлятися під час дзвінка.</li>
+            <li><strong>Простора ширина карток (1200px сітка):</strong> оптимізована геометрія блоків (540px+), де обидва рядки ідеально вміщуються в один суцільний рядок.</li>
+            <li><strong>Пошук за адресою поштоматів та відділень:</strong> розпізнавання запитів оператора за вулицею («Київ Берестейський 24», «Київ Пирогівський 135», «Переяслав Героїв Дніпра»).</li>
+            <li><strong>Прямий пошук поштоматів:</strong> миттєве знаходження поштомату за номером без введення міста («поштомат 1230»).</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.5.1 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.5.1</span>
             <span class="version-state">Живий API реєстр для всіх міст та сіл України</span>
@@ -327,12 +343,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.5.1"></script>
+  <script src="data/branches.js?v=8.5.2"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.5.1"></script>
+  <script src="data/fuzzySearch.js?v=8.5.2"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.5.1"></script>
+  <script src="app.js?v=8.5.2"></script>
 </body>
 </html>

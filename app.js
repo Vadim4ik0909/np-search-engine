@@ -542,7 +542,42 @@
         if (liveData && liveData.length > 0) {
           allCityBranches = liveData;
 
-          if (parsed.targetBranchNumber) {
+          // 1. Пошук за адресою / вулицею у знайденому місті (пріоритет, якщо користувач вказав вулицю)
+          const streetWords = rawQuery.toLowerCase().split(/[,.\s]+/).filter(w =>
+            w.length > 2 &&
+            !/^(місто|село|селище|смт|київ|переяслав|смига|березнегувате|бучач|відділення|поштомат|поштове|склад|номер|район|область)$/i.test(w)
+          );
+
+          if (streetWords.length > 0) {
+            const scored = liveData.map(b => {
+              const fullText = ((b.street || '') + ' ' + (b.address || '') + ' ' + (b.name || '')).toLowerCase();
+              let score = 0;
+              for (const w of streetWords) {
+                if (fullText.includes(w)) {
+                  score += 30;
+                  if (new RegExp('\\b' + w + '\\b', 'i').test(fullText)) {
+                    score += 20;
+                  }
+                }
+              }
+              // Якщо номер також збігається з номером відділення
+              if (parsed.targetBranchNumber && b.number && b.number.toString() === parsed.targetBranchNumber.toString()) {
+                score += (score > 0 ? 30 : 15);
+              }
+              if (parsed.isPostomat && (b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')))) {
+                score += 30;
+              }
+              return { branch: b, score };
+            }).filter(item => item.score > 0);
+
+            scored.sort((a, b) => b.score - a.score);
+            if (scored.length > 0) {
+              results = scored.map(s => s.branch);
+            }
+          }
+
+          // 2. Якщо вулицю не вказано або збігів немає, шукаємо за точним номером відділення/поштомату
+          if (results.length === 0 && parsed.targetBranchNumber) {
             const targetNum = parsed.targetBranchNumber.toString();
             const exactMatches = liveData.filter(b => {
               if (b.number && b.number.toString() === targetNum) {
@@ -556,12 +591,15 @@
 
             if (exactMatches.length > 0) {
               results = exactMatches;
-            } else {
-              const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
-              didYouMeanText = `⚠️ Відділення або поштомат №${targetNum} у ${cityName ? 'м. ' + cityName : 'цьому місті'} не знайдено. Доступні відділення:`;
-              results = liveData;
             }
-          } else {
+          }
+
+          // Якщо ні за вулицею, ні за номером не знайдено:
+          if (results.length === 0) {
+            if (parsed.targetBranchNumber) {
+              const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
+              didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${cityName} не знайдено. Доступні відділення:`;
+            }
             results = liveData;
           }
         }
@@ -572,12 +610,18 @@
     if (results.length === 0) {
       const allBranches = getAllCurrentServiceBranches();
 
-      // 2.0. Точний пошук за номером, АЛЕ тільки якщо місто співпадає (захист від показу інших міст!)
-      if (parsed.targetBranchNumber && parsed.matchedSettlement) {
-        const sName = parsed.matchedSettlement.name.toLowerCase();
+      // 2.0. Точний пошук за номером (навіть без міста: «поштомат 1230»)
+      if (parsed.targetBranchNumber) {
         const exactNumMatches = allBranches.filter(b => {
           const matchNum = b.number && b.number.toString() === parsed.targetBranchNumber;
-          return matchNum && b.city && b.city.toLowerCase() === sName;
+          if (!matchNum) return false;
+          if (parsed.matchedSettlement) {
+            return b.city && b.city.toLowerCase() === parsed.matchedSettlement.name.toLowerCase();
+          }
+          if (parsed.isPostomat) {
+            return b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат'));
+          }
+          return true;
         });
 
         if (exactNumMatches.length > 0) {
@@ -604,34 +648,64 @@
 
         if (cityBranches.length > 0) {
           allCityBranches = cityBranches;
-          if (parsed.targetBranchNumber) {
+
+          // Спочатку перевіряємо вулицю у цьому місті
+          const streetWords = rawQuery.toLowerCase().split(/[,.\s]+/).filter(w =>
+            w.length > 2 &&
+            !/^(місто|село|селище|смт|київ|переяслав|смига|березнегувате|бучач|відділення|поштомат|поштове|склад|номер|район|область)$/i.test(w)
+          );
+
+          if (streetWords.length > 0) {
+            const scored = cityBranches.map(b => {
+              const fullText = ((b.street || '') + ' ' + (b.address || '') + ' ' + (b.name || '')).toLowerCase();
+              let score = 0;
+              for (const w of streetWords) {
+                if (fullText.includes(w)) score += 30;
+              }
+              if (parsed.targetBranchNumber && b.number && b.number.toString() === parsed.targetBranchNumber) {
+                score += (score > 0 ? 30 : 15);
+              }
+              return { branch: b, score };
+            }).filter(item => item.score > 0);
+
+            scored.sort((a, b) => b.score - a.score);
+            if (scored.length > 0) {
+              results = scored.map(s => s.branch);
+            }
+          }
+
+          // Потім перевіряємо номер відділення
+          if (results.length === 0 && parsed.targetBranchNumber) {
             const exact = cityBranches.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber);
             if (exact.length > 0) {
               results = exact;
-            } else {
-              didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${parsed.matchedSettlement.name} не існує. Доступні відділення:`;
-              results = cityBranches;
             }
-          } else {
+          }
+
+          if (results.length === 0) {
+            if (parsed.targetBranchNumber) {
+              didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${parsed.matchedSettlement.name} не існує. Доступні відділення:`;
+            }
             results = cityBranches;
           }
         }
       }
 
-      // 2.3. Пошук за токенами (вулиця, назва, тощо)
+      // 2.3. Пошук за адресою чи вулицею по всій базі
       if (results.length === 0) {
-        const cleanTokens = parsed.cleanQuery ? parsed.cleanQuery.split(/\s+/).filter(t => t.length > 1 && !/^\d+$/.test(t)) : [];
+        const cleanTokens = parsed.cleanQuery ? parsed.cleanQuery.split(/\s+/).filter(t => t.length > 2 && !/^\d+$/.test(t)) : [];
         if (cleanTokens.length > 0) {
           results = allBranches.filter(b => {
-            return cleanTokens.some(tok => {
-              return (b.city && b.city.toLowerCase().includes(tok)) ||
-                     (b.address && b.address.toLowerCase().includes(tok)) ||
-                     (b.name && b.name.toLowerCase().includes(tok));
-            });
+            const fullText = (b.city + ' ' + (b.address || '') + ' ' + (b.street || '') + ' ' + (b.name || '')).toLowerCase();
+            return cleanTokens.some(tok => fullText.includes(tok));
           });
           if (parsed.targetBranchNumber && results.length > 0) {
             const withNum = results.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber);
             if (withNum.length > 0) results = withNum;
+          }
+          if (parsed.isPostomat && results.length > 0) {
+            const pOnly = results.filter(b => b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')));
+            if (pOnly.length > 0) results = pOnly;
           }
         }
       }
@@ -915,21 +989,20 @@
       }
 
       card.innerHTML = `
-        <div class="card-head">
-          <div class="branch-hero-title">
-            <span class="settlement-type-badge">${escapeHtml(sType)}</span>
-            <span class="city-name">${escapeHtml(branch.city || '')}</span>
-            <span class="branch-separator">·</span>
-            <span class="branch-num">${isPostomat ? 'Поштомат' : 'Відділення'} №${escapeHtml(branch.number || '')}</span>
-          </div>
+        <!-- Рядок 1: Місто · Відділення · Вулиця — в один суцільний рядок -->
+        <div class="card-primary-line" title="${escapeHtml(sType)} ${escapeHtml(branch.city || '')} · ${isPostomat ? 'Поштомат' : 'Відділення'} №${escapeHtml(branch.number || '')} · ${escapeHtml(cleanStreet)}">
+          <span class="settlement-type-badge">${escapeHtml(sType)}</span>
+          <span class="city-name">${escapeHtml(branch.city || '')}</span>
+          <span class="branch-separator">·</span>
+          <span class="branch-num">${isPostomat ? 'Поштомат' : 'Відділення'} №${escapeHtml(branch.number || '')}</span>
+          <span class="branch-separator">·</span>
+          <span class="branch-street-text">📍 ${escapeHtml(cleanStreet)}</span>
         </div>
 
-        <div class="branch-street-main">
-          📍 ${escapeHtml(cleanStreet)}
-        </div>
-
-        <div class="branch-geo-sub">
-          <span class="geo-label">Населений пункт:</span> ${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}
+        <!-- Рядок 2: Населений пункт (район, область) — великий, контрастний та в один рядок -->
+        <div class="card-geo-line" title="Населений пункт: ${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}">
+          <span class="geo-label">Населений пункт:</span>
+          <span class="geo-val">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}</span>
         </div>
 
         ${renamingHtml}

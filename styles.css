@@ -76,7 +76,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  max-width: 1050px;
+  max-width: 1200px;
   margin: 0 auto;
   width: 100%;
   padding: 28px 24px 90px 24px;
@@ -834,7 +834,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
   gap: 16px;
 }
 
@@ -842,10 +842,10 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   border: 1px solid var(--border-light);
   background: var(--bg-card-subtle);
   border-radius: var(--radius-md);
-  padding: 15px 17px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   transition: border-color 0.2s ease, background 0.2s ease;
   position: relative;
 }
@@ -855,26 +855,22 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   background: var(--bg-card-hover);
 }
 
-/* Рівень 1: Місто + Відділення */
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-}
-
-.branch-hero-title {
-  font-size: 15px;
+/* Рівень 1: Місто · Відділення · Вулиця — все в один рівний рядок */
+.card-primary-line {
+  font-size: 15.5px;
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.2px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
-.settlement-type-badge {
+.card-primary-line .settlement-type-badge {
   font-size: 11px;
   font-weight: 600;
   color: #94a3b8;
@@ -883,60 +879,65 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
   text-transform: lowercase;
+  flex-shrink: 0;
 }
 
-.branch-hero-title .city-name {
+.card-primary-line .city-name {
   color: #ffffff;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
-.branch-hero-title .branch-separator {
+.card-primary-line .branch-separator {
   color: var(--text-subtle);
+  font-weight: 400;
+  flex-shrink: 0;
 }
 
-.branch-hero-title .branch-num {
+.card-primary-line .branch-num {
   color: var(--text-main);
   font-weight: 800;
-}
-
-.status-pill {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(34, 197, 94, 0.08);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #22c55e;
-}
-
-/* Рівень 2: Вулиця */
-.branch-street-main {
-  font-size: 14px;
-  font-weight: 600;
+.card-primary-line .branch-street-text {
   color: #f1f5f9;
-  line-height: 1.35;
-}
-
-/* Рівень 3: Район, область для звірки */
-.branch-geo-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
-.branch-geo-sub .geo-label {
-  color: #cbd5e1;
   font-weight: 600;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Рівень 2: Населений пункт: район, область — великий, контрастний та в один рядок */
+.card-geo-line {
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.card-geo-line .geo-label {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 13.5px;
+  flex-shrink: 0;
+}
+
+.card-geo-line .geo-val {
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Перейменування (тільки якщо було) */
@@ -1660,6 +1661,16 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 @media (max-width: 640px) {
   .app-layout {
     padding: 16px 16px 90px 16px;
+  }
+
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-primary-line,
+  .card-geo-line {
+    white-space: normal;
+    flex-wrap: wrap;
   }
 
   .chips-grid-10 {
