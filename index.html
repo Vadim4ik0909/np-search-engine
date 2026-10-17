@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=8.5.1">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v0.4.0</span>
+          <span class="version-tag">v8.5.1</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 0.4.0 -->
+        <!-- Версія 8.5.1 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.5.1</span>
+            <span class="version-state">Живий API реєстр для всіх міст та сіл України</span>
+            <span class="version-date">17 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Прямий живий API Нової пошти:</strong> 100% реальні актуальні дані для будь-яких населених пунктів — від мегаполісів до найменших смт та сіл (Переяслав, Смига, Березнегувате, Бучач, тощо).</li>
+            <li><strong>Контекстна карта міста:</strong> на карті відображаються всі діючі відділення знайденого міста, а шукане відділення підсвічується брендовим маркером із відкритим вікном.</li>
+            <li><strong>Ізоляція міст:</strong> ліквідовано баг із підтягуванням відділень №1 інших міст області — тепер пошук показує тільки точне відділення запитаного пункту.</li>
+            <li><strong>Швидкісний кеш пам'яті:</strong> завантажені відділення міст кешуються у клієнті для блискавичного миттєвого відгуку оператору.</li>
+            <li><strong>Кеш-бастинг (Cache-Busting):</strong> автоматичне оновлення скриптів та стилів у браузері без затримок кешу.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 0.4.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v0.4.0</span>
             <span class="version-state">Calm Precision (Senior UX)</span>
@@ -311,12 +327,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js"></script>
+  <script src="data/branches.js?v=8.5.1"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js"></script>
+  <script src="data/fuzzySearch.js?v=8.5.1"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js"></script>
+  <script src="app.js?v=8.5.1"></script>
 </body>
 </html>

@@ -318,28 +318,17 @@
     }
   };
 
-  // Запит до офіційного API Нової пошти (через локальний проксі або прямий CORS API)
-  async function fetchLiveNovaPoshta(cityName, searchPart) {
-    let normalizedCity = cityName;
-    if (normalizedCity && window.SmartSearchEngine) {
-      normalizedCity = window.SmartSearchEngine.normalizeLocativeCase(normalizedCity);
-      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s =>
-        s.name.toLowerCase() === normalizedCity.toLowerCase() ||
-        s.aliases.includes(normalizedCity.toLowerCase())
-      );
-      if (found) normalizedCity = found.name;
-    }
+  // Кеш у пам'яті для відділень Нової пошти (швидкодія + збереження завантажених міст)
+  const liveWarehousesCache = {
+    novaposhta: new Map()
+  };
 
-    const methodProperties = {
-      Limit: '100'
-    };
-    if (normalizedCity) methodProperties.CityName = normalizedCity;
-    if (searchPart) methodProperties.FindByString = searchPart.toString();
-
+  // Прямий запит до офіційного API Нової пошти (через локальний проксі або прямий CORS API)
+  async function queryNovaPoshtaApi(modelName, calledMethod, methodProperties) {
     const requestPayload = {
       apiKey: state.apiKeyNP || '',
-      modelName: 'AddressGeneral',
-      calledMethod: 'getWarehouses',
+      modelName: modelName,
+      calledMethod: calledMethod,
       methodProperties: methodProperties
     };
 
@@ -375,65 +364,118 @@
       }
     }
 
-    if (rawData && rawData.success && Array.isArray(rawData.data) && rawData.data.length > 0) {
-      return rawData.data.map(item => {
-        const maxWeight = parseFloat(item.TotalMaxWeightAllowed) || 30;
-        const desc = item.Description || '';
-        const isPostomat = item.CategoryOfWarehouse === 'Postomat' || desc.toLowerCase().includes('поштомат');
-        const isCargo = maxWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
-        const isPickup = maxWeight <= 10 || desc.toLowerCase().includes('приймання-видачі');
+    if (rawData && rawData.success && Array.isArray(rawData.data)) {
+      return rawData.data;
+    }
+    return null;
+  }
 
-        let typeName, typeBadge, typeClass;
-        if (isPostomat) {
-          typeName = 'Поштомат';
-          typeBadge = 'Поштомат (до 20 кг)';
-          typeClass = 'poshtomat';
-        } else if (isCargo) {
-          typeName = 'Вантажне(ий)';
-          typeBadge = `Вантажне (до ${maxWeight || 1100} кг)`;
-          typeClass = 'cargo';
-        } else if (isPickup) {
-          typeName = 'Пункт приймання-видачі';
-          typeBadge = `Пункт приймання-видачі (до ${maxWeight || 10} кг)`;
-          typeClass = 'pickup';
-        } else {
-          typeName = 'Поштове';
-          typeBadge = `Поштове (до ${maxWeight || 30} кг)`;
-          typeClass = 'post';
-        }
-
-        let street = '';
-        if (desc.includes(':')) {
-          street = desc.split(':')[1].trim();
-        } else if (item.ShortAddress) {
-          street = item.ShortAddress.replace(new RegExp(`^${item.CityDescription || cityName}[,\\s]*`, 'i'), '').trim();
-        } else {
-          street = desc;
-        }
-
-        return {
-          id: 'np-live-' + item.Ref,
-          city: item.CityDescription || normalizedCity || cityName,
-          settlementType: item.SettlementTypeDescription || 'місто',
-          oblast: item.SettlementAreaDescription || '',
-          raion: item.SettlementRegionsDescription || '',
-          postalCode: item.PostalCodeUA || '',
-          number: item.Number,
-          name: desc,
-          street: street,
-          address: item.ShortAddress || street,
-          maxWeight: maxWeight,
-          typeName: typeName,
-          typeText: typeBadge,
-          typeClass: typeClass,
-          lat: parseFloat(item.Latitude) || 50.4501,
-          lng: parseFloat(item.Longitude) || 30.5234,
-          isLiveApi: true
-        };
-      });
+  // Отримання повного списку відділень для будь-якого населеного пункту України
+  async function fetchLiveNovaPoshta(cityName) {
+    if (!cityName) return null;
+    let normalizedCity = cityName.trim();
+    if (window.SmartSearchEngine) {
+      normalizedCity = window.SmartSearchEngine.normalizeLocativeCase(normalizedCity);
+      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s =>
+        s.name.toLowerCase() === normalizedCity.toLowerCase() ||
+        (s.aliases && s.aliases.includes(normalizedCity.toLowerCase()))
+      );
+      if (found) normalizedCity = found.name;
     }
 
-    return null;
+    const cacheKey = normalizedCity.toLowerCase();
+    if (liveWarehousesCache.novaposhta.has(cacheKey)) {
+      return liveWarehousesCache.novaposhta.get(cacheKey);
+    }
+
+    // Крок 1: Запитуємо всі відділення міста (Limit 300, БЕЗ FindByString для чистого списку)
+    let rawWarehouses = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
+      CityName: normalizedCity,
+      Limit: '300'
+    });
+
+    // Крок 2: Якщо за CityName не знайдено (наприклад село, смт або складний запит),
+    // шукаємо Settlement через Address.searchSettlements
+    if (!rawWarehouses || rawWarehouses.length === 0) {
+      const settlementData = await queryNovaPoshtaApi('Address', 'searchSettlements', {
+        CityName: normalizedCity,
+        Limit: '5'
+      });
+
+      if (settlementData && settlementData.length > 0 && settlementData[0].Addresses && settlementData[0].Addresses.length > 0) {
+        const addr = settlementData[0].Addresses[0];
+        const cityRef = addr.DeliveryCity || addr.Ref;
+        if (cityRef) {
+          rawWarehouses = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
+            CityRef: cityRef,
+            Limit: '300'
+          });
+        }
+      }
+    }
+
+    if (!rawWarehouses || rawWarehouses.length === 0) {
+      return null;
+    }
+
+    const branches = rawWarehouses.map(item => {
+      const maxWeight = parseFloat(item.TotalMaxWeightAllowed) || 30;
+      const desc = item.Description || '';
+      const isPostomat = item.CategoryOfWarehouse === 'Postomat' || desc.toLowerCase().includes('поштомат');
+      const isCargo = maxWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
+      const isPickup = maxWeight <= 10 || desc.toLowerCase().includes('приймання-видачі');
+
+      let typeName, typeBadge, typeClass;
+      if (isPostomat) {
+        typeName = 'Поштомат';
+        typeBadge = 'Поштомат (до 20 кг)';
+        typeClass = 'poshtomat';
+      } else if (isCargo) {
+        typeName = 'Вантажне(ий)';
+        typeBadge = `Вантажне (до ${maxWeight || 1100} кг)`;
+        typeClass = 'cargo';
+      } else if (isPickup) {
+        typeName = 'Пункт приймання-видачі';
+        typeBadge = `Пункт приймання-видачі (до ${maxWeight || 10} кг)`;
+        typeClass = 'pickup';
+      } else {
+        typeName = 'Поштове';
+        typeBadge = `Поштове (до ${maxWeight || 30} кг)`;
+        typeClass = 'post';
+      }
+
+      let street = '';
+      if (desc.includes(':')) {
+        street = desc.split(':')[1].trim();
+      } else if (item.ShortAddress) {
+        street = item.ShortAddress.replace(new RegExp(`^${item.CityDescription || cityName}[,\\s]*`, 'i'), '').trim();
+      } else {
+        street = desc;
+      }
+
+      return {
+        id: 'np-live-' + item.Ref,
+        city: item.CityDescription || normalizedCity || cityName,
+        settlementType: item.SettlementTypeDescription || 'місто',
+        oblast: item.SettlementAreaDescription || '',
+        raion: item.SettlementRegionsDescription || '',
+        postalCode: item.PostalCodeUA || '',
+        number: item.Number,
+        name: desc,
+        street: street,
+        address: item.ShortAddress || street,
+        maxWeight: maxWeight,
+        typeName: typeName,
+        typeText: typeBadge,
+        typeClass: typeClass,
+        lat: parseFloat(item.Latitude) || 50.0650,
+        lng: parseFloat(item.Longitude) || 31.4450,
+        isLiveApi: true
+      };
+    });
+
+    liveWarehousesCache.novaposhta.set(cacheKey, branches);
+    return branches;
   }
 
   // Утиліта фокусування поля пошуку з встановленням курсору в самий кінець (після назви міста/слова)
@@ -453,7 +495,6 @@
     if (!rawQuery) return;
 
     state.searchQuery = rawQuery;
-    // Зберігаємо доданий пробіл та позицію курсору, якщо користувач уже ввів/клікнув місто
     if (dom.searchInput.value.trim() !== rawQuery) {
       dom.searchInput.value = rawQuery;
     }
@@ -477,6 +518,7 @@
 
     const isNP = state.currentService === 'novaposhta';
     let results = [];
+    let allCityBranches = [];
     let didYouMeanText = parsed.didYouMeanText;
 
     // Скидаємо блокування поштоматів, якщо користувач шукає звичайне відділення або не вказав 'поштомат'
@@ -485,45 +527,57 @@
       updateTypeFilterUI();
     }
 
-    // 1. Запит до онлайн API Нової пошти (офіційний CORS API або локальний проксі)
+    // 1. Онлайн API Нової пошти: підтримка будь-яких міст, смт і сіл України з автооновленням
     if (isNP) {
-      const searchCity = parsed.matchedSettlement ? parsed.matchedSettlement.name : '';
-      const searchTarget = parsed.targetBranchNumber || '';
-      if (searchCity || searchTarget) {
-        const liveData = await fetchLiveNovaPoshta(searchCity, searchTarget);
+      let searchCity = parsed.matchedSettlement ? parsed.matchedSettlement.name : '';
+      if (!searchCity && parsed.cleanQuery) {
+        const candidate = parsed.cleanQuery.split(/[, ]+/)[0];
+        if (candidate && candidate.length >= 3 && !/^\d+$/.test(candidate)) {
+          searchCity = candidate;
+        }
+      }
+
+      if (searchCity) {
+        const liveData = await fetchLiveNovaPoshta(searchCity);
         if (liveData && liveData.length > 0) {
-          results = liveData;
+          allCityBranches = liveData;
+
+          if (parsed.targetBranchNumber) {
+            const targetNum = parsed.targetBranchNumber.toString();
+            const exactMatches = liveData.filter(b => {
+              if (b.number && b.number.toString() === targetNum) {
+                if (parsed.isPostomat) {
+                  return b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат'));
+                }
+                return true;
+              }
+              return false;
+            });
+
+            if (exactMatches.length > 0) {
+              results = exactMatches;
+            } else {
+              const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
+              didYouMeanText = `⚠️ Відділення або поштомат №${targetNum} у ${cityName ? 'м. ' + cityName : 'цьому місті'} не знайдено. Доступні відділення:`;
+              results = liveData;
+            }
+          } else {
+            results = liveData;
+          }
         }
       }
     }
 
-    // Якщо онлайн API повернуло дані і користувач шукав конкретний номер:
-    if (results.length > 0 && parsed.targetBranchNumber) {
-      const targetNum = parsed.targetBranchNumber.toString();
-      const exactMatches = results.filter(b => b.number && b.number.toString() === targetNum);
-      if (exactMatches.length > 0) {
-        results = exactMatches;
-      } else {
-        // Такого номера не існує в цьому місті! Чесно попереджаємо:
-        const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : '';
-        didYouMeanText = `⚠️ Відділення №${targetNum} у ${cityName ? 'м. ' + cityName : 'цьому місті'} не існує. Доступні відділення:`;
-        results = results.filter(b => b.number && b.number.toString() !== targetNum);
-      }
-    }
-
-    // 2. Локальний пошук у базі даних (для Укрпошти або якщо API не дало результату)
+    // 2. Локальний пошук у базі даних (для Укрпошти або якщо API не повернуло даних)
     if (results.length === 0) {
       const allBranches = getAllCurrentServiceBranches();
 
-      // 2.0. Пріоритет: Точний пошук за номером поштомату / відділення
-      if (parsed.targetBranchNumber) {
+      // 2.0. Точний пошук за номером, АЛЕ тільки якщо місто співпадає (захист від показу інших міст!)
+      if (parsed.targetBranchNumber && parsed.matchedSettlement) {
+        const sName = parsed.matchedSettlement.name.toLowerCase();
         const exactNumMatches = allBranches.filter(b => {
           const matchNum = b.number && b.number.toString() === parsed.targetBranchNumber;
-          if (!matchNum) return false;
-          if (parsed.matchedSettlement) {
-            return b.city && b.city.toLowerCase() === parsed.matchedSettlement.name.toLowerCase();
-          }
-          return true;
+          return matchNum && b.city && b.city.toLowerCase() === sName;
         });
 
         if (exactNumMatches.length > 0) {
@@ -531,7 +585,7 @@
         }
       }
 
-      // 2.1. Пошук за точним поштовим індексом (наприклад: 47501, 47500)
+      // 2.1. Пошук за точним поштовим індексом (наприклад: 47501, 47500, 08400)
       if (results.length === 0 && parsed.postalCode) {
         results = allBranches.filter(b => b.postalCode === parsed.postalCode);
       }
@@ -541,39 +595,44 @@
         const sName = parsed.matchedSettlement.name.toLowerCase();
         const oblName = parsed.matchedSettlement.oblast ? parsed.matchedSettlement.oblast.toLowerCase() : '';
 
-        // Фільтруємо дійсні відділення за назвою міста або області
+        // Фільтруємо дійсні відділення ТІЛЬКИ в межах цього населеного пункту
         const cityBranches = allBranches.filter(b => {
           const matchCity = b.city && b.city.toLowerCase() === sName;
           const matchRegion = oblName && b.region && b.region.toLowerCase().includes(oblName);
           return matchCity || (matchRegion && b.address && b.address.toLowerCase().includes(sName));
         });
 
-        if (parsed.targetBranchNumber) {
-          const exact = cityBranches.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber);
-          if (exact.length > 0) {
-            results = exact;
+        if (cityBranches.length > 0) {
+          allCityBranches = cityBranches;
+          if (parsed.targetBranchNumber) {
+            const exact = cityBranches.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber);
+            if (exact.length > 0) {
+              results = exact;
+            } else {
+              didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${parsed.matchedSettlement.name} не існує. Доступні відділення:`;
+              results = cityBranches;
+            }
           } else {
-            // Відділення з таким номером немає в цьому місті (НЕ вигадуємо фейкове!)
-            didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${parsed.matchedSettlement.name} не існує. Доступні відділення:`;
             results = cityBranches;
           }
-        } else {
-          results = cityBranches;
         }
       }
 
-      // 2.3. Пошук за токенами (вулиця, назва, район тощо)
+      // 2.3. Пошук за токенами (вулиця, назва, тощо)
       if (results.length === 0) {
-        const cleanTokens = parsed.cleanQuery ? parsed.cleanQuery.split(/\s+/).filter(t => t.length > 1) : [];
+        const cleanTokens = parsed.cleanQuery ? parsed.cleanQuery.split(/\s+/).filter(t => t.length > 1 && !/^\d+$/.test(t)) : [];
         if (cleanTokens.length > 0) {
           results = allBranches.filter(b => {
             return cleanTokens.some(tok => {
               return (b.city && b.city.toLowerCase().includes(tok)) ||
                      (b.address && b.address.toLowerCase().includes(tok)) ||
-                     (b.name && b.name.toLowerCase().includes(tok)) ||
-                     (b.number && b.number.toString() === tok);
+                     (b.name && b.name.toLowerCase().includes(tok));
             });
           });
+          if (parsed.targetBranchNumber && results.length > 0) {
+            const withNum = results.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber);
+            if (withNum.length > 0) results = withNum;
+          }
         }
       }
 
@@ -586,7 +645,7 @@
         });
 
         scored.sort((a, b) => b.score - a.score);
-        const bestCandidates = scored.filter(item => item.score > 0.20).slice(0, 6);
+        const bestCandidates = scored.filter(item => item.score > 0.40).slice(0, 6);
         if (bestCandidates.length > 0) {
           results = bestCandidates.map(item => item.branch);
         }
@@ -605,17 +664,17 @@
 
     // Оновлення карти: показуємо ВСІ відділення знайденого міста, а шукане відділення виділяємо!
     if (state.isMapVisible && state.leafletMap) {
-      const allBranches = getAllCurrentServiceBranches();
-      let mapBranches = [];
+      let mapBranches = allCityBranches.length > 0 ? allCityBranches : [];
       let targetBranch = results.length === 1 ? results[0] : (results.length > 0 ? results[0] : null);
 
-      if (parsed.matchedSettlement) {
+      if (mapBranches.length === 0 && parsed.matchedSettlement) {
+        const allBranches = getAllCurrentServiceBranches();
         const sName = parsed.matchedSettlement.name.toLowerCase();
         mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName);
       }
 
       if (mapBranches.length === 0) {
-        mapBranches = results.length > 0 ? results : allBranches;
+        mapBranches = results.length > 0 ? results : getAllCurrentServiceBranches();
       }
 
       updateMapMarkers(mapBranches, targetBranch);
