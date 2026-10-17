@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.5.6">
+  <link rel="stylesheet" href="styles.css?v=8.6.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.5.6</span>
+          <span class="version-tag">v8.6.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.5.6 -->
+        <!-- Версія 8.6.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.6.0</span>
+            <span class="version-state">Одноколонковий LP-CRM пошук та вибір адрес</span>
+            <span class="version-date">17 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Одноколонковий формат (1 колонка):</strong> спрощено сітку результатів до 1 суцільної колонки на всю комфортну ширину екрана без 2-колоночного розбиття.</li>
+            <li><strong>Дворежимний інтерфейс (збіги адреси ➔ вибір ➔ повна картка):</strong> під час пошуку за адресою відображаються лише компактні рядки збігів (як у випадаючому списку LP-CRM), а повна картка з кнопкою «Скопіювати для LP-CRM» відкривається при виборі конкретного відділення або при єдиному точному збігу.</li>
+            <li><strong>Ієрархічне звуження пошуку:</strong> місто ➔ область/район ➔ вулиця ➔ номер відділення (наприклад, «Антонівка Кагарлицький», «Київ Богатирська 11»).</li>
+            <li><strong>Автоматичне розклеювання цифр:</strong> запити на кшталт «підгайці1» або «київ2» автоматично розділяються на назву та номер шуканого відділення.</li>
+            <li><strong>Кнопка повернення:</strong> швидке повернення <code>← Показати всі збіги адреси</code> до списку варіантів в один клік.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.5.6 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.5.6</span>
             <span class="version-state">Мульти-кандидатний пошук населених пунктів та нормалізація відмінків</span>
@@ -404,12 +420,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.5.6"></script>
+  <script src="data/branches.js?v=8.6.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.5.6"></script>
+  <script src="data/fuzzySearch.js?v=8.6.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.5.6"></script>
+  <script src="app.js?v=8.6.0"></script>
 </body>
 </html>

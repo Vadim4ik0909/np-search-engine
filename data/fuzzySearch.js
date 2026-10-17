@@ -395,6 +395,10 @@
     let corrected = fixKeyboardLayout(rawQuery.trim());
     const isLayoutFixed = corrected.toLowerCase() !== rawQuery.trim().toLowerCase();
 
+    // Автоматично розділяємо склеєні літери та цифри (наприклад, «підгайці1» -> «підгайці 1», «київ2» -> «київ 2»)
+    corrected = corrected.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
+                         .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
+
     // Видаляємо прийменники на початку або після роздільників (у, в, по, на, біля)
     corrected = corrected.replace(/^(?:у|в|по|на|біля)\s+/iu, '')
                          .replace(/([,;])\s*(?:у|в|по|на|біля)\s+/giu, '$1 ');

@@ -22,6 +22,7 @@
     userLocationMarker: null,
     apiKeyNP: localStorage.getItem('np_api_key') || '',
     hasServerKey: false,
+    selectedBranch: null, // Обране користувачем відділення для повної картки
     onlineTabsCount: 1
   };
 
@@ -162,6 +163,7 @@
     dom.searchResultsSection.classList.add('hidden');
     if (dom.didYouMeanBox) dom.didYouMeanBox.classList.add('hidden');
     state.currentResults = [];
+    state.selectedBranch = null;
 
     if (state.isMapVisible) {
       updateMapMarkers(getAllCurrentServiceBranches());
@@ -434,8 +436,8 @@
 
     // Якщо знайшли населені пункти через searchSettlements (особливо для сіл, смт або однойменних міст у різних областях)
     if (settlements.length > 0) {
-      // Беремо топ-2 співпадіння (наприклад, Підгайці у Тернопільській та Підгайці у Волинській обл.)
-      for (const s of settlements.slice(0, 2)) {
+      // Беремо топ-4 співпадіння (наприклад, однойменні села чи селища у різних областях)
+      for (const s of settlements.slice(0, 4)) {
         const cityRef = s.DeliveryCity || s.Ref;
         if (cityRef) {
           const wList = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
@@ -617,12 +619,36 @@
         const liveData = await fetchLiveNovaPoshta(searchCity, currentSignal);
         if (liveData && liveData.length > 0) {
           allCityBranches = liveData;
+          let workingPool = liveData;
+
+          // Ієрархічне звуження: 1. Звірка за областю
+          if (parsed.detectedOblast) {
+            const oblNeedle = (typeof parsed.detectedOblast === 'string' ? parsed.detectedOblast : parsed.detectedOblast.name || '').toLowerCase();
+            if (oblNeedle && oblNeedle !== 'україна') {
+              const byObl = workingPool.filter(b => (b.oblast || '').toLowerCase().includes(oblNeedle));
+              if (byObl.length > 0) workingPool = byObl;
+            }
+          }
+
+          // Ієрархічне звуження: 2. Звірка за районом
+          if (parsed.detectedRaion) {
+            const raionNeedle = (typeof parsed.detectedRaion === 'string' ? parsed.detectedRaion : parsed.detectedRaion.name || '').toLowerCase();
+            if (raionNeedle) {
+              const byRaion = workingPool.filter(b => (b.raion || '').toLowerCase().includes(raionNeedle));
+              if (byRaion.length > 0) workingPool = byRaion;
+            }
+          }
 
           // Очищаємо слова пошуку від назви міста, стоп-слів та числових номерів для виявлення назви вулиці
           const cityWordsRegex = new RegExp('^(місто|село|селище|смт|відділення|відділ|поштомат|почтомат|поштове|вантажне|склад|номер|№|вулиця|вул|просп|проспект|пров|провулок|бульв|бульвар|район|р-н|область|обл|' + escapeRegex(searchCity.toLowerCase()) + (parsed.matchedSettlement ? '|' + escapeRegex(parsed.matchedSettlement.name.toLowerCase()) : '') + ')$', 'i');
 
+          const oblStr = typeof parsed.detectedOblast === 'string' ? parsed.detectedOblast : (parsed.detectedOblast?.name || '');
+          const raionStr = typeof parsed.detectedRaion === 'string' ? parsed.detectedRaion : (parsed.detectedRaion?.name || '');
+
           const streetWords = rawQuery.toLowerCase().split(/[,.\s]+/).filter(w =>
-            w.length >= 2 && !cityWordsRegex.test(w) && !/^\d+$/.test(w)
+            w.length >= 2 && !cityWordsRegex.test(w) && !/^\d+$/.test(w) &&
+            !(oblStr && oblStr.toLowerCase().includes(w)) &&
+            !(raionStr && raionStr.toLowerCase().includes(w))
           );
 
           const targetNum = parsed.targetBranchNumber ? parsed.targetBranchNumber.toString() : null;
@@ -632,11 +658,7 @@
 
           // 1. ПРЯМИЙ ПОШУК ЗА НОМЕРОМ ВІДДІЛЕННЯ (наприклад: «Ужгород 11», «Київ 1», «Смига 1», «Підгайці 1»)
           if (targetNum) {
-            let exactMatches = liveData.filter(b => b.number && b.number.toString() === targetNum);
-            if (exactMatches.length > 1 && parsed.detectedOblast) {
-              const oblMatches = exactMatches.filter(b => b.oblast && b.oblast.toLowerCase().includes(parsed.detectedOblast.name.toLowerCase()));
-              if (oblMatches.length > 0) exactMatches = oblMatches;
-            }
+            let exactMatches = workingPool.filter(b => b.number && b.number.toString() === targetNum);
             if (exactMatches.length > 0) {
               // Пріоритет: якщо користувач шукає поштомат — поштомати вперед, якщо ні — вантажні/поштові відділення вперед
               exactMatches.sort((a, b) => {
@@ -646,13 +668,13 @@
               });
               primary = exactMatches;
               // Решту відділень цього міста додаємо нижче для швидкого огляду
-              secondary = liveData.filter(b => !b.number || b.number.toString() !== targetNum);
+              secondary = workingPool.filter(b => !b.number || b.number.toString() !== targetNum);
             }
           }
 
-          // 2. ПОШУК ЗА ВУЛИЦЕЮ (наприклад: «Київ Хрещатик», «Ужгород Другетів 111»)
+          // 2. ПОШУК ЗА ВУЛИЦЕЮ (наприклад: «Київ Хрещатик», «Ужгород Другетів 111», «Київ Богатирська 11»)
           if (streetWords.length > 0) {
-            const poolToScore = primary.length > 0 ? primary : liveData;
+            const poolToScore = primary.length > 0 ? primary : workingPool;
             const scored = poolToScore.map(b => {
               const fullText = ((b.street || '') + ' ' + (b.address || '') + ' ' + (b.name || '')).toLowerCase();
               let score = 0;
@@ -665,7 +687,7 @@
                 }
               }
               if (targetNum && b.number && b.number.toString() === targetNum) {
-                score += 35;
+                score += 40;
               }
               return { branch: b, score };
             }).filter(item => item.score > 0);
@@ -674,7 +696,7 @@
             if (scored.length > 0) {
               primary = scored.map(s => s.branch);
               const matchedIds = new Set(primary.map(b => b.id || (b.city + '-' + b.number)));
-              secondary = liveData.filter(b => !matchedIds.has(b.id || (b.city + '-' + b.number)));
+              secondary = workingPool.filter(b => !matchedIds.has(b.id || (b.city + '-' + b.number)));
             }
           }
 
@@ -684,9 +706,9 @@
           } else if (targetNum) {
             const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
             didYouMeanText = `⚠️ Відділення або поштомат №${targetNum} у м. ${cityName} не знайдено. Доступні відділення:`;
-            results = liveData;
+            results = workingPool;
           } else {
-            results = liveData;
+            results = workingPool;
           }
         }
       }
@@ -813,6 +835,11 @@
     }
 
     state.currentResults = results;
+    if (results.length === 1) {
+      state.selectedBranch = results[0];
+    } else {
+      state.selectedBranch = null;
+    }
     closeAutocomplete();
     renderSearchResults(results, rawQuery, didYouMeanText);
 
@@ -990,6 +1017,85 @@
     showToast(text);
   }
 
+  // Створення повнорозмірної картки відділення (з'являється тільки при виборі конкретної адреси)
+  function createFullBranchCard(branch) {
+    const card = document.createElement('div');
+    card.className = 'branch-card';
+
+    let sType = branch.settlementType || '';
+    if (!sType && window.SmartSearchEngine) {
+      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === (branch.city || '').toLowerCase());
+      if (found) sType = found.type;
+    }
+    if (!sType) sType = 'місто';
+
+    const lpCrmCopyText = formatLpCrmCopyString(branch);
+    const cleanStreet = getCleanStreet(branch);
+    const geoSub = formatGeoSub(branch);
+    const typeInfo = getTypeBadgeInfo(branch);
+    const isPostomat = branch.type === 'poshtomat' || (branch.typeText && branch.typeText.includes('Поштомат')) || (branch.typeName && branch.typeName.includes('Поштомат')) || (branch.name && branch.name.includes('Поштомат'));
+
+    const renaming = window.SmartSearchEngine
+      ? window.SmartSearchEngine.detectRenaming(branch.city, (branch.name || '') + ' ' + (branch.street || branch.address || ''))
+      : null;
+
+    let renamingHtml = '';
+    if (renaming) {
+      renamingHtml = `
+        <div class="branch-renamed-note" title="В LP-CRM може використовуватися попередня назва">
+          🔄 Раніше: <strong>${escapeHtml(renaming.oldName)}</strong> (в LP-CRM)
+        </div>
+      `;
+    }
+
+    let typeDisplay = branch.typeName;
+    if (isPostomat) {
+      typeDisplay = 'Поштомат';
+    } else if (!typeDisplay) {
+      if (branch.number === '1') typeDisplay = 'Вантажне(ий)';
+      else typeDisplay = 'Поштове(ий)';
+    }
+    if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
+    if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
+
+    const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || ''}: ${cleanStreet}`;
+
+    card.innerHTML = `
+      <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
+      <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
+        <span class="city-highlight">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}</span>
+        <span class="line-sep">-</span>
+        <span class="branch-highlight">${escapeHtml(typeDisplay)} №${escapeHtml(branch.number || '')}:</span>
+        <span class="street-highlight">${escapeHtml(cleanStreet)}</span>
+      </div>
+
+      <!-- Рядок 2: Населений пункт (район, область) -->
+      <div class="card-geo-line" title="Населений пункт: ${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}">
+        <span class="geo-label">Населений пункт:</span>
+        <span class="geo-val">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}</span>
+      </div>
+
+      ${renamingHtml}
+
+      <div class="card-foot">
+        <div class="card-foot-meta">
+          <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
+          <span class="status-pill"><span class="status-dot"></span> Працює</span>
+        </div>
+        <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
+          📋 Скопіювати
+        </button>
+      </div>
+    `;
+
+    const btnCopy = card.querySelector('.btn-copy-action');
+    btnCopy.addEventListener('click', () => {
+      copyTextToClipboard(lpCrmCopyText, btnCopy, 'Скопійовано!');
+    });
+
+    return card;
+  }
+
   function renderSearchResults(branches, query, didYouMeanText) {
     dom.searchResultsSection.classList.remove('hidden');
 
@@ -1001,7 +1107,6 @@
       filtered = filtered.filter(b => !(b.type === 'poshtomat' || (b.typeText && b.typeText.includes('Поштомат')) || (b.typeName && b.typeName.includes('Поштомат')) || (b.name && b.name.includes('Поштомат'))));
     }
 
-    dom.resultsCount.textContent = `${filtered.length} відділень`;
     dom.resultsList.innerHTML = '';
 
     // Відображення Google-style підказки
@@ -1025,8 +1130,9 @@
     }
 
     if (filtered.length === 0) {
+      dom.resultsCount.textContent = '0 відділень';
       dom.resultsList.innerHTML = `
-        <div style="grid-column: 1 / -1; padding: 36px 16px; text-align: center; color: var(--text-muted);">
+        <div style="padding: 36px 16px; text-align: center; color: var(--text-muted); width: 100%;">
           <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
           <h4 style="font-weight: 800; color: var(--text-main); font-size: 16px; margin-bottom: 6px;">
             ${state.typeFilter === 'postomat' ? 'Поштоматів' : 'Відділень'} за запитом «${escapeHtml(query || state.searchQuery)}» не знайдено
@@ -1039,7 +1145,52 @@
       return;
     }
 
-    // 2. Обмеження кількості карток (5 | 10 | 20 | Всі)
+    // РЕЖИМ 1: КОРИСТУВАЧ ОБРАВ КОНКРЕТНЕ ВІДДІЛЕННЯ (або є 1 точний результат)
+    // Повну картку показуємо тільки коли вже вибрано конкретну адресу!
+    if (state.selectedBranch) {
+      dom.resultsCount.textContent = `1 обране відділення`;
+      const branch = state.selectedBranch;
+
+      const container = document.createElement('div');
+      container.className = 'selected-branch-container';
+      container.style.width = '100%';
+
+      let backBtnHtml = '';
+      if (filtered.length > 1) {
+        backBtnHtml = `
+          <button type="button" class="btn-back-to-matches" id="btnBackToMatches">
+            <span>←</span>
+            <span>Показати всі збіги адреси (${filtered.length})</span>
+          </button>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="selected-branch-header">
+          ${backBtnHtml}
+          <span class="selected-badge-indicator">✓ Обрана адреса</span>
+        </div>
+      `;
+
+      const card = createFullBranchCard(branch);
+      container.appendChild(card);
+      dom.resultsList.appendChild(container);
+
+      if (filtered.length > 1) {
+        const btnBack = container.querySelector('#btnBackToMatches');
+        if (btnBack) {
+          btnBack.addEventListener('click', () => {
+            state.selectedBranch = null;
+            renderSearchResults(branches, query, didYouMeanText);
+          });
+        }
+      }
+      return;
+    }
+
+    // РЕЖИМ 2: ПОШУК ПО АДРЕСІ — ПОКАЗУЄМО СУТО ЗБІГИ АДРЕСИ В 1 КОЛОНКУ (як в LP-CRM)
+    dom.resultsCount.textContent = `${filtered.length} збігів адреси`;
+
     let toDisplay = filtered;
     if (state.displayLimit !== 'all') {
       const limitNum = parseInt(state.displayLimit, 10) || 10;
@@ -1047,8 +1198,10 @@
     }
 
     toDisplay.forEach(branch => {
-      const card = document.createElement('div');
-      card.className = 'branch-card';
+      const row = document.createElement('div');
+      row.className = 'address-match-row';
+      row.setAttribute('role', 'button');
+      row.setAttribute('tabindex', '0');
 
       let sType = branch.settlementType || '';
       if (!sType && window.SmartSearchEngine) {
@@ -1057,25 +1210,10 @@
       }
       if (!sType) sType = 'місто';
 
-      const lpCrmCopyText = formatLpCrmCopyString(branch);
       const cleanStreet = getCleanStreet(branch);
       const geoSub = formatGeoSub(branch);
       const typeInfo = getTypeBadgeInfo(branch);
       const isPostomat = branch.type === 'poshtomat' || (branch.typeText && branch.typeText.includes('Поштомат')) || (branch.typeName && branch.typeName.includes('Поштомат')) || (branch.name && branch.name.includes('Поштомат'));
-
-      // Визначення перейменувань вулиць або міст (Декомунізація / LP-CRM синхронізація)
-      const renaming = window.SmartSearchEngine
-        ? window.SmartSearchEngine.detectRenaming(branch.city, (branch.name || '') + ' ' + (branch.street || branch.address || ''))
-        : null;
-
-      let renamingHtml = '';
-      if (renaming) {
-        renamingHtml = `
-          <div class="branch-renamed-note" title="В LP-CRM може використовуватися попередня назва">
-            🔄 Раніше: <strong>${escapeHtml(renaming.oldName)}</strong> (в LP-CRM)
-          </div>
-        `;
-      }
 
       let typeDisplay = branch.typeName;
       if (isPostomat) {
@@ -1087,43 +1225,40 @@
       if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
       if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
 
-      const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || ''}: ${cleanStreet}`;
+      const branchTitle = `${typeDisplay} №${branch.number || ''}: <span class="street-part">${escapeHtml(cleanStreet)}</span>`;
+      const locationSub = `${sType} ${branch.city || ''}${geoSub ? ', ' + geoSub : ''}`;
 
-      card.innerHTML = `
-        <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
-        <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
-          <span class="city-highlight">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}</span>
-          <span class="line-sep">-</span>
-          <span class="branch-highlight">${escapeHtml(typeDisplay)} №${escapeHtml(branch.number || '')}:</span>
-          <span class="street-highlight">${escapeHtml(cleanStreet)}</span>
-        </div>
-
-        <!-- Рядок 2: Населений пункт (район, область) -->
-        <div class="card-geo-line" title="Населений пункт: ${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}">
-          <span class="geo-label">Населений пункт:</span>
-          <span class="geo-val">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}</span>
-        </div>
-
-        ${renamingHtml}
-
-        <div class="card-foot">
-          <div class="card-foot-meta">
-            <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
-            <span class="status-pill"><span class="status-dot"></span> Працює</span>
+      row.innerHTML = `
+        <div class="address-match-left">
+          <div class="address-match-icon">${isPostomat ? '📦' : '🏢'}</div>
+          <div class="address-match-content">
+            <div class="address-match-title">${branchTitle}</div>
+            <div class="address-match-sub">${escapeHtml(locationSub)}</div>
           </div>
-          <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
-            📋 Скопіювати
-          </button>
+        </div>
+        <div class="address-match-right">
+          <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
+          <span class="address-match-select-btn">Обрати ➔</span>
         </div>
       `;
 
-      // Обробник копіювання рядка в LP-CRM
-      const btnCopy = card.querySelector('.btn-copy-action');
-      btnCopy.addEventListener('click', () => {
-        copyTextToClipboard(lpCrmCopyText, btnCopy, 'Скопійовано!');
+      const selectThis = () => {
+        state.selectedBranch = branch;
+        renderSearchResults(branches, query, didYouMeanText);
+        if (state.isMapVisible && state.leafletMap && branch.lat && branch.lng) {
+          state.leafletMap.flyTo([branch.lat, branch.lng], 15, { duration: 1.0 });
+        }
+      };
+
+      row.addEventListener('click', selectThis);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectThis();
+        }
       });
 
-      dom.resultsList.appendChild(card);
+      dom.resultsList.appendChild(row);
     });
   }
 
