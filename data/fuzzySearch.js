@@ -64,12 +64,33 @@
     if (lower.endsWith('ому')) return lower.slice(0, -3) + 'е';
     if (lower.endsWith('ях') || lower.endsWith('ах')) return lower.slice(0, -2) + 'и';
     if (lower.endsWith('зі')) return lower.slice(0, -2) + 'га';
-    if (lower.endsWith('ці')) return lower.slice(0, -2) + 'ця';
     if (lower.endsWith('сі')) return lower.slice(0, -2) + 'са';
-    if (lower.endsWith('і') && lower.length > 3) return lower.slice(0, -1) + 'а';
     if (lower.endsWith('у') || lower.endsWith('ю')) return lower.slice(0, -1);
 
     return lower;
+  }
+
+  // Генерація можливих називних форм для пошуку в базі та API Нової пошти
+  function getCandidateCityForms(rawCity) {
+    if (!rawCity) return [];
+    const c = rawCity.toLowerCase().trim();
+    const forms = new Set([c]);
+    if (c === 'буковель') forms.add('поляниця');
+    if (c === 'переяслав-хмельницький') forms.add('переяслав');
+    if (c.endsWith('ця')) forms.add(c.slice(0, -2) + 'ці');
+    if (c.endsWith('ці')) { forms.add(c.slice(0, -2) + 'ця'); forms.add(c); }
+    if (c.endsWith('ях') || c.endsWith('ах')) { forms.add(c.slice(0, -2) + 'і'); forms.add(c.slice(0, -2) + 'и'); }
+    if (c.endsWith('і')) {
+      forms.add(c.slice(0, -1));
+      forms.add(c.slice(0, -1) + 'а');
+      forms.add(c.slice(0, -1) + 'я');
+      if (c.endsWith('ові') || c.endsWith('еві')) forms.add(c.slice(0, -3) + 'ів');
+      if (c.endsWith('єві')) forms.add(c.slice(0, -3) + 'їв');
+    }
+    if (c.endsWith('и')) forms.add(c.slice(0, -1) + 'а');
+    if (c.endsWith('ого')) { forms.add(c.slice(0, -3) + 'е'); forms.add(c.slice(0, -3) + 'ий'); }
+    if (c.endsWith('а') || c.endsWith('у')) forms.add(c.slice(0, -1));
+    return Array.from(forms);
   }
 
   // 2. ДОВІДНИК ОБЛАСТЕЙ УКРАЇНИ (з варіаціями та синонімами)
@@ -790,6 +811,7 @@
   window.SmartSearchEngine = {
     fixKeyboardLayout,
     normalizeLocativeCase,
+    getCandidateCityForms,
     damerauLevenshtein,
     similarityScore,
     detectOblast,

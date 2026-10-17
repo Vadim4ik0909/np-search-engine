@@ -411,27 +411,63 @@
       }
     } catch (e) {}
 
-    // Крок 1: Запитуємо всі відділення міста (Limit 300)
-    let rawWarehouses = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
-      CityName: normalizedCity,
-      Limit: '300'
-    }, signal);
+    // Крок 1: Отримуємо можливі форми назви населеного пункту (називний відмінок, множина, однина, тощо)
+    const candidates = window.SmartSearchEngine && window.SmartSearchEngine.getCandidateCityForms
+      ? window.SmartSearchEngine.getCandidateCityForms(normalizedCity)
+      : [normalizedCity];
 
-    // Крок 2: Якщо за CityName не знайдено (наприклад село чи смт), шукаємо через Address.searchSettlements
-    if (!rawWarehouses || rawWarehouses.length === 0) {
-      const settlementData = await queryNovaPoshtaApi('Address', 'searchSettlements', {
-        CityName: normalizedCity,
+    let rawWarehouses = [];
+    let settlements = [];
+
+    // Шукаємо серед адрес/населених пунктів Nova Poshta
+    for (const cand of candidates) {
+      const sRes = await queryNovaPoshtaApi('Address', 'searchSettlements', {
+        CityName: cand,
         Limit: '5'
       }, signal);
 
-      if (settlementData && settlementData.length > 0 && settlementData[0].Addresses && settlementData[0].Addresses.length > 0) {
-        const addr = settlementData[0].Addresses[0];
-        const cityRef = addr.DeliveryCity || addr.Ref;
+      if (sRes && sRes.length > 0 && sRes[0].Addresses && sRes[0].Addresses.length > 0) {
+        settlements = sRes[0].Addresses;
+        break;
+      }
+    }
+
+    // Якщо знайшли населені пункти через searchSettlements (особливо для сіл, смт або однойменних міст у різних областях)
+    if (settlements.length > 0) {
+      // Беремо топ-2 співпадіння (наприклад, Підгайці у Тернопільській та Підгайці у Волинській обл.)
+      for (const s of settlements.slice(0, 2)) {
+        const cityRef = s.DeliveryCity || s.Ref;
         if (cityRef) {
-          rawWarehouses = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
+          const wList = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
             CityRef: cityRef,
             Limit: '300'
           }, signal);
+          if (wList && wList.length > 0) {
+            // Збагачуємо інформацією про область та район з settlement якщо вони відсутні
+            const enriched = wList.map(w => {
+              if (!w.SettlementAreaDescription && s.Area) w.SettlementAreaDescription = s.Area;
+              if (!w.SettlementRegionsDescription && s.Region) w.SettlementRegionsDescription = s.Region;
+              if (!w.SettlementTypeDescription && s.SettlementTypeCode) {
+                w.SettlementTypeDescription = s.SettlementTypeCode === 'м.' ? 'місто' : (s.SettlementTypeCode === 'смт' ? 'селище' : 'село');
+              }
+              return w;
+            });
+            rawWarehouses = rawWarehouses.concat(enriched);
+          }
+        }
+      }
+    }
+
+    // Якщо через searchSettlements не знайдено, спробуємо прямий виклик getWarehouses за формою міста
+    if (!rawWarehouses || rawWarehouses.length === 0) {
+      for (const cand of candidates) {
+        const directList = await queryNovaPoshtaApi('AddressGeneral', 'getWarehouses', {
+          CityName: cand,
+          Limit: '300'
+        }, signal);
+        if (directList && directList.length > 0) {
+          rawWarehouses = directList;
+          break;
         }
       }
     }
@@ -594,9 +630,13 @@
           let primary = [];
           let secondary = [];
 
-          // 1. ПРЯМИЙ ПОШУК ЗА НОМЕРОМ ВІДДІЛЕННЯ (наприклад: «Ужгород 11», «Київ 1», «Смига 1»)
+          // 1. ПРЯМИЙ ПОШУК ЗА НОМЕРОМ ВІДДІЛЕННЯ (наприклад: «Ужгород 11», «Київ 1», «Смига 1», «Підгайці 1»)
           if (targetNum) {
-            const exactMatches = liveData.filter(b => b.number && b.number.toString() === targetNum);
+            let exactMatches = liveData.filter(b => b.number && b.number.toString() === targetNum);
+            if (exactMatches.length > 1 && parsed.detectedOblast) {
+              const oblMatches = exactMatches.filter(b => b.oblast && b.oblast.toLowerCase().includes(parsed.detectedOblast.name.toLowerCase()));
+              if (oblMatches.length > 0) exactMatches = oblMatches;
+            }
             if (exactMatches.length > 0) {
               // Пріоритет: якщо користувач шукає поштомат — поштомати вперед, якщо ні — вантажні/поштові відділення вперед
               exactMatches.sort((a, b) => {
