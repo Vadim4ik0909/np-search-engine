@@ -186,6 +186,38 @@ async function sync() {
   const allBranches = [];
   const seenIds = new Set();
 
+  // 1. Пріоритетне завантаження основних міст, райцентрів та СМТ (включає відділення №1, №15, Хрещатик тощо)
+  const KEY_CITIES = [
+    'Київ', 'Харків', 'Одеса', 'Дніпро', 'Запоріжжя', 'Львів', 'Кривий Ріг',
+    'Миколаїв', 'Вінниця', 'Полтава', 'Чернігів', 'Черкаси', 'Житомир', 'Суми',
+    'Хмельницький', 'Чернівці', 'Рівне', 'Івано-Франківськ', 'Тернопіль', 'Луцьк',
+    'Ужгород', 'Кропивницький', 'Кременчук', 'Біла Церква', 'Бровари', 'Бориспіль',
+    'Ірпінь', 'Буча', 'Обухів', 'Переяслав', 'Смига', 'Березнегувате', 'Підгайці'
+  ];
+
+  console.log(`[CI/CD Sync] Завантаження ключових міст та СМТ (${KEY_CITIES.length} пунктів)...`);
+  for (const city of KEY_CITIES) {
+    try {
+      const res = await queryApi('AddressGeneral', 'getWarehouses', {
+        CityName: city,
+        Limit: '100',
+        Page: '1'
+      });
+      if (res.success && Array.isArray(res.data)) {
+        for (const item of res.data) {
+          if (!seenIds.has(item.Ref)) {
+            seenIds.add(item.Ref);
+            allBranches.push(transformWarehouse(item));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[CI/CD Sync] Помилка завантаження міста ${city}:`, e.message);
+    }
+  }
+  console.log(`[CI/CD Sync] Ключові міста завантажено: ${allBranches.length} відділень.`);
+
+  // 2. Загальна пагінація відділень по всій Україні
   for (let page = 1; page <= MAX_PAGES; page++) {
     try {
       console.log(`[CI/CD Sync] Запит сторінки ${page}...`);
@@ -206,7 +238,7 @@ async function sync() {
         }
       }
 
-      console.log(`[CI/CD Sync] Сторінка ${page}: завантажено ${res.data.length} відділень (Всього: ${allBranches.length})`);
+      console.log(`[CI/CD Sync] Сторінка ${page}: всього завантажено ${allBranches.length} відділень`);
       if (res.data.length < PAGE_SIZE) break;
     } catch (e) {
       console.error(`[CI/CD Sync] Помилка на сторінці ${page}:`, e.message);
