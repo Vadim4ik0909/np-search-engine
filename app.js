@@ -441,10 +441,16 @@
     }
 
     const branches = rawWarehouses.map(item => {
-      const maxWeight = parseFloat(item.TotalMaxWeightAllowed) || 30;
+      const totalWeight = parseFloat(item.TotalMaxWeightAllowed) || 0;
+      const placeWeight = parseFloat(item.PlaceMaxWeightAllowed) || 0;
       const desc = item.Description || '';
       const isPostomat = item.CategoryOfWarehouse === 'Postomat' || desc.toLowerCase().includes('поштомат');
-      const isCargo = maxWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
+      const isCargo = totalWeight > 200 || placeWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
+
+      let maxWeight = Math.max(totalWeight, placeWeight);
+      if (maxWeight === 0) {
+        maxWeight = isCargo ? 1100 : 30;
+      }
       const isPickup = maxWeight <= 10 || desc.toLowerCase().includes('приймання-видачі');
 
       let typeName, typeBadge, typeClass;
@@ -454,7 +460,7 @@
         typeClass = 'poshtomat';
       } else if (isCargo) {
         typeName = 'Вантажне(ий)';
-        typeBadge = `Вантажне (до ${maxWeight || 1100} кг)`;
+        typeBadge = `Вантажне (до ${maxWeight >= 1000 ? maxWeight : 1100} кг)`;
         typeClass = 'cargo';
       } else if (isPickup) {
         typeName = 'Пункт приймання-видачі';
@@ -633,7 +639,8 @@
           }
 
           if (primary.length > 0) {
-            results = primary.concat(secondary);
+            // Показуємо виключно знайдені відділення/поштомати, без засмічення іншими 300 відділеннями
+            results = primary;
           } else if (targetNum) {
             const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
             didYouMeanText = `⚠️ Відділення або поштомат №${targetNum} у м. ${cityName} не знайдено. Доступні відділення:`;

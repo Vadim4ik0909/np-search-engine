@@ -756,14 +756,19 @@
     if (!fullAddressText) return null;
     const lower = fullAddressText.toLowerCase();
 
-    // 1. Якщо у назві від Нової Пошти вже є дужки зі старою назвою, наприклад «просп. Берестейський (Перемоги), 20»
+    // 1. Якщо у назві від Нової Пошти є явна згадка старого перейменування: «(ран. ...)», «(раніше ...)», «(кол. ...)»
     const parenMatch = fullAddressText.match(/\(([^)]+)\)/);
-    if (parenMatch && !/до \d+ кг/i.test(parenMatch[1]) && !/офіс/i.test(parenMatch[1]) && !/пасаж/i.test(parenMatch[1])) {
-      return {
-        oldName: parenMatch[1].trim(),
-        newName: fullAddressText.replace(/\([^)]+\)/, '').trim(),
-        note: `В LP-CRM або клієнт може називати «${parenMatch[1].trim()}»`
-      };
+    if (parenMatch) {
+      const inside = parenMatch[1].trim();
+      const renamingPrefix = inside.match(/^(?:ран|раніше|кол|колишня|колишній|перейм)\.?\s*(.+)/i);
+      if (renamingPrefix) {
+        const oldClean = renamingPrefix[1].trim();
+        return {
+          oldName: oldClean,
+          newName: fullAddressText.replace(/\([^)]+\)/, '').trim(),
+          note: `В LP-CRM або клієнт може називати «${oldClean}»`
+        };
+      }
     }
 
     // 2. Пошук у довіднику перейменувань
