@@ -478,12 +478,27 @@
     };
   }
 
+  // Утиліта фокусування поля пошуку з встановленням курсору в самий кінець (після назви міста/слова)
+  function focusSearchInputAtEnd(appendSpace = true) {
+    if (!dom.searchInput) return;
+    if (appendSpace && dom.searchInput.value && !dom.searchInput.value.endsWith(' ')) {
+      dom.searchInput.value += ' ';
+    }
+    dom.btnClearSearch.classList.remove('hidden');
+    dom.searchInput.focus();
+    const len = dom.searchInput.value.length;
+    dom.searchInput.setSelectionRange(len, len);
+  }
+
   async function executeSearch(query, shouldRecordAnalytics = true) {
     const rawQuery = (query || '').trim();
     if (!rawQuery) return;
 
     state.searchQuery = rawQuery;
-    dom.searchInput.value = rawQuery;
+    // Зберігаємо доданий пробіл та позицію курсору, якщо користувач уже ввів/клікнув місто
+    if (dom.searchInput.value.trim() !== rawQuery) {
+      dom.searchInput.value = rawQuery;
+    }
     dom.btnClearSearch.classList.remove('hidden');
 
     const engine = window.SmartSearchEngine;
@@ -795,8 +810,13 @@
         <a class="did-you-mean-link" id="linkDidYouMean">${escapeHtml(didYouMeanText)}</a>
       `;
 
-      document.getElementById('linkDidYouMean').addEventListener('click', () => {
+      document.getElementById('linkDidYouMean').addEventListener('click', (e) => {
+        e.preventDefault();
+        dom.searchInput.value = didYouMeanText + ' ';
+        dom.btnClearSearch.classList.remove('hidden');
         executeSearch(didYouMeanText, true);
+        focusSearchInputAtEnd(true);
+        setTimeout(() => focusSearchInputAtEnd(true), 25);
       });
     } else if (dom.didYouMeanBox) {
       dom.didYouMeanBox.classList.add('hidden');
@@ -956,8 +976,13 @@
         <span class="chip-count" title="${item.count} запитів сьогодні">${item.count}</span>
       `;
 
-      chip.addEventListener('click', () => {
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        dom.searchInput.value = item.query + ' ';
+        dom.btnClearSearch.classList.remove('hidden');
         executeSearch(item.query, true);
+        focusSearchInputAtEnd(true);
+        setTimeout(() => focusSearchInputAtEnd(true), 25);
       });
 
       dom.frequentChipsGrid.appendChild(chip);
@@ -1063,9 +1088,14 @@
         </div>
       `;
 
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        e.preventDefault();
         switchService(item.service);
+        dom.searchInput.value = item.query + ' ';
+        dom.btnClearSearch.classList.remove('hidden');
         executeSearch(item.query, true);
+        focusSearchInputAtEnd(true);
+        setTimeout(() => focusSearchInputAtEnd(true), 25);
       });
 
       dom.recentHistoryList.appendChild(card);
@@ -1430,11 +1460,19 @@
 
   function selectAutocompleteItem(item) {
     if (!item) return;
-    const fill = item.textToFill || item.title;
+    let fill = item.textToFill || item.title;
+    const isSettlement = item.type === 'місто' || item.type === 'смт' || item.type === 'село' || item.type === 'селище';
+    if (isSettlement && !fill.endsWith(' ')) {
+      fill += ' ';
+    }
     dom.searchInput.value = fill;
     dom.btnClearSearch.classList.remove('hidden');
     closeAutocomplete();
-    executeSearch(fill, true);
+    executeSearch(fill.trim(), true);
+    if (isSettlement) {
+      focusSearchInputAtEnd(true);
+      setTimeout(() => focusSearchInputAtEnd(true), 25);
+    }
   }
 
   function updateAutocompleteFocus() {
@@ -1475,13 +1513,16 @@
     dom.btnNovaPoshta.addEventListener('click', () => switchService('novaposhta'));
     dom.btnUkrposhta.addEventListener('click', () => switchService('ukrposhta'));
 
+    let liveSearchDebounceTimer = null;
+
     dom.searchForm.addEventListener('submit', e => {
       e.preventDefault();
+      clearTimeout(liveSearchDebounceTimer);
       closeAutocomplete();
       executeSearch(dom.searchInput.value, true);
     });
 
-    // Автодоповнення при введенні
+    // Автодоповнення та миттєвий живий пошук при введенні
     dom.searchInput.addEventListener('input', () => {
       const val = dom.searchInput.value.trim();
       if (val.length > 0) {
@@ -1496,6 +1537,14 @@
         renderAutocomplete(suggestions, val);
       } else {
         closeAutocomplete();
+      }
+
+      // Живий пошук при введенні номера або запиту (350мс)
+      clearTimeout(liveSearchDebounceTimer);
+      if (val.length >= 2) {
+        liveSearchDebounceTimer = setTimeout(() => {
+          executeSearch(val, false);
+        }, 350);
       }
     });
 
@@ -1688,6 +1737,13 @@
     renderFrequentChips();
     renderRecentHistory();
     initHonestOnlineCounter();
+
+    // Автофокус на поле пошуку для миттєвої роботи оператора без зайвих кліків
+    setTimeout(() => {
+      if (dom.searchInput) {
+        dom.searchInput.focus();
+      }
+    }, 120);
   }
 
   if (document.readyState === 'loading') {
