@@ -79,7 +79,7 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-  padding: 28px 24px 90px 24px;
+  padding: 20px 16px 80px 16px;
   position: relative;
 }
 
@@ -834,18 +834,24 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 1050px) {
+  .results-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .branch-card {
   border: 1px solid var(--border-light);
   background: var(--bg-card-subtle);
   border-radius: var(--radius-md);
-  padding: 16px 20px;
+  padding: 13px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   transition: border-color 0.2s ease, background 0.2s ease;
   position: relative;
 }
@@ -855,69 +861,46 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   background: var(--bg-card-hover);
 }
 
-/* Рівень 1: Місто · Відділення · Вулиця — все в один рівний рядок */
+/* Рівень 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) */
 .card-primary-line {
-  font-size: 15.5px;
-  font-weight: 700;
-  color: var(--text-main);
-  letter-spacing: -0.2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
-}
-
-.card-primary-line .settlement-type-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: #94a3b8;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  text-transform: lowercase;
-  flex-shrink: 0;
-}
-
-.card-primary-line .city-name {
-  color: #ffffff;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
-.card-primary-line .branch-separator {
-  color: var(--text-subtle);
-  font-weight: 400;
-  flex-shrink: 0;
-}
-
-.card-primary-line .branch-num {
-  color: var(--text-main);
-  font-weight: 800;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.card-primary-line .branch-street-text {
+  font-size: 13.5px;
+  font-weight: 500;
   color: #f1f5f9;
-  font-weight: 600;
-  font-size: 15px;
+  letter-spacing: -0.1px;
+  line-height: 1.45;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
 }
 
-/* Рівень 2: Населений пункт: район, область — великий, контрастний та в один рядок */
+.card-primary-line .city-highlight {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.card-primary-line .line-sep {
+  color: var(--text-muted);
+  margin: 0 4px;
+}
+
+.card-primary-line .branch-highlight {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.card-primary-line .street-highlight {
+  color: #e2e8f0;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* Рівень 2: Населений пункт: місто [Місто], [Район] район, [Область] область */
 .card-geo-line {
-  font-size: 14px;
+  font-size: 13px;
   color: #cbd5e1;
   line-height: 1.4;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -926,18 +909,15 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .card-geo-line .geo-label {
   color: #94a3b8;
-  font-weight: 700;
-  font-size: 13.5px;
-  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 13px;
+  margin-right: 4px;
 }
 
 .card-geo-line .geo-val {
   color: #e2e8f0;
-  font-weight: 600;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 500;
+  font-size: 13px;
 }
 
 /* Перейменування (тільки якщо було) */

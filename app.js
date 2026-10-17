@@ -846,11 +846,13 @@
 
     let type = branch.typeName;
     if (isPostomat) {
-      type = isNP ? "Поштомат 'Нова Пошта'" : 'Поштомат';
+      type = 'Поштомат';
     } else if (!type) {
       if (branch.number === '1') type = 'Вантажне(ий)';
-      else type = 'Поштове';
+      else type = 'Поштове(ий)';
     }
+    if (type === 'Поштове') type = 'Поштове(ий)';
+    if (type === 'Вантажне') type = 'Вантажне(ий)';
 
     const num = branch.number || '1';
     const street = getCleanStreet(branch);
@@ -988,18 +990,28 @@
         `;
       }
 
+      let typeDisplay = branch.typeName;
+      if (isPostomat) {
+        typeDisplay = 'Поштомат';
+      } else if (!typeDisplay) {
+        if (branch.number === '1') typeDisplay = 'Вантажне(ий)';
+        else typeDisplay = 'Поштове(ий)';
+      }
+      if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
+      if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
+
+      const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || ''}: ${cleanStreet}`;
+
       card.innerHTML = `
-        <!-- Рядок 1: Місто · Відділення · Вулиця — в один суцільний рядок -->
-        <div class="card-primary-line" title="${escapeHtml(sType)} ${escapeHtml(branch.city || '')} · ${isPostomat ? 'Поштомат' : 'Відділення'} №${escapeHtml(branch.number || '')} · ${escapeHtml(cleanStreet)}">
-          <span class="settlement-type-badge">${escapeHtml(sType)}</span>
-          <span class="city-name">${escapeHtml(branch.city || '')}</span>
-          <span class="branch-separator">·</span>
-          <span class="branch-num">${isPostomat ? 'Поштомат' : 'Відділення'} №${escapeHtml(branch.number || '')}</span>
-          <span class="branch-separator">·</span>
-          <span class="branch-street-text">📍 ${escapeHtml(cleanStreet)}</span>
+        <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
+        <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
+          <span class="city-highlight">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}</span>
+          <span class="line-sep">-</span>
+          <span class="branch-highlight">${escapeHtml(typeDisplay)} №${escapeHtml(branch.number || '')}:</span>
+          <span class="street-highlight">${escapeHtml(cleanStreet)}</span>
         </div>
 
-        <!-- Рядок 2: Населений пункт (район, область) — великий, контрастний та в один рядок -->
+        <!-- Рядок 2: Населений пункт (район, область) -->
         <div class="card-geo-line" title="Населений пункт: ${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}">
           <span class="geo-label">Населений пункт:</span>
           <span class="geo-val">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}</span>

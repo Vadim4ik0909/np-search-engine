@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.5.2">
+  <link rel="stylesheet" href="styles.css?v=8.5.3">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.5.2</span>
+          <span class="version-tag">v8.5.3</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,23 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.5.2 -->
+        <!-- Версія 8.5.3 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.5.3</span>
+            <span class="version-state">Чистий суцільний рядок для Split View</span>
+            <span class="version-date">17 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Суцільний формат речення:</strong> прибрано сірі бейджі, іконки (📍) та крапки — тепер вигляд <code>місто Івано-Франківськ - Поштове(ий) №22: вул. Горбачевського, 14Д</code> як у DelEngine.</li>
+            <li><strong>100% вміщення в один рядок:</strong> оптимізовано розмір шрифту (13.5px) та відступи карток, рядок не обрізається навіть при розділеному екрані 50/50.</li>
+            <li><strong>Адаптивна одноколонкова сітка:</strong> у режимі спліт-скріна (до 1050px) картки займають усю ширину робочої зони.</li>
+            <li><strong>Ідентичний формат копіювання:</strong> кнопка «Скопіювати для LP-CRM» копіює дані в точно такому ж узгодженому форматі.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.5.2 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.5.2</span>
             <span class="version-state">Однорядковий ергономічний формат для LP-CRM</span>
@@ -343,12 +358,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.5.2"></script>
+  <script src="data/branches.js?v=8.5.3"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.5.2"></script>
+  <script src="data/fuzzySearch.js?v=8.5.3"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.5.2"></script>
+  <script src="app.js?v=8.5.3"></script>
 </body>
 </html>
