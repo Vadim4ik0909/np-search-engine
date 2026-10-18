@@ -573,15 +573,16 @@
   }
 
   async function executeSearch(query, shouldRecordAnalytics = true, isExplicitSubmit = false) {
-    const rawQuery = (query || '').trim();
-    if (!rawQuery) return;
+    try {
+      const rawQuery = (query || '').trim();
+      if (!rawQuery) return;
 
-    // Скасовуємо попередній незавершений запит для миттєвої швидкодії
-    if (activeSearchAbortController) {
-      activeSearchAbortController.abort();
-    }
-    activeSearchAbortController = new AbortController();
-    const currentSignal = activeSearchAbortController.signal;
+      // Скасовуємо попередній незавершений запит для миттєвої швидкодії
+      if (activeSearchAbortController) {
+        activeSearchAbortController.abort();
+      }
+      activeSearchAbortController = new AbortController();
+      const currentSignal = activeSearchAbortController.signal;
 
     state.searchQuery = rawQuery;
     if (dom.searchInput.value.trim() !== rawQuery) {
@@ -628,7 +629,15 @@
     if (staticMatches.length > 0) {
       if (parsed.targetBranchNumber) {
         // Якщо шукали конкретний номер, залишаємо відділення саме з цим номером (відсікаючи номери будинків з адреси)
-        const exactMatches = staticMatches.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber.toString());
+        let exactMatches = staticMatches.filter(b => (b.number && b.number.toString() === parsed.targetBranchNumber.toString()) || (b.postalCode && b.postalCode.toString() === parsed.targetBranchNumber.toString()));
+
+        // ФОЛЛБЕК ДЛЯ УКРПОШТИ:
+        // Якщо клієнт шукає населений пункт + номер ("житомир нові білокоровичі 1"),
+        // але в Укрпошті номери відділень - це 5-значні індекси (наприклад 11051):
+        if (exactMatches.length === 0 && !isNP && staticMatches.length > 0) {
+          exactMatches = staticMatches;
+        }
+
         if (exactMatches.length > 0) {
           results = exactMatches;
           didYouMeanText = null;
@@ -684,14 +693,21 @@
     // 3. ДОДАТКОВИЙ ФОЛБЕК ДЛЯ СТАТИЧНИХ ДАНИХ (Укрпошта або якщо API не відповіло)
     // КАТЕГОРИЧНЕ ПРАВИЛО EMPTY STATE:
     // Якщо в запиті вказано номер відділення/поштомату (parsed.targetBranchNumber), і його не знайдено:
-    // КАТЕГОРИЧНО ЗАБОРОНЕНО фолбечитись до показу всіх інших відділень міста!
-    if (results.length === 0 && !parsed.targetBranchNumber) {
-      if (staticMatches.length > 0) {
-        results = staticMatches;
-      } else if (parsed.matchedSettlement) {
+    // Для Нової Пошти КАТЕГОРИЧНО ЗАБОРОНЕНО фолбечитись до показу всіх інших відділень міста!
+    // Для Укрпошти: у селах/СМТ відділення мають поштовий індекс замість номера 1-9, тому показуємо відділення населеного пункту з індексом
+    if (results.length === 0) {
+      if (!isNP && parsed.matchedSettlement) {
         const sName = parsed.matchedSettlement.name.toLowerCase();
         const cityOnly = allStaticBranches.filter(b => b.city && b.city.toLowerCase() === sName);
         if (cityOnly.length > 0) results = cityOnly;
+      } else if (!parsed.targetBranchNumber) {
+        if (staticMatches.length > 0) {
+          results = staticMatches;
+        } else if (parsed.matchedSettlement) {
+          const sName = parsed.matchedSettlement.name.toLowerCase();
+          const cityOnly = allStaticBranches.filter(b => b.city && b.city.toLowerCase() === sName);
+          if (cityOnly.length > 0) results = cityOnly;
+        }
       }
     }
 
@@ -744,6 +760,9 @@
       } else if (parsed.matchedSettlement && parsed.matchedSettlement.lat) {
         state.leafletMap.flyTo([parsed.matchedSettlement.lat, parsed.matchedSettlement.lng], 13, { duration: 1.2 });
       }
+      }
+    } catch (err) {
+      console.error('executeSearch ERROR:', err);
     }
   }
 
@@ -828,20 +847,24 @@
     }
     if (!sType) sType = 'місто';
 
-    const isNP = state.currentService === 'novaposhta';
+    const isNP = state.currentService === 'novaposhta' || (branch.id && branch.id.startsWith('np-'));
     const isPostomat = branch.type === 'poshtomat' || (branch.typeText && branch.typeText.includes('Поштомат')) || (branch.typeName && branch.typeName.includes('Поштомат')) || (branch.name && branch.name.includes('Поштомат'));
 
     let type = branch.typeName;
     if (isPostomat) {
-      type = 'Поштомат';
+      type = isNP ? "Поштомат 'Нова Пошта'" : 'Поштомат';
     } else if (!type) {
-      if (branch.number === '1') type = 'Вантажне(ий)';
-      else type = 'Поштове(ий)';
+      if (isNP) {
+        if (branch.number === '1') type = 'Вантажне(ий)';
+        else type = 'Поштове(ий)';
+      } else {
+        type = 'Відділення';
+      }
     }
     if (type === 'Поштове') type = 'Поштове(ий)';
     if (type === 'Вантажне') type = 'Вантажне(ий)';
 
-    const num = branch.number || '1';
+    const num = branch.number || branch.postalCode || '1';
     const street = getCleanStreet(branch);
 
     return `${sType} ${city} - ${type} №${num}: ${street}`;
@@ -902,6 +925,8 @@
     }
     if (!sType) sType = 'місто';
 
+    const isUkrposhta = state.currentService === 'ukrposhta' || (branch.id && branch.id.startsWith('up-'));
+    const postalCode = (branch.postalCode || branch.number || '').toString().trim();
     const lpCrmCopyText = formatLpCrmCopyString(branch);
     const cleanStreet = getCleanStreet(branch);
     const geoSub = formatGeoSub(branch);
@@ -925,20 +950,36 @@
     if (isPostomat) {
       typeDisplay = 'Поштомат';
     } else if (!typeDisplay) {
-      if (branch.number === '1') typeDisplay = 'Вантажне(ий)';
-      else typeDisplay = 'Поштове(ий)';
+      if (isUkrposhta) {
+        typeDisplay = 'Відділення';
+      } else if (branch.number === '1') {
+        typeDisplay = 'Вантажне(ий)';
+      } else {
+        typeDisplay = 'Поштове(ий)';
+      }
     }
     if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
     if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
 
-    const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || ''}: ${cleanStreet}`;
+    const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || postalCode}: ${cleanStreet}`;
+
+    let ukrposhtaIndexBadgeHtml = '';
+    let copyIndexBtnHtml = '';
+    if (isUkrposhta && postalCode) {
+      ukrposhtaIndexBadgeHtml = `<span class="ukrposhta-index-badge">📮 ІНДЕКС: ${escapeHtml(postalCode)}</span>`;
+      copyIndexBtnHtml = `
+        <button class="btn-copy-index-action" type="button" title="Скопіювати суто 5 цифр індексу для CRM">
+          📋 Індекс ${escapeHtml(postalCode)}
+        </button>
+      `;
+    }
 
     card.innerHTML = `
       <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
       <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
         <span class="city-highlight">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}</span>
         <span class="line-sep">-</span>
-        <span class="branch-highlight">${escapeHtml(typeDisplay)} №${escapeHtml(branch.number || '')}:</span>
+        <span class="branch-highlight">${escapeHtml(typeDisplay)} №${escapeHtml(branch.number || postalCode)}:</span>
         <span class="street-highlight">${escapeHtml(cleanStreet)}</span>
       </div>
 
@@ -952,12 +993,16 @@
 
       <div class="card-foot">
         <div class="card-foot-meta">
+          ${ukrposhtaIndexBadgeHtml}
           <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
           <span class="status-pill"><span class="status-dot"></span> Працює</span>
         </div>
-        <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
-          📋 Скопіювати
-        </button>
+        <div class="card-foot-actions" style="display: flex; gap: 8px; align-items: center;">
+          ${copyIndexBtnHtml}
+          <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
+            📋 Скопіювати
+          </button>
+        </div>
       </div>
     `;
 
@@ -965,6 +1010,14 @@
     btnCopy.addEventListener('click', () => {
       copyTextToClipboard(lpCrmCopyText, btnCopy, 'Скопійовано!');
     });
+
+    const btnCopyIndex = card.querySelector('.btn-copy-index-action');
+    if (btnCopyIndex) {
+      btnCopyIndex.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyTextToClipboard(postalCode, btnCopyIndex, 'Індекс скопійовано!');
+      });
+    }
 
     return card;
   }
@@ -1119,17 +1172,25 @@
       const typeInfo = getTypeBadgeInfo(branch);
       const isPostomat = branch.type === 'poshtomat' || (branch.typeText && branch.typeText.includes('Поштомат')) || (branch.typeName && branch.typeName.includes('Поштомат')) || (branch.name && branch.name.includes('Поштомат'));
 
+      const isUkrposhta = state.currentService === 'ukrposhta' || (branch.id && branch.id.startsWith('up-'));
+      const postalCode = (branch.postalCode || branch.number || '').toString().trim();
+
       let typeDisplay = branch.typeName;
       if (isPostomat) {
         typeDisplay = 'Поштомат';
       } else if (!typeDisplay) {
-        if (branch.number === '1') typeDisplay = 'Вантажне(ий)';
-        else typeDisplay = 'Поштове(ий)';
+        if (isUkrposhta) {
+          typeDisplay = 'Відділення';
+        } else if (branch.number === '1') {
+          typeDisplay = 'Вантажне(ий)';
+        } else {
+          typeDisplay = 'Поштове(ий)';
+        }
       }
       if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
       if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
 
-      const branchTitle = `${typeDisplay} №${branch.number || ''}: <span class="street-part">${escapeHtml(cleanStreet)}</span>`;
+      const branchTitle = `${typeDisplay} №${branch.number || postalCode}: <span class="street-part">${escapeHtml(cleanStreet)}</span>`;
       const locationSub = `${sType} ${branch.city || ''}${geoSub ? ', ' + geoSub : ''}`;
 
       row.innerHTML = `
@@ -1141,6 +1202,7 @@
           </div>
         </div>
         <div class="address-match-right">
+          ${isUkrposhta && postalCode ? `<span class="ukrposhta-index-badge-sm">📮 ІНДЕКС: ${escapeHtml(postalCode)}</span>` : ''}
           <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
           <span class="address-match-select-btn">Обрати ➔</span>
         </div>

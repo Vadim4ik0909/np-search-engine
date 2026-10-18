@@ -348,6 +348,7 @@
     { name: 'Хмельницький', oblast: 'Хмельницька', raion: 'Хмельницький', type: 'місто', lat: 49.4230, lng: 26.9871, postalCodes: ['29000'], aliases: ['хмельницький', 'хмельницкий', 'khmelnytskyi'], streets: ['вул. Проскурівська', 'вул. Подільська', 'просп. Миру'] },
     { name: 'Кам\'янець-Подільський', oblast: 'Хмельницька', raion: 'Кам\'янець-Подільський', type: 'місто', lat: 48.6833, lng: 26.5833, postalCodes: ['32300'], aliases: ['кам\'янець-подільський', 'камянець-подільський', 'каменец-подольский', 'камянець'], streets: ['вул. Соборна', 'вул. Князів Коріатовичів'] },
     { name: 'Славута', oblast: 'Хмельницька', raion: 'Шепетівський', type: 'місто', lat: 50.2917, lng: 26.8603, postalCodes: ['30000'], aliases: ['славута', 'slavuta', 'славуті', 'у славуті', 'в славуті', 'славуту'], streets: ['вул. Кузовкова', 'вул. Соборності', 'вул. Миру', 'вул. Ярослава Мудрого'] },
+    { name: 'Гриців', oblast: 'Хмельницька', raion: 'Шепетівський', type: 'смт', lat: 49.9825, lng: 27.2099, postalCodes: ['30455'], aliases: ['гриців', 'грицев', 'hrytsiv', 'грицеві', 'грицові'], streets: ['вул. Київська', 'вул. Суворова', 'вул. Миру', 'вул. Центральна', 'вул. Героїв Майдану'] },
     { name: 'Черкаси', oblast: 'Черкаська', raion: 'Черкаський', type: 'місто', lat: 49.4444, lng: 32.0598, postalCodes: ['18000'], aliases: ['черкаси', 'черкассы', 'cherkasy'], streets: ['бульв. Шевченка', 'вул. Смілянська'] },
     { name: 'Умань', oblast: 'Черкаська', raion: 'Уманський', type: 'місто', lat: 48.7500, lng: 30.2167, postalCodes: ['20300'], aliases: ['умань', 'uman'], streets: ['вул. Європейська', 'вул. Київська'] },
     { name: 'Сміла', oblast: 'Черкаська', raion: 'Черкаський', type: 'місто', lat: 49.2167, lng: 31.8667, postalCodes: ['20700'], aliases: ['сміла', 'смела'], streets: ['вул. Соборна'] },
@@ -360,7 +361,7 @@
     { name: 'Охтирка', oblast: 'Сумська', raion: 'Охтирський', type: 'місто', lat: 50.3167, lng: 34.9000, postalCodes: ['42700'], aliases: ['охтирка', 'ахтырка'], streets: ['вул. Незалежності'] },
     { name: 'Кропивницький', oblast: 'Кіровоградська', raion: 'Кропивницький', type: 'місто', lat: 48.5079, lng: 32.2623, postalCodes: ['25000'], aliases: ['кропивницький', 'кировоград', 'kropyvnytskyi'], streets: ['вул. Велика Перспективна', 'вул. Соборна'] },
     { name: 'Олександрія', oblast: 'Кіровоградська', raion: 'Олександрійський', type: 'місто', lat: 48.6667, lng: 33.1167, postalCodes: ['28000'], aliases: ['олександрія', 'александрия'], streets: ['просп. Соборний'] },
-    { name: 'Нові Білокоровичі', oblast: 'Житомирська', raion: 'Коростенський', type: 'смт', lat: 51.1167, lng: 28.0500, postalCodes: ['11055'], aliases: ['нові білокоровичі', 'нові-білокоровичі', 'новые белокоровичи', 'нови билокоровичи', 'білокоровичі'], streets: ['вул. Довженка', 'вул. Центральна'] }
+    { name: 'Нові Білокоровичі', oblast: 'Житомирська', raion: 'Коростенський', type: 'смт', lat: 51.1167, lng: 28.0500, postalCodes: ['11051', '11055'], aliases: ['нові білокоровичі', 'нові-білокоровичі', 'новые белокоровичи', 'нови билокоровичи', 'білокоровичі'], streets: ['вул. Довженка', 'вул. Центральна'] }
   ];
 
   // 4. ДАМЕРАУ-ЛЕВЕНШТЕЙН (Відстань редагування для виправлення одруків та перестановок)
@@ -400,7 +401,7 @@
   }
 
   const FAMOUS_STREETS = [
-    'лесі українки', 'богдана хмельницького', 'степана бандери', 'княгині ольги',
+    'хрещатик', 'лесі українки', 'богдана хмельницького', 'степана бандери', 'княгині ольги',
     'володимира великого', 'ярослава мудрого', 'січових стрільців', 'героїв майдану',
     'михайла грушевського', 'івана франка', 'тараса шевченка', 'чорновола',
     'соборна', 'центральна', 'незалежності', 'миру', 'перемоги', 'залізнична',
@@ -567,8 +568,21 @@
       if (next && !/^\d+$/.test(cur) && !/^\d+$/.test(next)) {
         const foundCombined = findSettlementByNameOrFuzzy(cur + ' ' + next) || findSettlementByNameOrFuzzy((cur + next).replace(/-/g, ''));
         if (foundCombined) {
-          mergedTokens.push(foundCombined.name.toLowerCase());
-          detectedCity = foundCombined;
+          if (!detectedCity) {
+            detectedCity = foundCombined;
+            mergedTokens.push(foundCombined.name.toLowerCase());
+          } else {
+            // Region disambiguation: check if foundCombined is in detectedCity's oblast (e.g. Житомир -> Нові Білокоровичі)
+            const oblStem = detectedCity.name.toLowerCase().slice(0, 5);
+            const combObl = (foundCombined.oblast || '').toLowerCase();
+            if (combObl.includes(oblStem)) {
+              detectedCity = foundCombined;
+              mergedTokens.push(foundCombined.name.toLowerCase());
+            } else {
+              mergedTokens.push(cur);
+              continue;
+            }
+          }
           i++; // Пропускаємо наступний склеєний токен
           continue;
         }
@@ -578,8 +592,22 @@
       if (!/^\d+$/.test(cur)) {
         const foundSingle = findSettlementByNameOrFuzzy(cur);
         if (foundSingle) {
-          mergedTokens.push(foundSingle.name.toLowerCase());
-          if (!detectedCity) detectedCity = foundSingle;
+          if (!detectedCity) {
+            detectedCity = foundSingle;
+            mergedTokens.push(foundSingle.name.toLowerCase());
+          } else {
+            // Region disambiguation: check if foundSingle is in detectedCity's oblast
+            const oblStem = detectedCity.name.toLowerCase().slice(0, 5);
+            const singleObl = (foundSingle.oblast || '').toLowerCase();
+            if (singleObl.includes(oblStem)) {
+              detectedCity = foundSingle;
+              mergedTokens.push(foundSingle.name.toLowerCase());
+            } else {
+              // Primary Settlement Anchor: anchor is already fixed!
+              // Do NOT overwrite detectedCity and treat cur as street/other token (e.g. "київ" in "гриців 1 київ")
+              mergedTokens.push(cur);
+            }
+          }
           continue;
         }
       }
@@ -1307,31 +1335,52 @@
       .replace(/\s+/g, ' ')
       .trim();
 
-    // 5. Виділення міста
+    // 5. Виділення міста (Primary Settlement Anchor з урахуванням обласних центрів)
     let city = null;
     let settlementOblast = null;
     const words = text.split(/\s+/).filter(Boolean);
 
-    if (words.length >= 2) {
-      const two = (words[0] + ' ' + words[1]).toLowerCase();
-      const s2 = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === two || (s.aliases && s.aliases.includes(two)));
-      if (s2) {
-        city = s2.name;
-        settlementOblast = s2.oblast;
-        text = text.replace(new RegExp('(?<!\\p{L})' + words[0] + '\\s+' + words[1] + '(?!\\p{L})', 'iu'), ' ').trim();
+    const foundSettlementsInOrder = [];
+    for (let i = 0; i < words.length; i++) {
+      if (i + 1 < words.length) {
+        const two = (words[i] + ' ' + words[i + 1]).toLowerCase();
+        const s2 = findSettlementByNameOrFuzzy(two);
+        if (s2) {
+          foundSettlementsInOrder.push({ s: s2, raw: words[i] + ' ' + words[i + 1], startIndex: i });
+          i++;
+          continue;
+        }
+      }
+      const s1 = findSettlementByNameOrFuzzy(words[i]);
+      if (s1) {
+        foundSettlementsInOrder.push({ s: s1, raw: words[i], startIndex: i });
       }
     }
 
-    if (!city) {
-      for (const w of words) {
-        const wNorm = normalizeLocativeCase(w.toLowerCase());
-        const matchedS = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === wNorm || s.name.toLowerCase() === w.toLowerCase() || (s.aliases && s.aliases.includes(wNorm)));
-        if (matchedS) {
-          city = matchedS.name;
-          settlementOblast = matchedS.oblast;
-          text = text.replace(new RegExp('(?<!\\p{L})' + w + '(?!\\p{L})', 'iu'), ' ').trim();
-          break;
-        }
+    if (foundSettlementsInOrder.length === 1) {
+      const match = foundSettlementsInOrder[0];
+      city = match.s.name;
+      settlementOblast = match.s.oblast;
+      text = text.replace(new RegExp('(?<!\\p{L})' + match.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ').trim();
+    } else if (foundSettlementsInOrder.length >= 2) {
+      const first = foundSettlementsInOrder[0];
+      const second = foundSettlementsInOrder[1];
+      const firstStem = first.s.name.toLowerCase().slice(0, 5);
+      const secondObl = (second.s.oblast || '').toLowerCase();
+
+      // Якщо друге місто належить до області першого міста (наприклад: "житомир нові білокоровичі", "хмельницький славута"):
+      if (secondObl.includes(firstStem)) {
+        oblast = second.s.oblast;
+        city = second.s.name;
+        settlementOblast = second.s.oblast;
+        text = text.replace(new RegExp('(?<!\\p{L})' + first.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ');
+        text = text.replace(new RegExp('(?<!\\p{L})' + second.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ').trim();
+      } else {
+        // Primary Settlement Anchor: перше ідентифіковане місто залишається зафіксованим якорем!
+        // Наступні слова-топоніми (наприклад, "київ" у "гриців 1 київ") стають кандидатами в назву вулиці
+        city = first.s.name;
+        settlementOblast = first.s.oblast;
+        text = text.replace(new RegExp('(?<!\\p{L})' + first.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ').trim();
       }
     }
 
@@ -1441,6 +1490,13 @@
         if (tm.isDigit) {
           if (bNum === tok) continue;
           if (isPostomat && bNum.startsWith(tok)) continue;
+          // Фолбек для Укрпошти: у невеликих населених пунктах відділення має 5-значний індекс (наприклад 11051),
+          // а клієнти вказують номер "1" або "2" ("житомир нові білокоровичі 1").
+          // Якщо відділення належить до знайденого населеного пункту і це Укрпошта, одиночна цифра не відсікає його!
+          const isUkrposhtaBranch = (b.id && b.id.startsWith('up-')) || /^\d{5}$/.test(bNum) || (b.postalCode && /^\d{5}$/.test(b.postalCode));
+          if (isUkrposhtaBranch && tok.length <= 2 && detectedCityName && bCity === detectedCityName) {
+            continue;
+          }
           if (!searchTarget.includes(tok) || !tm.regex.test(searchTarget)) {
             matchesAll = false;
             break;
@@ -1495,17 +1551,18 @@
       // Ваговий скоринг (Scoring):
       let score = 0;
 
-      // 1. Прямий пошук поштоматів за довгим номером (4-5 цифр):
-      // Точний збіг номера поштомату b.number === token з найвищим пріоритетом (+2000 балів)
-      const hasExactLongNum = tokens.some(tok => /^\d{4,5}$/.test(tok) && bNum === tok) ||
-                              (facets.number && /^\d{4,5}$/.test(facets.number) && bNum === facets.number);
+      // 1. Прямий пошук поштоматів та індексів Укрпошти за довгим номером (4-5 цифр):
+      // Точний збіг номера поштомату або поштового індексу b.number / b.postalCode === token (+2000 балів)
+      const bPostal = (b.postalCode || '').toString();
+      const hasExactLongNum = tokens.some(tok => /^\d{4,5}$/.test(tok) && (bNum === tok || bPostal === tok)) ||
+                              (facets.number && /^\d{4,5}$/.test(facets.number) && (bNum === facets.number || bPostal === facets.number));
       if (hasExactLongNum) {
         score += 2000;
       }
 
-      // Точний збіг номера відділення / поштомату (найвищий абсолютний пріоритет: +1000 балів)
+      // Точний збіг номера відділення / поштомату / індексу (найвищий абсолютний пріоритет: +1000 балів)
       if (facets.number) {
-        if (bNum === facets.number) {
+        if (bNum === facets.number || bPostal === facets.number) {
           score += 1000;
         } else if (isPostomat && bNum.startsWith(facets.number)) {
           score += 200;
@@ -1515,7 +1572,7 @@
       for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];
         if (/^\d+$/.test(tok)) {
-          if (bNum === tok) {
+          if (bNum === tok || bPostal === tok) {
             score += 350;
           } else if (isPostomat && bNum.startsWith(tok)) {
             score += 120;

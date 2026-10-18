@@ -35,7 +35,19 @@ class MockElement {
   }
 
   get innerHTML() {
-    return this._innerHTML;
+    let html = this._innerHTML || '';
+    if (this.children.length > 0) {
+      for (let c of this.children) {
+        html += c.outerHTML;
+      }
+    }
+    return html;
+  }
+
+  get outerHTML() {
+    const tag = (this.tagName || 'div').toLowerCase();
+    const cls = this.className ? ` class="${this.className}"` : '';
+    return `<${tag}${cls}>${this.innerHTML}</${tag}>`;
   }
 
   set innerHTML(val) {
@@ -190,7 +202,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 19;
+  let totalTests = 21;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1000,6 +1012,117 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 19:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 20: Primary Settlement Anchor ("гриців 1 київ" -> смт Гриців, №1 вул. Київська, 3)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 20: Primary Settlement Anchor (ізоляція першого міста та префіксний збіг вулиць "гриців 1 київ")');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const resultsList = elementsById['resultsList'];
+
+    // 1. Пошук "гриців 1 київ" через SmartSearchEngine
+    const res1 = window.SmartSearchEngine.searchBranches('гриців 1 київ', pool, 5);
+    if (!res1 || res1.length === 0) {
+      throw new Error("Не знайдено відділення для запиту 'гриців 1 київ'");
+    }
+    const top1 = res1[0];
+    if (top1.city !== 'Гриців' || top1.number !== '1' || !top1.street.includes('Київська')) {
+      throw new Error(`Очікувався смт Гриців №1 (вул. Київська, 3), отримано: ${top1.city} №${top1.number} (${top1.street})`);
+    }
+
+    // 2. Пошук "гриців 1 київська" через SmartSearchEngine
+    const res2 = window.SmartSearchEngine.searchBranches('гриців 1 київська', pool, 5);
+    if (!res2 || res2.length === 0) {
+      throw new Error("Не знайдено відділення для запиту 'гриців 1 київська'");
+    }
+    const top2 = res2[0];
+    if (top2.city !== 'Гриців' || top2.number !== '1' || !top2.street.includes('Київська')) {
+      throw new Error(`Очікувався смт Гриців №1 для 'гриців 1 київська', отримано: ${top2.city} №${top2.number} (${top2.street})`);
+    }
+
+    // 3. Перевірка UI: вводимо в searchInput "гриців 1 київ"
+    searchInput.value = 'гриців 1 київ';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const emptyBox = resultsList.querySelector('.empty-results-box');
+    if (emptyBox) {
+      throw new Error(`Помилково показано Empty State: "${emptyBox.textContent.trim()}"`);
+    }
+
+    console.log("  ✓ Успіх: Primary Settlement Anchor зафіксував 'Гриців', 'київ' успішно зіставлено з 'вул. Київська, 3', помилкове сповіщення про Київ відсутнє.\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 20:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 21: Двосторонній адресний пошук індексів Укрпошти ("житомир нові білокоровичі 1" та "11051")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 21: Двосторонній адресний пошук індексів Укрпошти ("житомир нові білокоровичі 1", "11051")');
+  try {
+    const upPool = window.BRANCHES_DATA.ukrposhta;
+    const btnNovaPoshta = elementsById['btnNovaPoshta'];
+    const btnUkrposhta = elementsById['btnUkrposhta'];
+    const resultsList = elementsById['resultsList'];
+
+    // 1. Пошук за запитом "житомир нові білокоровичі 1"
+    const resUP1 = window.SmartSearchEngine.searchBranches('житомир нові білокоровичі 1', upPool, 5);
+    if (!resUP1 || resUP1.length === 0) {
+      throw new Error("Не знайдено відділення для 'житомир нові білокоровичі 1'");
+    }
+    const topUP1 = resUP1[0];
+    if (topUP1.city !== 'Нові Білокоровичі' || (topUP1.postalCode !== '11051' && topUP1.number !== '11051')) {
+      throw new Error(`Очікувалися Нові Білокоровичі з індексом 11051, отримано: ${topUP1.city} №${topUP1.number} (індекс: ${topUP1.postalCode})`);
+    }
+
+    // 2. Пошук за запитом "нові білокоровичі"
+    const resUP2 = window.SmartSearchEngine.searchBranches('нові білокоровичі', upPool, 5);
+    if (!resUP2 || resUP2.length === 0) {
+      throw new Error("Не знайдено відділення для 'нові білокоровичі'");
+    }
+    const topUP2 = resUP2[0];
+    if (topUP2.city !== 'Нові Білокоровичі' || topUP2.postalCode !== '11051') {
+      throw new Error(`Очікувався індекс 11051 для 'нові білокоровичі', отримано: ${topUP2.city} (індекс: ${topUP2.postalCode})`);
+    }
+
+    // 3. Прямий запит індексу "11051"
+    const resUP3 = window.SmartSearchEngine.searchBranches('11051', upPool, 5);
+    if (!resUP3 || resUP3.length === 0) {
+      throw new Error("Не знайдено відділення за прямим поштовим індексом '11051'");
+    }
+    const topUP3 = resUP3[0];
+    if (topUP3.postalCode !== '11051' || topUP3.city !== 'Нові Білокоровичі') {
+      throw new Error(`Очікувалися Нові Білокоровичі (11051) для '11051', отримано: ${topUP3.city} (індекс: ${topUP3.postalCode})`);
+    }
+
+    // 4. Перевірка UI у табі Укрпошти
+    btnUkrposhta.dispatchEvent({ type: 'click' });
+    await sleep(200);
+
+    searchInput.value = 'житомир нові білокоровичі 1';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const emptyBoxUP = resultsList.querySelector('.empty-results-box');
+    if (emptyBoxUP) {
+      throw new Error(`Укрпошта помилково показала Empty State для 'житомир нові білокоровичі 1': "${emptyBoxUP.textContent.trim()}"`);
+    }
+    const fullText = resultsList.innerHTML;
+    if (!fullText.includes('11051')) {
+      throw new Error("У картці відділення Укрпошти відсутній поштовий індекс 11051");
+    }
+
+    // Повертаємо таб Нової Пошти назад
+    btnNovaPoshta.dispatchEvent({ type: 'click' });
+    await sleep(200);
+
+    console.log("  ✓ Успіх: Двосторонній пошук індексів бездоганно розпізнав 'житомир нові білокоровичі 1' та '11051', підтягнувши індекс 11051 (вул. Довженка, 20) без помилок.\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 21:', err.message, '\n');
   }
 
   console.log('===============================================================');

@@ -1211,6 +1211,72 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3) !important;
 }
 
+/* Бейдж поштового індексу Укрпошти */
+.ukrposhta-index-badge {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.ukrposhta-index-badge-sm {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* Кнопка швидкого копіювання індексу в 1 клік */
+.btn-copy-index-action {
+  padding: 7px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.09);
+  color: #fde68a;
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-copy-index-action:hover {
+  background: #f59e0b;
+  color: #0f172a;
+  border-color: #f59e0b;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+}
+
+.btn-copy-index-action:active {
+  transform: translateY(0);
+}
+
+.btn-copy-index-action.copied {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3) !important;
+}
+
 /* Спливаючий Toast для швидкого підтвердження копіювання */
 .toast-notification {
   position: fixed;

@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.15.0">
+  <link rel="stylesheet" href="styles.css?v=8.16.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.15.0</span>
+          <span class="version-tag">v8.16.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.15.0 -->
+        <!-- Версія 8.16.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.16.0</span>
+            <span class="version-state">Primary Settlement Anchor & Укрпошта Address-to-Index</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Primary Settlement Anchor:</strong> абсолютне закріплення першого введеного міста/селища як географічного якоря (наприклад, <code>«гриців 1 київ»</code> або <code>«гриців 1 київська»</code> безпомилково повертає смт Гриців, Відділення №1 на вул. Київська, 3, повністю усуваючи фальшиві помилки «у м. Київ не знайдено»).</li>
+            <li><strong>Двосторонній адресний пошук індексів Укрпошти (Address-to-Index):</strong> за введенням назви мікропункту та номера (наприклад, <code>«житомир нові білокоровичі 1»</code> або <code>«нові білокоровичі»</code>) автоматично визначається поштовий індекс <strong>11051</strong> (вул. Довженка, 20), а також підтримується прямий пошук за індексом <code>«11051»</code>.</li>
+            <li><strong>Помітний UI-бейдж індексу та копіювання в 1 клік:</strong> у картках та списку видачі Укрпошти додано виразний акцентний бейдж <code>📮 ІНДЕКС: 11051</code> та окрему кнопку швидкого копіювання суто 5 цифр індексу для CRM.</li>
+            <li><strong>Адаптований формат копіювання для LP-CRM:</strong> для Укрпошти формується рядок <code>селище Нові Білокоровичі - Відділення №11051: вул. Довженка, 20</code>.</li>
+            <li><strong>100% успішність повного комплексу автотестів (21 / 21):</strong> верифіковано Primary Settlement Anchor, двосторонній пошук індексів Укрпошти та оновлену картку видачі.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.15.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.15.0</span>
             <span class="version-state">Адаптивний Google-подібний Omnibox та Region Stemming</span>
@@ -564,12 +580,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.15.0"></script>
+  <script src="data/branches.js?v=8.16.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.15.0"></script>
+  <script src="data/fuzzySearch.js?v=8.16.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.15.0"></script>
+  <script src="app.js?v=8.16.0"></script>
 </body>
 </html>
