@@ -1051,15 +1051,13 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 /* Рівень 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) */
 .card-primary-line {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: #f1f5f9;
-  letter-spacing: -0.1px;
-  line-height: 1.45;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 1.25rem; /* 20px */
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
   display: block;
+  word-break: break-word;
 }
 
 .card-primary-line .city-highlight {
@@ -1068,8 +1066,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .card-primary-line .line-sep {
-  color: var(--text-muted);
-  margin: 0 4px;
+  color: #64748b;
+  margin: 0 6px;
+  font-weight: 400;
 }
 
 .card-primary-line .branch-highlight {
@@ -1078,34 +1077,31 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .card-primary-line .street-highlight {
-  color: #e2e8f0;
-  font-weight: 500;
+  color: #f8fafc;
+  font-weight: 700;
   margin-left: 2px;
 }
 
 /* Рівень 2: Населений пункт: місто [Місто], [Район] район, [Область] область */
 .card-geo-line {
-  font-size: 13px;
-  color: #cbd5e1;
-  line-height: 1.4;
+  font-size: 0.95rem; /* ~15px */
+  color: #e2e8f0;
+  line-height: 1.45;
   display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 1px;
+  margin-top: 4px;
 }
 
 .card-geo-line .geo-label {
   color: #94a3b8;
   font-weight: 600;
-  font-size: 13px;
-  margin-right: 4px;
+  font-size: 0.95rem;
+  margin-right: 5px;
 }
 
 .card-geo-line .geo-val {
-  color: #e2e8f0;
-  font-weight: 500;
-  font-size: 13px;
+  color: #f1f5f9;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 /* Перейменування (тільки якщо було) */
@@ -1116,22 +1112,23 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   border-left: 2px solid #f59e0b;
   padding: 3px 8px;
   border-radius: 2px 4px 4px 2px;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .branch-renamed-note strong {
   color: #fde68a;
 }
 
-/* Рівень 4 + 5: Низ картки (Тип/вага та статус зліва + Кнопка Скопіювати справа) */
+/* Рівень 4 + 5: Низ картки (Кнопка Скопіювати зліва, індекс, тип/вага, статус) */
 .card-foot {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: 12px;
-  margin-top: 5px;
-  padding-top: 9px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .card-foot-meta {
@@ -1176,15 +1173,15 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   border: 1px solid rgba(245, 158, 11, 0.18);
 }
 
-/* Спокійна кнопка швидкої дії "Скопіювати" */
+/* Кнопка швидкої дії "Скопіювати" (розташована ліворуч) */
 .btn-copy-action {
-  padding: 7px 15px;
+  padding: 8px 18px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
   font-family: var(--font-main);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
@@ -1213,17 +1210,17 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 /* Бейдж поштового індексу Укрпошти */
 .ukrposhta-index-badge {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  padding: 3px 9px;
+  padding: 5px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(245, 158, 11, 0.12);
+  background: rgba(245, 158, 11, 0.16);
   color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgba(245, 158, 11, 0.4);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   white-space: nowrap;
 }
 
@@ -1243,18 +1240,18 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 /* Кнопка швидкого копіювання індексу в 1 клік */
 .btn-copy-index-action {
-  padding: 7px 13px;
+  padding: 8px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.09);
-  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fef08a;
   font-family: var(--font-main);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   transition: all 0.2s ease;
   white-space: nowrap;
 }

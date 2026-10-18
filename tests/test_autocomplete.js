@@ -859,7 +859,36 @@ async function runTests() {
       throw new Error('Масовий список .address-match-row не повинен рендеритися при виборі 1 точного відділення');
     }
 
-    console.log('  ✓ Успіх: Empty State надійно блокує спам неіснуючими відділеннями, стан набору міста ізольовано від фону, а перемикачі ліміту приховані для чистого фокусу на картці.\n');
+    // 4. ПЕРЕВІРКА UI/UX НОВОГО ЛЕЙАУТУ КАРТКИ (v8.16.0)
+    // а) Зелена плашка "✓ ОБРАНА АДРЕСА" повинна бути повністю відсутня
+    const selectedBadge = resultsList.querySelector('.selected-badge-indicator');
+    if (selectedBadge || resultsList.innerHTML.includes('selected-badge-indicator') || resultsList.innerHTML.includes('Обрана адреса')) {
+      throw new Error('Помилка UX: зелена плашка "Обрана адреса" знайдена у розмітці картки, але повинна бути прибрана!');
+    }
+
+    // б) Кнопка "Скопіювати" (.btn-copy-action) повинна знаходитися у .card-foot ліворуч від бейджів (.weight-pill / .status-badge)
+    const cardFoot = resultsList.querySelector('.card-foot');
+    if (!cardFoot) {
+      throw new Error('Очікувався .card-foot у вибраній картці');
+    }
+    const copyBtn = cardFoot.querySelector('.btn-copy-action');
+    if (!copyBtn) {
+      throw new Error('Кнопка "Скопіювати" (.btn-copy-action) відсутня у .card-foot');
+    }
+    const footHtml = cardFoot.innerHTML || '';
+    const copyBtnPos = footHtml.indexOf('btn-copy-action');
+    const weightPillPos = footHtml.indexOf('weight-pill');
+    if (copyBtnPos === -1 || (weightPillPos !== -1 && copyBtnPos > weightPillPos)) {
+      throw new Error(`Кнопка "Скопіювати" повинна бути ліворуч від бейджів типу (.weight-pill), отримано pos(btn)=${copyBtnPos}, pos(pill)=${weightPillPos}`);
+    }
+
+    // в) Читабельність заголовку (.card-primary-line присутній)
+    const primaryLine = resultsList.querySelector('.card-primary-line');
+    if (!primaryLine) {
+      throw new Error('Очікувався .card-primary-line для збільшеного контрастного текстового блоку адреси');
+    }
+
+    console.log('  ✓ Успіх: Empty State надійно блокує спам неіснуючими відділеннями, зелену плашку "Обрана адреса" ліквідовано, кнопку "Скопіювати" перенесено ліворуч, ліміти приховані.\n');
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 16:', err.message, '\n');
@@ -1098,7 +1127,7 @@ async function runTests() {
       throw new Error(`Очікувалися Нові Білокоровичі (11051) для '11051', отримано: ${topUP3.city} (індекс: ${topUP3.postalCode})`);
     }
 
-    // 4. Перевірка UI у табі Укрпошти
+    // 4. Перевірка UI у табі Укрпошти: "житомир нові білокоровичі 1"
     btnUkrposhta.dispatchEvent({ type: 'click' });
     await sleep(200);
 
@@ -1115,11 +1144,27 @@ async function runTests() {
       throw new Error("У картці відділення Укрпошти відсутній поштовий індекс 11051");
     }
 
+    // Перевірка наявності бейджа або кнопки копіювання індексу в один клік
+    const hasIndexAction = fullText.includes('btn-copy-index-action') || fullText.includes('ukrposhta-index-badge');
+    if (!hasIndexAction) {
+      throw new Error("У картці Укрпошти відсутній блок швидкого копіювання індексу (.btn-copy-index-action або .ukrposhta-index-badge)");
+    }
+
+    // 5. Перевірка UI для запиту "житомир нові білокоровичі" (без номера)
+    searchInput.value = 'житомир нові білокоровичі';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const fullTextWithoutNum = resultsList.innerHTML;
+    if (!fullTextWithoutNum.includes('11051')) {
+      throw new Error("Запит 'житомир нові білокоровичі' без номера повинен виводити відділення з індексом 11051");
+    }
+
     // Повертаємо таб Нової Пошти назад
     btnNovaPoshta.dispatchEvent({ type: 'click' });
     await sleep(200);
 
-    console.log("  ✓ Успіх: Двосторонній пошук індексів бездоганно розпізнав 'житомир нові білокоровичі 1' та '11051', підтягнувши індекс 11051 (вул. Довженка, 20) без помилок.\n");
+    console.log("  ✓ Успіх: Двосторонній пошук індексів бездоганно розпізнав 'житомир нові білокоровичі 1', 'житомир нові білокоровичі' та '11051', підтягнувши індекс 11051 (вул. Довженка, 20) та бейдж індексу.\n");
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 21:', err.message, '\n');

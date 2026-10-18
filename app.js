@@ -992,17 +992,13 @@
       ${renamingHtml}
 
       <div class="card-foot">
-        <div class="card-foot-meta">
-          ${ukrposhtaIndexBadgeHtml}
-          <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
-          <span class="status-pill"><span class="status-dot"></span> Працює</span>
-        </div>
-        <div class="card-foot-actions" style="display: flex; gap: 8px; align-items: center;">
-          ${copyIndexBtnHtml}
-          <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
-            📋 Скопіювати
-          </button>
-        </div>
+        <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
+          📋 Скопіювати
+        </button>
+        ${copyIndexBtnHtml}
+        ${ukrposhtaIndexBadgeHtml}
+        <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
+        <span class="status-pill"><span class="status-dot"></span> Працює</span>
       </div>
     `;
 
@@ -1107,19 +1103,16 @@
       let backBtnHtml = '';
       if (filtered.length > 1) {
         backBtnHtml = `
-          <button type="button" class="btn-back-to-matches" id="btnBackToMatches">
-            <span>←</span>
-            <span>Показати всі збіги адреси (${filtered.length})</span>
-          </button>
+          <div class="selected-branch-header">
+            <button type="button" class="btn-back-to-matches" id="btnBackToMatches">
+              <span>←</span>
+              <span>Показати всі збіги адреси (${filtered.length})</span>
+            </button>
+          </div>
         `;
       }
 
-      container.innerHTML = `
-        <div class="selected-branch-header">
-          ${backBtnHtml}
-          <span class="selected-badge-indicator">✓ Обрана адреса</span>
-        </div>
-      `;
+      container.innerHTML = backBtnHtml;
 
       const card = createFullBranchCard(branch);
       container.appendChild(card);
