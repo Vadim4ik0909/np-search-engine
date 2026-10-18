@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.8.0">
+  <link rel="stylesheet" href="styles.css?v=8.10.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.9.0</span>
+          <span class="version-tag">v8.10.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,25 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.9.0 -->
+        <!-- Версія 8.10.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.10.0</span>
+            <span class="version-state">Google-like Omnibox: Нечіткий пошук, Поштомати та City Guard</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Інтелектуальна нормалізація запитів (Google-like Spellcheck):</strong> автоматичне склеювання розірваних слів (наприклад, <code>«коломи я 6»</code> ➔ <code>«Коломия №6»</code>) та нечітке розпізнавання міст за відстанню Левенштейна (<code>«коломыя»</code>, <code>«каломия»</code>).</li>
+            <li><strong>Пріоритет номера відділення та поштомату:</strong> числовий токен має найвищий пріоритет; усунено хибні повідомлення про відсутність існуючих точок.</li>
+            <li><strong>Повноцінна підтримка поштоматів:</strong> обробка слова «поштомат», «пм» та миттєвий пріоритетний пошук за 5-значним номером (наприклад, <code>«33159»</code> або <code>«львів поштомат 33159»</code>).</li>
+            <li><strong>City Autocomplete Guard:</strong> випадаючий список міст показується лише при чистому текстовому введенні. Поява будь-якої цифри негайно приховує поп-ап, не перекриваючи картки знайдених відділень.</li>
+            <li><strong>Очищення пунктуації:</strong> фільтрація сміттєвих тире, дефісів і підкреслень (<code>«нова пошта --- коломи я 6»</code>).</li>
+            <li><strong>Розширений тестовий комплекс (14 / 14 автотестів):</strong> 100% покриття сценаріїв пошуку міст, відділень, поштоматів та поведінки поп-апів.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.9.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.9.0</span>
             <span class="version-state">Smart Omnibox: Multi-token AND та Ваговий Скоринг</span>
@@ -452,12 +469,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.8.0"></script>
+  <script src="data/branches.js?v=8.10.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.8.0"></script>
+  <script src="data/fuzzySearch.js?v=8.10.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.8.0"></script>
+  <script src="app.js?v=8.10.0"></script>
 </body>
 </html>
