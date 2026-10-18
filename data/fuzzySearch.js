@@ -157,6 +157,19 @@
     for (let item of OBLAST_SHORT_ALIASES) {
       if (item.aliases.includes(t)) return item.name;
     }
+    // Стем-префіксне розпізнавання областей (Region Stemming):
+    // Якщо токен має довжину від 3 символів і є префіксом назви області (і не є точним містом)
+    if (t.length >= 3) {
+      for (let obl of OBLASTS) {
+        const oLower = obl.name.toLowerCase();
+        if (oLower.startsWith(t)) {
+          const isExactCity = Array.isArray(UKRAINE_SETTLEMENTS) && UKRAINE_SETTLEMENTS.some(s => s.name.toLowerCase() === t);
+          if (!isExactCity) {
+            return obl.name;
+          }
+        }
+      }
+    }
     return null;
   }
 
@@ -1482,6 +1495,14 @@
       // Ваговий скоринг (Scoring):
       let score = 0;
 
+      // 1. Прямий пошук поштоматів за довгим номером (4-5 цифр):
+      // Точний збіг номера поштомату b.number === token з найвищим пріоритетом (+2000 балів)
+      const hasExactLongNum = tokens.some(tok => /^\d{4,5}$/.test(tok) && bNum === tok) ||
+                              (facets.number && /^\d{4,5}$/.test(facets.number) && bNum === facets.number);
+      if (hasExactLongNum) {
+        score += 2000;
+      }
+
       // Точний збіг номера відділення / поштомату (найвищий абсолютний пріоритет: +1000 балів)
       if (facets.number) {
         if (bNum === facets.number) {
@@ -1584,6 +1605,8 @@
     buildNormalizedSearchText,
     searchBranches,
     filterBranchesByNormalizedSearch,
+    isOblastToken,
+    OBLAST_SHORT_ALIASES,
     OBLASTS,
     UKRAINE_SETTLEMENTS,
     RENAMED_REGISTRY

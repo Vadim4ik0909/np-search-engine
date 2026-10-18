@@ -190,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 18;
+  let totalTests = 19;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -953,6 +953,53 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 18:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 19: Прямий пошук поштоматів за довгим номером ("33159", "львів 33159") та Region Stemming
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 19: Прямий пошук поштоматів за довгим номером ("33159", "львів 33159") та Region Stemming');
+  try {
+    const branches = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Пошук суто за номером "33159"
+    const resNumOnly = window.SmartSearchEngine.searchBranches('33159', branches, 5);
+    if (!resNumOnly || resNumOnly.length === 0) {
+      throw new Error("Не знайдено поштомат за прямим 5-значним номером '33159'");
+    }
+    const topNum = resNumOnly[0];
+    if (topNum.number !== '33159' || topNum.city !== 'Львів') {
+      throw new Error(`Очікувався Львів №33159, отримано: ${topNum.city} №${topNum.number}`);
+    }
+
+    // 2. Пошук за комбінацією "львів 33159"
+    const resCityNum = window.SmartSearchEngine.searchBranches('львів 33159', branches, 5);
+    if (!resCityNum || resCityNum.length === 0) {
+      throw new Error("Не знайдено поштомат за комбінацією 'львів 33159'");
+    }
+    const topCityNum = resCityNum[0];
+    if (topCityNum.number !== '33159' || topCityNum.city !== 'Львів') {
+      throw new Error(`Очікувався Львів №33159 для 'львів 33159', отримано: ${topCityNum.city} №${topCityNum.number}`);
+    }
+
+    // 3. Перевірка Region Stemming (стем-префікси від 3 символів)
+    if (window.SmartSearchEngine.isOblastToken('хмель') !== 'Хмельницька') {
+      throw new Error("isOblastToken('хмель') повинен повертати 'Хмельницька'");
+    }
+    if (window.SmartSearchEngine.isOblastToken('терн') !== 'Тернопільська') {
+      throw new Error("isOblastToken('терн') повинен повертати 'Тернопільська'");
+    }
+    if (window.SmartSearchEngine.isOblastToken('льв') !== 'Львівська') {
+      throw new Error("isOblastToken('льв') повинен повертати 'Львівська'");
+    }
+    if (window.SmartSearchEngine.isOblastToken('львів') !== null) {
+      throw new Error("isOblastToken('львів') повинен повертати null (місто Львів не є скороченням області)");
+    }
+
+    console.log("  ✓ Успіх: Прямий пошук поштоматів за довгим номером ('33159', 'львів 33159') миттєво знаходить цільовий поштомат на 1-му місці, а Region Stemming бездоганно розпізнає 'хмель', 'терн', 'льв'.\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 19:', err.message, '\n');
   }
 
   console.log('===============================================================');

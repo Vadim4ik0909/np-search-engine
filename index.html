@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.14.0">
+  <link rel="stylesheet" href="styles.css?v=8.15.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.14.0</span>
+          <span class="version-tag">v8.15.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,23 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.14.0 -->
+        <!-- Версія 8.15.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.15.0</span>
+            <span class="version-state">Адаптивний Google-подібний Omnibox та Region Stemming</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Прямий пошук поштоматів за довгим номером (+2000 балів):</strong> при наявності 4-5-значного номера (наприклад, <code>«33159»</code> або <code>«львів 33159»</code>) точний поштомат миттєво займає 1-ше місце з найвищим пріоритетом.</li>
+            <li><strong>Стем-префіксне розпізнавання областей (Region Stemming):</strong> підтримка довільних 3+ літерних префіксів областей (<code>«хмель»</code> ➔ Хмельницька, <code>«терн»</code> ➔ Тернопільська, <code>«льв»</code> ➔ Львівська) з автоматичною ізоляцією від назв вулиць чи міст.</li>
+            <li><strong>Exact Settlement Guard:</strong> гарантований пріоритет точної назви міста (<code>«славута хмель 2»</code> повертає Славуту №2 у Хмельницькій обл. без підміни на Славутич).</li>
+            <li><strong>100% успішність розширеного комплексу автотестів (19 / 19):</strong> верифіковано прямий пошук поштоматів, стем-префікси та захист від колізій.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.14.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.14.0</span>
             <span class="version-state">Exact Match Priority та Словник скорочень областей</span>
@@ -549,12 +564,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.14.0"></script>
+  <script src="data/branches.js?v=8.15.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.14.0"></script>
+  <script src="data/fuzzySearch.js?v=8.15.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.14.0"></script>
+  <script src="app.js?v=8.15.0"></script>
 </body>
 </html>
