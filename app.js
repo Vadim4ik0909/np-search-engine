@@ -635,7 +635,8 @@
       }
     }
     const city = branch.city || '';
-    street = street.replace(new RegExp(`^${city}[,\\s]*`, 'i'), '').trim();
+    const escapedCity = city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    street = street.replace(new RegExp(`^${escapedCity}[,\\s]*`, 'i'), '').trim();
     if (!/^(вул|просп|проспект|пл|площа|бульв|бульвар|урочище|набережна|пров|провулок)/i.test(street)) {
       street = 'вул. ' + street;
     }

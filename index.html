@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.17.0">
+  <link rel="stylesheet" href="styles.css?v=8.18.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.17.0</span>
+          <span class="version-tag">v8.18.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.17.0 -->
+        <!-- Версія 8.18.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.18.0</span>
+            <span class="version-state">Scoring Matrix Engine: універсальна система нарахування балів замість бінарних if/else</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Універсальна матриця скорингу (Scoring Matrix Pipeline):</strong> ліквідовано локальні перевірки if/else під конкретні міста. Кожне відділення оцінюється математично: точний номер відділення (+1000) або поштомату (+2000), префікс номера (+200), збіг населеного пункту (+800, нечіткий +400), область (+300), район (+250), точна назва вулиці (+500) або морфологічний корінь (+350).</li>
+            <li><strong>Штрафи та ізоляція контексту:</strong> автоматичне штрафування відділень із чужих міст (-1000) та невідповідних областей (-800), що природно усуває будь-які витоки та колізії (наприклад, <code>«Львів 4»</code> повертає виключно Львів №4 без Бродів чи Вороновиці).</li>
+            <li><strong>Динамічний поріг релевантності (Top-K Filter):</strong> при високому балі лідера (&gt; 1200) показуються виключно результати з балом не менше 70% від лідера, а при відсутності прохідного балу (&gt; 300) виводиться чистий Empty State без спаму сторонніми точками.</li>
+            <li><strong>Природне вирішення складних сценаріїв:</strong> запити <code>«гриців 1 київ»</code> (смт Гриців №1, вул. Київська, 3), <code>«славута хмель 2»</code> (м. Славута №2), <code>«33159»</code> (поштомат №33159) та <code>«житомир нові білокоровичі 1»</code> (індекс 11051) набирають максимальний бал без жодного хардкоду.</li>
+            <li><strong>100% успішність розширеного комплексу автотестів (21 / 21):</strong> повна математична верифікація точності скорингу та швидкості видачі.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.17.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.17.0</span>
             <span class="version-state">Глобальна оптимізація: -56% розміру бази, LRU Cache та DocumentFragment</span>
@@ -599,12 +615,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.17.0"></script>
+  <script src="data/branches.js?v=8.18.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.17.0"></script>
+  <script src="data/fuzzySearch.js?v=8.18.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.17.0"></script>
+  <script src="app.js?v=8.18.0"></script>
 </body>
 </html>

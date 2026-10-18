@@ -1365,7 +1365,7 @@
     return { city, number, oblast, raion, streetTokens, settlementOblast };
   }
 
-  // 9. ОПТИМІЗОВАНИЙ ДВИГУН ПОШУКУ З LRU КЕШУВАННЯМ ТА ВАГОВИМ СКОРИНГОМ
+  // 9. ОПТИМІЗОВАНИЙ ДВИГУН ПОШУКУ З LRU КЕШУВАННЯМ ТА УНІВЕРСАЛЬНИМ СКОРИНГОМ (SCORING MATRIX ENGINE)
   const SEARCH_LRU_LIMIT = 50;
   const _searchLruCache = new Map();
 
@@ -1373,7 +1373,8 @@
     if (!rawQuery || !Array.isArray(branches) || branches.length === 0) return [];
 
     // Швидкісний In-Memory LRU Cache (0 ms відгук при Backspace або повторі запиту)
-    const serviceTag = (branches[0] && branches[0].id && branches[0].id.startsWith('up-')) ? 'up' : 'np';
+    const isUkrposhta = (branches[0] && branches[0].id && branches[0].id.startsWith('up-')) || false;
+    const serviceTag = isUkrposhta ? 'up' : 'np';
     const cacheKey = rawQuery.trim().toLowerCase() + '|' + serviceTag + '|' + limit;
     if (_searchLruCache.has(cacheKey)) {
       const cached = _searchLruCache.get(cacheKey);
@@ -1382,7 +1383,7 @@
       return cached;
     }
 
-    // Інтелектуальна нормалізація токенів (очищення пунктуації, склеювання розірваних слів, нечітке зіставлення міст)
+    // Інтелектуальна нормалізація токенів
     const norm = normalizeSearchTokens(rawQuery);
     let tokens = norm.tokens;
     if (tokens.length === 0) return [];
@@ -1391,220 +1392,155 @@
     const hasPostomatKeyword = norm.hasPostomatKeyword;
     const hasBranchKeyword = norm.hasBranchKeyword;
     const detectedCityName = facets.city ? facets.city.toLowerCase() : (norm.detectedCity ? norm.detectedCity.name.toLowerCase() : null);
-
-    // 1. КОНТЕКСТНА ІЗОЛЯЦІЯ (Context Isolation)
-    let candidateBranches = branches;
-    if (detectedCityName) {
-      const cityFiltered = branches.filter(b => (b.city || '').toLowerCase() === detectedCityName);
-      if (cityFiltered.length > 0) {
-        candidateBranches = cityFiltered;
-      }
-    }
-
-    // Якщо вказана область, звужуємо пошук по області
     const targetOblast = facets.oblast ? facets.oblast.toLowerCase() : (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
-    if (targetOblast) {
-      const oblClean = targetOblast.replace(/\s*(?:область|обл\.?)$/i, '').replace(/(?:ська|цька|зька)$/i, '');
-      const oblFiltered = candidateBranches.filter(b => (b.oblast || '').toLowerCase().includes(oblClean));
-      if (oblFiltered.length > 0) {
-        candidateBranches = oblFiltered;
+
+    // Підготовка числових токенів
+    const numTokens = tokens.filter(t => /^\d+$/.test(t));
+    if (facets.number && !numTokens.includes(facets.number)) {
+      numTokens.push(facets.number);
+    }
+    const hasExplicitNumber = numTokens.length > 0;
+
+    // Підготовка токенів області / скорочень
+    let queryOblastName = targetOblast;
+    if (!queryOblastName) {
+      for (let t of tokens) {
+        const obl = isOblastToken(t);
+        if (obl) {
+          queryOblastName = obl.toLowerCase();
+          break;
+        }
       }
     }
+    const queryOblastClean = queryOblastName ? queryOblastName.replace(/(?:ська|цька|зька| область| обл\.?)$/gi, '').slice(0, 4) : null;
+    const queryRaionClean = facets.raion ? facets.raion.toLowerCase().replace(/(?:ський|цький|зький| район| р-н)$/gi, '').slice(0, 4) : null;
+
+    // Підготовка кандидатів у назву вулиці (без цифр, без міста, без області)
+    const streetCandidates = (facets.streetTokens || []).concat(
+      tokens.filter(t => !/^\d+$/.test(t) && t !== detectedCityName && !isOblastToken(t) && !STOP_WORDS.has(t))
+    );
+    const uniqueStreetTokens = Array.from(new Set(streetCandidates)).filter(t => t.length >= 2);
+    const cityStem = detectedCityName ? detectedCityName.slice(0, 4) : null;
 
     const matched = [];
 
-    // Попередня компіляція та класифікація токенів ДО старту циклу (Zero-Allocation inside 55k loop)
-    const tokenMeta = tokens.map(tok => {
-      const isDigit = /^\d+$/.test(tok);
-      const isLongDigit = isDigit && tok.length >= 4 && tok.length <= 5;
-      return {
-        tok,
-        isDigit,
-        isLongDigit,
-        regex: isDigit ? new RegExp('(?<!\\d)' + tok + '(?!\\d)', 'u') : null
-      };
-    });
-
-    const longDigitTokens = tokenMeta.filter(tm => tm.isLongDigit).map(tm => tm.tok);
-    const facetsIsLongNum = facets.number && /^\d{4,5}$/.test(facets.number);
-
-    for (let i = 0; i < candidateBranches.length; i++) {
-      const b = candidateBranches[i];
-      let searchTarget = b.normalizedSearchText;
+    // МАТРИЦЯ СКОРИНГУ (Scoring Matrix Pipeline)
+    for (let i = 0; i < branches.length; i++) {
+      const b = branches[i];
+      let score = 0;
 
       const isPostomat = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || (b.name && b.name.toLowerCase().includes('поштомат'));
       const bNum = (b.number || '').toString();
       const bCity = (b.city || '').toLowerCase();
-      const bStreet = (b.street || '').toLowerCase();
+      const bStreet = ((b.street || '') + ' ' + (b.address || '')).toLowerCase();
       const bOblast = (b.oblast || '').toLowerCase();
       const bRaion = (b.raion || '').toLowerCase();
-
-      // Фільтр категорій: якщо явно вказано 'поштомат' або 'відділення'
-      if (hasPostomatKeyword && !isPostomat) {
-        continue;
-      }
-      if (hasBranchKeyword && isPostomat) {
-        continue;
-      }
-
-      // Multi-token AND: кожен введений токен має обов'язково збігатися
-      let matchesAll = true;
-      let targetWords = null;
-
-      for (let t = 0; t < tokenMeta.length; t++) {
-        const tm = tokenMeta[t];
-        const tok = tm.tok;
-        if (STOP_WORDS.has(tok)) continue;
-
-        if (tm.isDigit) {
-          if (bNum === tok) continue;
-          if (isPostomat && bNum.startsWith(tok)) continue;
-          // Фолбек для Укрпошти: одиночна цифра не відсікає відділення мікропункту
-          const isUkrposhtaBranch = (b.id && b.id.startsWith('up-')) || /^\d{5}$/.test(bNum) || (b.postalCode && /^\d{5}$/.test(b.postalCode));
-          if (isUkrposhtaBranch && tok.length <= 2 && detectedCityName && bCity === detectedCityName) {
-            continue;
-          }
-
-          // Швидка перевірка: якщо цифри немає ні в номері, ні в вулиці, ні в індексі, ні в назві
-          const bPost = (b.postalCode || '').toString();
-          const bNameLower = (b.name || '').toLowerCase();
-          if (!bNum.includes(tok) && !bStreet.includes(tok) && !bPost.includes(tok) && !bNameLower.includes(tok)) {
-            matchesAll = false;
-            break;
-          }
-
-          if (!searchTarget) {
-            searchTarget = buildNormalizedSearchText(b);
-            b.normalizedSearchText = searchTarget;
-          }
-          if (!searchTarget.includes(tok) || !tm.regex.test(searchTarget)) {
-            matchesAll = false;
-            break;
-          }
-        } else {
-          // Якщо токен є назвою знайденого міста, перевіряємо місто відділення
-          if (detectedCityName && (tok === detectedCityName || tok === bCity)) {
-            continue;
-          }
-
-          // Якщо токен є скороченням або назвою області
-          if (isOblastToken(tok)) {
-            const oblName = isOblastToken(tok).toLowerCase().slice(0, 5);
-            if (bOblast.includes(oblName) || (targetOblast && targetOblast.includes(oblName))) {
-              continue;
-            }
-          }
-          if (targetOblast && (bOblast.includes(tok) || tok.includes(targetOblast.slice(0, 5)))) {
-            continue;
-          }
-          if (facets.raion && (bRaion.includes(tok) || tok.includes(facets.raion.toLowerCase().slice(0, 5)))) {
-            continue;
-          }
-
-          // Перевірка збігу вулиці з морфологією кореня (getUkrainianStem)
-          if (matchStreetOrAddress(b, tok)) {
-            continue;
-          }
-
-          if (!searchTarget) {
-            searchTarget = buildNormalizedSearchText(b);
-            b.normalizedSearchText = searchTarget;
-          }
-          if (searchTarget.includes(tok)) continue;
-
-          // Швидке відсікання
-          if (tok.length >= 3 && !searchTarget.includes(tok.slice(0, 3))) {
-            matchesAll = false;
-            break;
-          }
-
-          if (!targetWords) targetWords = searchTarget.split(/\s+/);
-          const wordMatch = targetWords.some(w => matchesWord(tok, w));
-          if (!wordMatch) {
-            const fuzzyWordMatch = tok.length >= 4 && targetWords.some(w => w.length >= 4 && Math.abs(tok.length - w.length) <= 1 && damerauLevenshtein(tok, w) <= 1);
-            if (!fuzzyWordMatch) {
-              matchesAll = false;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!matchesAll) continue;
-
-      // Ваговий скоринг (Scoring):
-      let score = 0;
-
-      // 1. Прямий пошук поштоматів та індексів Укрпошти за довгим номером (4-5 цифр):
       const bPostal = (b.postalCode || '').toString();
-      const hasExactLongNum = (longDigitTokens.length > 0 && longDigitTokens.some(tok => bNum === tok || bPostal === tok)) ||
-                              (facetsIsLongNum && (bNum === facets.number || bPostal === facets.number));
-      if (hasExactLongNum) {
-        score += 2000;
+
+      // Фільтр ключових слів поштомату / відділення
+      if (hasPostomatKeyword) {
+        if (isPostomat) score += 150;
+        else score -= 1000;
+      }
+      if (hasBranchKeyword) {
+        if (!isPostomat) score += 150;
+        else score -= 1000;
       }
 
-      // Точний збіг номера відділення / поштомату / індексу (найвищий абсолютний пріоритет: +1000 балів)
-      if (facets.number) {
-        if (bNum === facets.number || bPostal === facets.number) {
-          score += 1000;
-        } else if (isPostomat && bNum.startsWith(facets.number)) {
-          score += 200;
-        }
-      }
-
-      for (let t = 0; t < tokenMeta.length; t++) {
-        const tm = tokenMeta[t];
-        const tok = tm.tok;
-        if (tm.isDigit) {
-          if (bNum === tok || bPostal === tok) {
-            score += 350;
-          } else if (isPostomat && bNum.startsWith(tok)) {
-            score += 120;
-          } else {
-            score += 15;
-          }
-        } else {
-          // Збіг назви міста:
-          if (detectedCityName && (tok === detectedCityName || bCity === detectedCityName)) {
-            score += 150;
-          } else if (bCity === tok) {
-            score += 100;
-          } else if (bCity.startsWith(tok)) {
-            score += 50;
-          }
-
-          // Збіг по назві вулиці (з урахуванням кореня):
-          if (matchStreetOrAddress(b, tok)) {
-            score += 250;
-          } else if (bStreet.includes(tok)) {
-            score += 80;
-          }
-
-          // Збіг по області:
-          if (isOblastToken(tok)) {
-            const oblName = isOblastToken(tok).toLowerCase().slice(0, 5);
-            if (bOblast.includes(oblName)) {
-              score += 60;
+      // 1. ТОЧНИЙ НОМЕР ВІДДІЛЕННЯ / ПОШТОМАТУ:
+      // - Якщо введено 4-5 цифр (поштомат) і b.number === token: +2000 балів.
+      // - Якщо b.number === token (звичайне відділення): +1000 балів.
+      // - Якщо b.number лише починається з token: +200 балів.
+      let numMatched = false;
+      if (hasExplicitNumber) {
+        for (let t = 0; t < numTokens.length; t++) {
+          const numTok = numTokens[t];
+          const isLongNum = numTok.length >= 4 && numTok.length <= 5;
+          if (bNum === numTok || bPostal === numTok) {
+            numMatched = true;
+            if (isLongNum || isPostomat) {
+              score += 2000;
+            } else {
+              score += 1000;
             }
-          } else if (bOblast.includes(tok)) {
-            score += 50;
+          } else if (isPostomat && bNum.startsWith(numTok)) {
+            numMatched = true;
+            score += 200;
+          } else if (bNum.startsWith(numTok) && bNum.length <= numTok.length + 1) {
+            numMatched = true;
+            score += 200;
           }
+        }
 
-          // Збіг по району:
-          if (bRaion.includes(tok)) {
-            score += 40;
+        // Штраф за невідповідний номер, якщо номер було вказано
+        if (!numMatched) {
+          // Виняток для Укрпошти у селах: номер 1 не штрафує відділення села, якщо індекс 5-значний
+          const isUkrMicro = isUkrposhta && numTokens.some(t => t.length <= 2) && detectedCityName && bCity === detectedCityName;
+          if (!isUkrMicro) {
+            score -= 600;
           }
         }
       }
 
-      // Додатковий скоринг за збіг цільової області
-      if (targetOblast && bOblast.includes(targetOblast.replace(/(?:ська|цька|зька)$/i, ''))) {
-        score += 80;
+      // 2. НАСЕЛЕНИЙ ПУНКТ (Місто / Село / СМТ):
+      // - Точний збіг назви міста (b.city === token): +800 балів.
+      // - Нечіткий збіг або корінь міста (Levenshtein <= 1 чи стем): +400 балів (-50 за одруківку).
+      // - Якщо місто вказано, а відділення з іншого міста: мінус 1000 балів (жорсткий штраф).
+      if (detectedCityName) {
+        if (bCity === detectedCityName) {
+          score += 800;
+        } else {
+          const dist = damerauLevenshtein(bCity, detectedCityName);
+          if (dist <= 1 && Math.abs(bCity.length - detectedCityName.length) <= 1) {
+            score += 400 - (dist * 50);
+          } else if (cityStem && (bCity.startsWith(cityStem) || detectedCityName.startsWith(bCity.slice(0, 4)))) {
+            score += 350;
+          } else {
+            score -= 1000; // жорсткий штраф за чуже місто
+          }
+        }
+      } else {
+        // Якщо місто не було явно виділене, перевіряємо збіг токенів із містом відділення
+        for (let t = 0; t < tokens.length; t++) {
+          const tok = tokens[t];
+          if (/^\d+$/.test(tok) || STOP_WORDS.has(tok)) continue;
+          if (bCity === tok) {
+            score += 800;
+            break;
+          } else if (tok.length >= 4 && (bCity.startsWith(tok) || tok.startsWith(bCity))) {
+            score += 400;
+            break;
+          }
+        }
       }
 
-      // Додатковий скоринг при явному слові 'поштомат'
-      if (hasPostomatKeyword && isPostomat) {
-        score += 150;
+      // 3. ОБЛАСТЬ / РАЙОН:
+      // - Збіг області (включно зі скороченнями): +300 балів.
+      // - Збіг району: +250 балів.
+      if (queryOblastClean) {
+        if (bOblast.includes(queryOblastClean)) {
+          score += 300;
+        } else {
+          score -= 800; // штраф за іншу область при явно вказаній
+        }
+      }
+
+      if (queryRaionClean) {
+        if (bRaion.includes(queryRaionClean)) {
+          score += 250;
+        }
+      }
+
+      // 4. ВУЛИЦЯ:
+      // - Точний збіг слова з вулицею: +500 балів.
+      // - Входження кореня слова у назву вулиці (b.street): +350 балів.
+      for (let t = 0; t < uniqueStreetTokens.length; t++) {
+        const tok = uniqueStreetTokens[t];
+        if (bStreet.includes(tok)) {
+          score += 500;
+        } else if (matchStreetOrAddress(b, tok)) {
+          score += 350;
+        }
       }
 
       // Обласний центр / велике місто: +10 балів
@@ -1612,12 +1548,34 @@
         score += 10;
       }
 
-      matched.push({ branch: b, score });
+      // Прохідний поріг для кандидатів
+      if (score > 300) {
+        matched.push({ branch: b, score });
+      }
+    }
+
+    // 2. ДИНАМІЧНИЙ ПОРІГ РЕЛЕВАНТНОСТІ (Top-K Filter)
+    if (matched.length === 0) {
+      _searchLruCache.set(cacheKey, []);
+      return [];
     }
 
     matched.sort((a, b) => b.score - a.score);
 
-    const finalResults = matched.slice(0, limit).map(m => m.branch);
+    const leaderScore = matched[0].score;
+    if (leaderScore < 300) {
+      _searchLruCache.set(cacheKey, []);
+      return [];
+    }
+
+    let filtered = matched;
+    // Відсікання сміття: якщо лідер набрав високий бал (> 1200), показувати тільки його або результати з балом >= 70% від лідера
+    if (leaderScore >= 1200) {
+      const threshold = leaderScore * 0.7;
+      filtered = matched.filter(m => m.score >= threshold);
+    }
+
+    const finalResults = filtered.slice(0, limit).map(m => m.branch);
 
     // Збереження в LRU Cache
     if (_searchLruCache.size >= SEARCH_LRU_LIMIT) {
