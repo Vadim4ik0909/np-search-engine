@@ -256,7 +256,7 @@
     { name: 'Зборів', oblast: 'Тернопільська', raion: 'Тернопільський', type: 'місто', lat: 49.6639, lng: 25.1431, postalCodes: ['47200'], aliases: ['зборів', 'зборов'], streets: ['вул. Богдана Хмельницького'] },
 
     // --- ЛЬВІВСЬКА ОБЛАСТЬ ---
-    { name: 'Львів', oblast: 'Львівська', raion: 'Львівський', type: 'місто', lat: 49.8397, lng: 24.0297, postalCodes: ['79000', '79001'], aliases: ['львів', 'львов', 'львив', 'lviv', 'львув', 'сихів'], streets: ['вул. Городоцька', 'пл. Ринок', 'просп. Червоної Калини', 'вул. Стрийська', 'вул. Наукова', 'вул. Зелена', 'просп. Чорновола'] },
+    { name: 'Львів', oblast: 'Львівська', raion: 'Львівський', type: 'місто', lat: 49.8397, lng: 24.0297, postalCodes: ['79000', '79001', '79049'], aliases: ['львів', 'львов', 'львив', 'lviv', 'львув', 'сихів'], streets: ['вул. Городоцька', 'пл. Ринок', 'просп. Червоної Калини', 'вул. Стрийська', 'вул. Наукова', 'вул. Зелена', 'просп. Чорновола'] },
     { name: 'Миколаїв', oblast: 'Львівська', raion: 'Стрийський', type: 'місто', lat: 49.5233, lng: 23.9856, postalCodes: ['81600'], aliases: ['миколаїв львівська', 'миколаїв стрийський'], streets: ['вул. Шевченка', 'вул. Львівська'] },
     { name: 'Дрогобич', oblast: 'Львівська', raion: 'Дрогобицький', type: 'місто', lat: 49.3514, lng: 23.5042, postalCodes: ['82100'], aliases: ['дрогобич', 'дрогобыч', 'drohobych'], streets: ['вул. Пилипа Орлика', 'вул. Стрийська', 'вул. Самбірська'] },
     { name: 'Стрий', oblast: 'Львівська', raion: 'Стрийський', type: 'місто', lat: 49.2558, lng: 23.8569, postalCodes: ['82400'], aliases: ['стрий', 'стрый', 'stryi'], streets: ['вул. Шевченка', 'вул. Богдана Хмельницького'] },
@@ -1447,16 +1447,23 @@
         else score -= 1000;
       }
 
-      // 1. ТОЧНИЙ НОМЕР ВІДДІЛЕННЯ / ПОШТОМАТУ:
+      // 1. ТОЧНИЙ НОМЕР ВІДДІЛЕННЯ / ПОШТОМАТУ ТА ІНДЕКС УКРПОШТИ:
+      // - Якщо вкладка Укрпошта і 5-значний індекс (b.postalCode === token або b.number === token): +2500 балів.
       // - Якщо введено 4-5 цифр (поштомат) і b.number === token: +2000 балів.
       // - Якщо b.number === token (звичайне відділення): +1000 балів.
       // - Якщо b.number лише починається з token: +200 балів.
+      // - Якщо число є номером будинку у вулиці/адресі: +400 балів (без штрафу).
       let numMatched = false;
       if (hasExplicitNumber) {
         for (let t = 0; t < numTokens.length; t++) {
           const numTok = numTokens[t];
           const isLongNum = numTok.length >= 4 && numTok.length <= 5;
-          if (bNum === numTok || bPostal === numTok) {
+          const is5Digit = numTok.length === 5;
+
+          if (isUkrposhta && is5Digit && (bPostal === numTok || bNum === numTok)) {
+            numMatched = true;
+            score += 2500;
+          } else if (bNum === numTok || bPostal === numTok) {
             numMatched = true;
             if (isLongNum || isPostomat) {
               score += 2000;
@@ -1469,6 +1476,9 @@
           } else if (bNum.startsWith(numTok) && bNum.length <= numTok.length + 1) {
             numMatched = true;
             score += 200;
+          } else if (new RegExp('(?:^|[^0-9])' + numTok + '(?![0-9])').test(bStreet)) {
+            numMatched = true;
+            score += 400;
           }
         }
 

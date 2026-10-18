@@ -212,7 +212,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 21;
+  let totalTests = 22;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1178,6 +1178,81 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 21:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 22: Прямий індексний пошук Укрпошти ("79049" -> Львів, просп. Червоної Калини, 113)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 22: Прямий індексний пошук Укрпошти ("79049" -> Львів, просп. Червоної Калини, 113)');
+  try {
+    const upPool = window.BRANCHES_DATA.ukrposhta;
+    const btnUkrposhta = elementsById['btnUkrposhta'];
+    const btnNovaPoshta = elementsById['btnNovaPoshta'];
+    const searchInput = elementsById['searchInput'];
+    const resultsList = elementsById['resultsList'];
+
+    // 1. Пошук за 5-значним індексом "79049" у функції пошукового рушія
+    const res1 = window.SmartSearchEngine.searchBranches('79049', upPool, 5);
+    if (!res1 || res1.length === 0) {
+      throw new Error("Не знайдено відділення Укрпошти за індексом '79049'");
+    }
+    const top1 = res1[0];
+    if (top1.postalCode !== '79049' || top1.city !== 'Львів') {
+      throw new Error(`Очікувався Львів (79049), отримано: ${top1.city} (індекс: ${top1.postalCode})`);
+    }
+    if (!top1.street || !top1.street.includes('Червоної Калини')) {
+      throw new Error(`Очікувалася вулиця 'просп. Червоної Калини, 113', отримано: ${top1.street}`);
+    }
+
+    // 2. Пошук за адресою "львів червоної калини 113" у функції пошукового рушія
+    const res2 = window.SmartSearchEngine.searchBranches('львів червоної калини 113', upPool, 5);
+    if (!res2 || res2.length === 0) {
+      throw new Error("Не знайдено відділення Укрпошти за запитом 'львів червоної калини 113'");
+    }
+    const top2 = res2[0];
+    if (top2.postalCode !== '79049' || top2.city !== 'Львів') {
+      throw new Error(`Очікувався Львів (79049), отримано: ${top2.city} (індекс: ${top2.postalCode})`);
+    }
+
+    // 3. UI перевірка в табі Укрпошти: введення "79049"
+    btnUkrposhta.dispatchEvent({ type: 'click' });
+    await sleep(200);
+
+    searchInput.value = '79049';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const emptyBoxUP1 = resultsList.querySelector('.empty-results-box');
+    if (emptyBoxUP1) {
+      throw new Error(`Укрпошта помилково показала Empty State для '79049': "${emptyBoxUP1.textContent.trim()}"`);
+    }
+    let htmlUP = resultsList.innerHTML;
+    if (!htmlUP.includes('79049') || !htmlUP.includes('Червоної Калини')) {
+      throw new Error("Картка результатів Укрпошти для '79049' не містить індекс 79049 або вулицю Червоної Калини");
+    }
+
+    // 4. UI перевірка в табі Укрпошти: введення "львів червоної калини 113"
+    searchInput.value = 'львів червоної калини 113';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const emptyBoxUP2 = resultsList.querySelector('.empty-results-box');
+    if (emptyBoxUP2) {
+      throw new Error(`Укрпошта помилково показала Empty State для 'львів червоної калини 113': "${emptyBoxUP2.textContent.trim()}"`);
+    }
+    htmlUP = resultsList.innerHTML;
+    if (!htmlUP.includes('79049') || !htmlUP.includes('Червоної Калини')) {
+      throw new Error("Картка результатів Укрпошти для 'львів червоної калини 113' не містить індекс 79049");
+    }
+
+    // Повертаємо таб Нової Пошти назад
+    btnNovaPoshta.dispatchEvent({ type: 'click' });
+    await sleep(200);
+
+    console.log("  ✓ Успіх: Запити '79049' та 'львів червоної калини 113' у табі Укрпошти безпомилково знаходять відділення у м. Львів (просп. Червоної Калини, 113) з індексом 79049.\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 22:', err.message, '\n');
   }
 
   console.log('===============================================================');

@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.18.0</span>
+          <span class="version-tag">v8.18.1</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,23 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.18.0 -->
+        <!-- Версія 8.18.1 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.18.1</span>
+            <span class="version-state">Прямий індексний пошук Укрпошти (Postal Code Direct Match)</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Прямий індексний пошук Укрпошти (+2500 балів):</strong> при активній вкладці Укрпошти 5-значний індекс (наприклад, <code>«79049»</code>) має абсолютний пріоритет зіставлення з полем <code>postalCode</code> та <code>number</code>, миттєво підтягуючи цільове відділення на 1-му місці навіть якщо номер відділення відрізняється (наприклад, №49 або №79049).</li>
+            <li><strong>Пошук за адресою та номером будинку:</strong> запит <code>«львів червоної калини 113»</code> безпомилково знаходить міське відділення №79049 на просп. Червоної Калини, 113 з розпізнаванням номера будинку без штрафів за відсутність номера відділення.</li>
+            <li><strong>Розширення бази Укрпошти:</strong> додано відділення <code>up-79049</code> (м. Львів, просп. Червоної Калини, 113, Міське відділення №79049) з повними гео- та адресними атрибутами.</li>
+            <li><strong>100% успішність розширеного комплексу автотестів (22 / 22):</strong> верифіковано прямий пошук за індексом 79049, адресний пошук та повний набір сценаріїв Нової Пошти й Укрпошти.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.18.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.18.0</span>
             <span class="version-state">Scoring Matrix Engine: універсальна система нарахування балів замість бінарних if/else</span>
