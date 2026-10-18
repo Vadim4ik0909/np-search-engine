@@ -128,6 +128,38 @@
     { name: 'Херсонська', aliases: ['херсонська', 'херсонская', 'херсонщина', 'херсонська область', 'херсонська обл'] }
   ];
 
+  // 2.1. СЛОВНИК ПОПУЛЯРНИХ СКОРОЧЕНЬ ОБЛАСТЕЙ (Oblast Aliases)
+  const OBLAST_SHORT_ALIASES = [
+    { name: 'Хмельницька', aliases: ['хмель', 'хмел', 'хм'] },
+    { name: 'Тернопільська', aliases: ['терн', 'терноп'] },
+    { name: 'Івано-Франківська', aliases: ['франк', 'іф', 'иф', 'прикарпаття'] },
+    { name: 'Дніпропетровська', aliases: ['дніпро', 'днепр', 'дн'] },
+    { name: 'Вінницька', aliases: ['вінн', 'винн'] },
+    { name: 'Запорізька', aliases: ['запор', 'зп'] },
+    { name: 'Львівська', aliases: ['льв'] },
+    { name: 'Житомирська', aliases: ['житом', 'жт'] },
+    { name: 'Полтавська', aliases: ['полт'] },
+    { name: 'Харківська', aliases: ['харк', 'хр'] },
+    { name: 'Черкаська', aliases: ['черк'] },
+    { name: 'Чернівецька', aliases: ['чернів', 'чрн'] },
+    { name: 'Чернігівська', aliases: ['черніг'] },
+    { name: 'Миколаївська', aliases: ['микол', 'нік'] },
+    { name: 'Одеська', aliases: ['одес', 'од'] },
+    { name: 'Рівненська', aliases: ['рівн', 'ровн'] },
+    { name: 'Закарпатська', aliases: ['закарп', 'ужг'] },
+    { name: 'Волинська', aliases: ['волин', 'вол'] },
+    { name: 'Київська', aliases: ['київськ', 'кв'] }
+  ];
+
+  function isOblastToken(tok) {
+    if (!tok) return null;
+    const t = tok.toLowerCase().trim();
+    for (let item of OBLAST_SHORT_ALIASES) {
+      if (item.aliases.includes(t)) return item.name;
+    }
+    return null;
+  }
+
   // 3. ГЛИБОКИЙ КАТАЛОГ НАСЕЛЕНИХ ПУНКТІВ, СМТ, СІЛ ТА РАЙОНІВ УКРАЇНИ
   const UKRAINE_SETTLEMENTS = [
     // --- КИЇВСЬКА ОБЛАСТЬ ---
@@ -302,6 +334,7 @@
     { name: 'Хуст', oblast: 'Закарпатська', raion: 'Хустський', type: 'місто', lat: 48.1750, lng: 23.2981, postalCodes: ['90400'], aliases: ['хуст', 'khust'], streets: ['вул. Карпатської Січі'] },
     { name: 'Хмельницький', oblast: 'Хмельницька', raion: 'Хмельницький', type: 'місто', lat: 49.4230, lng: 26.9871, postalCodes: ['29000'], aliases: ['хмельницький', 'хмельницкий', 'khmelnytskyi'], streets: ['вул. Проскурівська', 'вул. Подільська', 'просп. Миру'] },
     { name: 'Кам\'янець-Подільський', oblast: 'Хмельницька', raion: 'Кам\'янець-Подільський', type: 'місто', lat: 48.6833, lng: 26.5833, postalCodes: ['32300'], aliases: ['кам\'янець-подільський', 'камянець-подільський', 'каменец-подольский', 'камянець'], streets: ['вул. Соборна', 'вул. Князів Коріатовичів'] },
+    { name: 'Славута', oblast: 'Хмельницька', raion: 'Шепетівський', type: 'місто', lat: 50.2917, lng: 26.8603, postalCodes: ['30000'], aliases: ['славута', 'slavuta', 'славуті', 'у славуті', 'в славуті', 'славуту'], streets: ['вул. Кузовкова', 'вул. Соборності', 'вул. Миру', 'вул. Ярослава Мудрого'] },
     { name: 'Черкаси', oblast: 'Черкаська', raion: 'Черкаський', type: 'місто', lat: 49.4444, lng: 32.0598, postalCodes: ['18000'], aliases: ['черкаси', 'черкассы', 'cherkasy'], streets: ['бульв. Шевченка', 'вул. Смілянська'] },
     { name: 'Умань', oblast: 'Черкаська', raion: 'Уманський', type: 'місто', lat: 48.7500, lng: 30.2167, postalCodes: ['20300'], aliases: ['умань', 'uman'], streets: ['вул. Європейська', 'вул. Київська'] },
     { name: 'Сміла', oblast: 'Черкаська', raion: 'Черкаський', type: 'місто', lat: 49.2167, lng: 31.8667, postalCodes: ['20700'], aliases: ['сміла', 'смела'], streets: ['вул. Соборна'] },
@@ -313,7 +346,8 @@
     { name: 'Шостка', oblast: 'Сумська', raion: 'Шосткинський', type: 'місто', lat: 51.8667, lng: 33.4833, postalCodes: ['41100'], aliases: ['шостка'], streets: ['вул. Свободи'] },
     { name: 'Охтирка', oblast: 'Сумська', raion: 'Охтирський', type: 'місто', lat: 50.3167, lng: 34.9000, postalCodes: ['42700'], aliases: ['охтирка', 'ахтырка'], streets: ['вул. Незалежності'] },
     { name: 'Кропивницький', oblast: 'Кіровоградська', raion: 'Кропивницький', type: 'місто', lat: 48.5079, lng: 32.2623, postalCodes: ['25000'], aliases: ['кропивницький', 'кировоград', 'kropyvnytskyi'], streets: ['вул. Велика Перспективна', 'вул. Соборна'] },
-    { name: 'Олександрія', oblast: 'Кіровоградська', raion: 'Олександрійський', type: 'місто', lat: 48.6667, lng: 33.1167, postalCodes: ['28000'], aliases: ['олександрія', 'александрия'], streets: ['просп. Соборний'] }
+    { name: 'Олександрія', oblast: 'Кіровоградська', raion: 'Олександрійський', type: 'місто', lat: 48.6667, lng: 33.1167, postalCodes: ['28000'], aliases: ['олександрія', 'александрия'], streets: ['просп. Соборний'] },
+    { name: 'Нові Білокоровичі', oblast: 'Житомирська', raion: 'Коростенський', type: 'смт', lat: 51.1167, lng: 28.0500, postalCodes: ['11055'], aliases: ['нові білокоровичі', 'нові-білокоровичі', 'новые белокоровичи', 'нови билокоровичи', 'білокоровичі'], streets: ['вул. Довженка', 'вул. Центральна'] }
   ];
 
   // 4. ДАМЕРАУ-ЛЕВЕНШТЕЙН (Відстань редагування для виправлення одруків та перестановок)
@@ -366,14 +400,33 @@
     if (!text) return null;
     const oblRegex = /(?<!\p{L})(київська|львівська|івано-франківська|тернопільська|дніпропетровська|одеська|харківська|вінницька|полтавська|житомирська|запорізька|миколаївська|черкаська|чернігівська|рівненська|волинська|закарпатська|чернівецька|хмельницька|сумська|кіровоградська|донецька|луганська|херсонська)(?!\p{L})\s*(?:область|обл)?/giu;
     const m = text.match(oblRegex);
-    if (!m) return null;
-    const oblRaw = m[0].trim().toLowerCase();
-    for (let obl of OBLASTS) {
-      if (obl.aliases.some(a => oblRaw.includes(a))) {
-        return obl;
+    if (m) {
+      const oblRaw = m[0].trim().toLowerCase();
+      for (let obl of OBLASTS) {
+        if (obl.aliases.some(a => oblRaw.includes(a))) {
+          return { ...obl, rawMatched: m[0] };
+        }
+      }
+      return { name: oblRaw.charAt(0).toUpperCase() + oblRaw.slice(1), rawMatched: m[0] };
+    }
+
+    // 2. Словник популярних скорочень областей (Oblast Aliases: "хмель", "терн", "іф", тощо)
+    const words = text.toLowerCase().split(/[^\p{L}0-9]+/u).filter(Boolean);
+    for (let w of words) {
+      if (w === 'дніпро' || w === 'днепр') {
+        if (/\b(?:дніпро|днепр)\s+(?:обл|область)\b/i.test(text)) {
+          return { name: 'Дніпропетровська', rawMatched: w };
+        }
+        continue;
+      }
+      const oblName = isOblastToken(w);
+      if (oblName) {
+        const fullObj = OBLASTS.find(o => o.name === oblName);
+        return { name: oblName, aliases: fullObj ? fullObj.aliases : [oblName.toLowerCase()], rawMatched: w };
       }
     }
-    return { name: oblRaw.charAt(0).toUpperCase() + oblRaw.slice(1) };
+
+    return null;
   }
 
   function detectRaion(text) {
@@ -393,9 +446,10 @@
   function findSettlementByNameOrFuzzy(word) {
     if (!word || word.length < 2) return null;
     const w = word.toLowerCase().trim();
+    if (isOblastToken(w) && w !== 'дніпро') return null;
     const wNorm = normalizeLocativeCase(w);
 
-    // 1. Точний збіг назви або аліасу
+    // 1. Точний збіг назви або аліасу (Абсолютний пріоритет!)
     for (let s of UKRAINE_SETTLEMENTS) {
       if (s.name.toLowerCase() === w || s.name.toLowerCase() === wNorm) {
         return s;
@@ -406,8 +460,8 @@
     }
 
     // 2. Нечітке зіставлення (Levenshtein Distance <= 2):
-    // Для слів довжиною >= 5: дистанція <= 2
-    // Для слів довжиною 4: дистанція <= 1
+    // Захист: точний збіг назви населеного пункту має абсолютний пріоритет над префіксами довших назв.
+    // Заборонено замінювати точну назву "Славута" на "Славутич" тощо.
     if (w.length >= 4) {
       const maxAllowedDist = w.length >= 5 ? 2 : 1;
       let bestMatch = null;
@@ -415,6 +469,11 @@
 
       for (let s of UKRAINE_SETTLEMENTS) {
         const sLower = s.name.toLowerCase();
+        // Якщо одне слово є префіксом іншого і вони мають різну довжину з різними закінченнями/суфіксами (наприклад, славута vs славутич), не підміняти!
+        if (Math.abs(w.length - sLower.length) > 1 && (sLower.startsWith(w) || w.startsWith(sLower))) {
+          continue;
+        }
+
         const d1 = damerauLevenshtein(w, sLower);
         const d2 = damerauLevenshtein(wNorm, sLower);
         const d = Math.min(d1, d2);
@@ -425,6 +484,9 @@
 
         if (s.aliases) {
           for (let alias of s.aliases) {
+            if (Math.abs(w.length - alias.length) > 1 && (alias.startsWith(w) || w.startsWith(alias))) {
+              continue;
+            }
             const da = damerauLevenshtein(w, alias);
             if (da <= maxAllowedDist && da < minDistance) {
               minDistance = da;
@@ -483,9 +545,14 @@
       const cur = filteredTokens[i];
       const next = filteredTokens[i + 1];
 
+      // Якщо токен є скороченням області (наприклад "хмель", "терн", "зп"), зберігаємо його як є і не замінюємо на місто
+      if (isOblastToken(cur) && cur !== 'дніпро') {
+        mergedTokens.push(cur);
+        continue;
+      }
+
       if (next && !/^\d+$/.test(cur) && !/^\d+$/.test(next)) {
-        const candidateCombined = (cur + next).replace(/-/g, '');
-        const foundCombined = findSettlementByNameOrFuzzy(candidateCombined);
+        const foundCombined = findSettlementByNameOrFuzzy(cur + ' ' + next) || findSettlementByNameOrFuzzy((cur + next).replace(/-/g, ''));
         if (foundCombined) {
           mergedTokens.push(foundCombined.name.toLowerCase());
           detectedCity = foundCombined;
@@ -1207,6 +1274,9 @@
     const detectedO = detectOblast(text);
     if (detectedO) {
       oblast = detectedO.name;
+      if (detectedO.rawMatched) {
+        text = text.replace(new RegExp('(?<!\\p{L})' + detectedO.rawMatched + '(?!\\p{L})', 'giu'), ' ');
+      }
       text = text.replace(new RegExp('(?<!\\p{L})' + detectedO.name + '(?:ська|ської|ській|ською)?\\s*(?:область|обл\\.?)?(?!\\p{L})', 'giu'), ' ');
     }
 
@@ -1271,7 +1341,7 @@
     // 6. Залишок — токени вулиці / адреси
     const streetTokens = text.split(/\s+/)
       .map(w => w.trim().toLowerCase())
-      .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
+      .filter(w => w.length >= 2 && !STOP_WORDS.has(w) && !isOblastToken(w));
 
     return { city, number, oblast, raion, streetTokens, settlementOblast };
   }
@@ -1368,7 +1438,13 @@
             continue;
           }
 
-          // Якщо токен є областю чи районом, перевіряємо збіг
+          // Якщо токен є скороченням або назвою області
+          if (isOblastToken(tok)) {
+            const oblName = isOblastToken(tok).toLowerCase().slice(0, 5);
+            if (bOblast.includes(oblName) || (targetOblast && targetOblast.includes(oblName))) {
+              continue;
+            }
+          }
           if (targetOblast && (bOblast.includes(tok) || tok.includes(targetOblast.slice(0, 5)))) {
             continue;
           }
@@ -1443,7 +1519,12 @@
           }
 
           // Збіг по області:
-          if (bOblast.includes(tok)) {
+          if (isOblastToken(tok)) {
+            const oblName = isOblastToken(tok).toLowerCase().slice(0, 5);
+            if (bOblast.includes(oblName)) {
+              score += 60;
+            }
+          } else if (bOblast.includes(tok)) {
             score += 50;
           }
 
@@ -1452,6 +1533,11 @@
             score += 40;
           }
         }
+      }
+
+      // Додатковий скоринг за збіг цільової області
+      if (targetOblast && bOblast.includes(targetOblast.replace(/(?:ська|цька|зька)$/i, ''))) {
+        score += 80;
       }
 
       // Додатковий скоринг при явному слові 'поштомат'

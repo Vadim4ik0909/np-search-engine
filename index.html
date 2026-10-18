@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.13.0">
+  <link rel="stylesheet" href="styles.css?v=8.14.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.13.0</span>
+          <span class="version-tag">v8.14.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,32 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.13.0 -->
+        <!-- Версія 8.14.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.14.0</span>
+            <span class="version-state">Exact Match Priority та Словник скорочень областей</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Абсолютний пріоритет точного міста (Exact Match Priority):</strong> заборонено алгоритмам нечіткого пошуку або Levenshtein замінювати точну назву міста на довші слова або префікси (наприклад, <code>«славута»</code> гарантовано розпізнається як м. Славута і ніколи не підміняється на «Славутич»).</li>
+            <li><strong>Словник популярних скорочень областей (Oblast Aliases):</strong> інтегровано розпізнавання скорочень областей у запитах оператора:
+              <ul>
+                <li><em>«хмель», «хмел», «хм»</em> ➔ Хмельницька область</li>
+                <li><em>«терн», «терноп»</em> ➔ Тернопільська область</li>
+                <li><em>«франк», «іф», «прикарпаття»</em> ➔ Івано-Франківська область</li>
+                <li><em>«дніпро», «днепр», «дн»</em> ➔ Дніпропетровська область</li>
+                <li><em>«вінн», «запор», «льв», «житом», «полт», «харк», «черк», «чернів», «черніг», «микол», «одес», «рівн», «закарп», «волин», «київськ»</em> та інші.</li>
+              </ul>
+            </li>
+            <li><strong>Ізоляція токенів областей:</strong> розпізнані скорочення областей звужують пошук за областю та виключаються зі списку слів вулиць чи міст.</li>
+            <li><strong>Пріоритет номера відділення:</strong> запит <code>«славута хмель 2»</code> повертає 1-м місцем Відділення №2 у м. Славута (вул. Кузовкова, 3), Хмельницька обл.</li>
+            <li><strong>100% успішність повного комплексу автотестів (18 / 18):</strong> верифіковано точний захист міст, розпізнавання скорочень областей та поведінку скорингу.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.13.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.13.0</span>
             <span class="version-state">Smart Faceted Search: вільне комбінування сутностей, ізоляція міст та стемінг вулиць</span>
@@ -525,12 +549,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.13.0"></script>
+  <script src="data/branches.js?v=8.14.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.13.0"></script>
+  <script src="data/fuzzySearch.js?v=8.14.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.13.0"></script>
+  <script src="app.js?v=8.14.0"></script>
 </body>
 </html>

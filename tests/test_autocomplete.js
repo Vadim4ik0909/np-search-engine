@@ -190,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 17;
+  let totalTests = 18;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -908,6 +908,51 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 17:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 18: Exact Match Priority та скорочення областей ("славута хмель 2")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 18: Exact Match Priority та скорочення областей ("славута хмель 2")');
+  try {
+    const branches = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Перевірка екстракції фасетів: "славута" -> місто, "хмель" -> Хмельницька область, "2" -> номер відділення
+    const facets = window.SmartSearchEngine.extractFacets('славута хмель 2');
+    if (facets.city !== 'Славута') {
+      throw new Error(`Очікувалось місто 'Славута', отримано: '${facets.city}'`);
+    }
+    if (facets.oblast !== 'Хмельницька' && facets.settlementOblast !== 'Хмельницька') {
+      throw new Error(`Очікувалась Хмельницька область для скорочення 'хмель', отримано oblast='${facets.oblast}', settlementOblast='${facets.settlementOblast}'`);
+    }
+    if (facets.number !== '2') {
+      throw new Error(`Очікувався номер відділення '2', отримано: '${facets.number}'`);
+    }
+    if (facets.streetTokens.includes('хмель')) {
+      throw new Error(`Скорочення області 'хмель' помилково потрапило у назву вулиці: ${JSON.stringify(facets.streetTokens)}`);
+    }
+
+    // 2. Пошук відділень: 1-ше місце обов'язково займає Славута Відділення №2 (вул. Кузовкова, 3), Хмельницька обл.
+    const res = window.SmartSearchEngine.searchBranches('славута хмель 2', branches, 5);
+    if (res.length === 0) {
+      throw new Error("Не знайдено жодного відділення за запитом 'славута хмель 2'");
+    }
+
+    const top = res[0];
+    if (top.city !== 'Славута' || top.number !== '2' || !top.oblast.includes('Хмельницьк')) {
+      throw new Error(`Топ результат повинен бути Славута №2 (Хмельницька обл.), а отримано: ${top.city} №${top.number} (${top.oblast}, ${top.street || top.address})`);
+    }
+
+    // 3. Захист від підміни точного міста: жодного Славутича у видачі
+    const hasSlavutych = res.some(b => (b.city || '').toLowerCase().includes('славутич'));
+    if (hasSlavutych) {
+      throw new Error("Критичний баг: у результатах для 'славута хмель 2' виявлено Славутич!");
+    }
+
+    console.log("  ✓ Успіх: Запит 'славута хмель 2' ідеально ідентифікував точне місто Славута (без підміни на Славутич), розпізнав скорочення 'хмель' як Хмельницьку область та повернув Відділення №2 на 1-му місці.\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 18:', err.message, '\n');
   }
 
   console.log('===============================================================');
