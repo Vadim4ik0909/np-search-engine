@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.11.0">
+  <link rel="stylesheet" href="styles.css?v=8.12.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.11.0</span>
+          <span class="version-tag">v8.12.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.11.0 -->
+        <!-- Версія 8.12.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.12.0</span>
+            <span class="version-state">UX-Рефакторинг: Чистий Empty State, розділення станів вводу та лаконічність карток</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Правило "Немає результату — не спамити списком":</strong> якщо вказано номер відділення або поштомату (наприклад, <code>«київ 99999»</code>), якого немає в базі — категорично заблоковано спам сотнями інших відділень (№1, №2, №3...). Виводиться виключно одне зрозуміле повідомлення: <code>«Відділення або поштомат №... у м. ... не знайдено. Перевірте правильність введеного номера.»</code> з повністю порожнім списком карток.</li>
+            <li><strong>Розділення станів "Введення міста" та "Видача результатів":</strong> під час набору назви міста (<code>«ки»</code>, <code>«київ»</code>, <code>«тернопіль»</code>) без вибору та без номера працює ВИКЛЮЧНО випадаючий поп-ап підказок міст. На фоні під поп-апом приховано рендер випадкових відділень. Відділення міста з'являються лише після явного вибору з підказок, натискання Enter або кнопки «Шукати».</li>
+            <li><strong>Лаконічність картки точного збігу:</strong> коли знайдено 1 конкретне обране відділення (<code>«київ 11»</code>, <code>«київ 111»</code>, <code>«33159»</code>), повністю ховаються зайві елементи масового списку (перемикачі ліміту видачі 5/10/20, фільтри «Всі / Відділення / Поштомати»), забезпечуючи 100% фокус на самій картці.</li>
+            <li><strong>Точна фільтрація номерів відділень:</strong> числовий токен номера відділення більше не змішується з номерами будинків на інших вулицях міста.</li>
+            <li><strong>100% успішність розширеного комплексу автотестів (16 / 16):</strong> верифіковано захист від спаму видачі, ізоляцію станів набору міст та адаптивне приховування контролів списку.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.11.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.11.0</span>
             <span class="version-state">Повна база України (55 000+ точок) та захист від галюцинацій</span>
@@ -486,12 +502,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.11.0"></script>
+  <script src="data/branches.js?v=8.12.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.11.0"></script>
+  <script src="data/fuzzySearch.js?v=8.12.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.11.0"></script>
+  <script src="app.js?v=8.12.0"></script>
 </body>
 </html>

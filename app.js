@@ -627,11 +627,17 @@
     // Перевіряємо, чи є впевнений збіг у статичній базі
     if (staticMatches.length > 0) {
       if (parsed.targetBranchNumber) {
-        // Якщо шукали конкретний номер, перевіряємо, чи є в результатах відділення саме з цим номером
-        const hasExactTarget = staticMatches.some(b => b.number && b.number.toString() === parsed.targetBranchNumber.toString());
-        if (hasExactTarget) {
-          results = staticMatches;
+        // Якщо шукали конкретний номер, залишаємо відділення саме з цим номером (відсікаючи номери будинків з адреси)
+        const exactMatches = staticMatches.filter(b => b.number && b.number.toString() === parsed.targetBranchNumber.toString());
+        if (exactMatches.length > 0) {
+          results = exactMatches;
           didYouMeanText = null;
+        } else if (parsed.isPostomat) {
+          const prefixMatches = staticMatches.filter(b => (b.typeClass === 'poshtomat' || b.type === 'poshtomat') && b.number && b.number.toString().startsWith(parsed.targetBranchNumber.toString()));
+          if (prefixMatches.length > 0) {
+            results = prefixMatches;
+            didYouMeanText = null;
+          }
         }
       } else {
         // Пошук за вулицею, містом або аліасом без фіксованого номера
@@ -668,10 +674,6 @@
           const liveFiltered = engine ? engine.filterBranchesByNormalizedSearch(rawQuery, liveData) : [];
           if (liveFiltered.length > 0) {
             results = liveFiltered;
-          } else if (parsed.targetBranchNumber && parsed.matchedSettlement) {
-            const cityName = parsed.matchedSettlement.name;
-            didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${cityName} не знайдено. Доступні відділення:`;
-            results = liveData;
           } else {
             results = [];
           }
@@ -680,7 +682,10 @@
     }
 
     // 3. ДОДАТКОВИЙ ФОЛБЕК ДЛЯ СТАТИЧНИХ ДАНИХ (Укрпошта або якщо API не відповіло)
-    if (results.length === 0) {
+    // КАТЕГОРИЧНЕ ПРАВИЛО EMPTY STATE:
+    // Якщо в запиті вказано номер відділення/поштомату (parsed.targetBranchNumber), і його не знайдено:
+    // КАТЕГОРИЧНО ЗАБОРОНЕНО фолбечитись до показу всіх інших відділень міста!
+    if (results.length === 0 && !parsed.targetBranchNumber) {
       if (staticMatches.length > 0) {
         results = staticMatches;
       } else if (parsed.matchedSettlement) {
@@ -688,6 +693,16 @@
         const cityOnly = allStaticBranches.filter(b => b.city && b.city.toLowerCase() === sName);
         if (cityOnly.length > 0) results = cityOnly;
       }
+    }
+
+    // Формуємо інформацію про цільове відділення, якого немає в базі
+    let missingTargetBranch = null;
+    if (parsed.targetBranchNumber && results.length === 0) {
+      missingTargetBranch = {
+        number: parsed.targetBranchNumber,
+        city: parsed.matchedSettlement ? parsed.matchedSettlement.name : ''
+      };
+      didYouMeanText = null;
     }
 
     state.currentResults = results;
@@ -699,7 +714,7 @@
     if (isExplicitSubmit || /\d/.test(rawQuery) || state.selectedBranch) {
       closeAutocomplete();
     }
-    renderSearchResults(results, rawQuery, didYouMeanText);
+    renderSearchResults(results, rawQuery, didYouMeanText, missingTargetBranch);
 
     // Запис у найчастіші запити та історію
     if (shouldRecordAnalytics) {
@@ -954,7 +969,7 @@
     return card;
   }
 
-  function renderSearchResults(branches, query, didYouMeanText) {
+  function renderSearchResults(branches, query, didYouMeanText, missingTargetBranch) {
     dom.searchResultsSection.classList.remove('hidden');
 
     // 1. Фільтрація за типом (Всі | Відділення | Поштомати)
@@ -987,26 +1002,48 @@
       dom.didYouMeanBox.classList.add('hidden');
     }
 
+    // EMPTY STATE: Якщо нічого не знайдено
     if (filtered.length === 0) {
       if (dom.didYouMeanBox) dom.didYouMeanBox.classList.add('hidden');
+      if (dom.limitSelector) dom.limitSelector.style.display = 'none';
+      if (dom.resultsTypeFilters) dom.resultsTypeFilters.style.display = 'none';
       dom.resultsCount.textContent = '0 відділень';
-      dom.resultsList.innerHTML = `
-        <div style="padding: 36px 16px; text-align: center; color: var(--text-muted); width: 100%;">
-          <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
-          <h4 style="font-weight: 800; color: var(--text-main); font-size: 16px; margin-bottom: 6px;">
-            Населений пункт або відділення не знайдено
-          </h4>
-          <p style="font-size: 13px; max-width: 500px; margin: 0 auto; line-height: 1.5;">
-            За запитом «${escapeHtml(query || state.searchQuery)}» нічого не знайдено. Перевірте правильність написання міста або номера відділення.
-          </p>
-        </div>
-      `;
+
+      if (missingTargetBranch) {
+        const cityPart = missingTargetBranch.city ? ` у м. ${escapeHtml(missingTargetBranch.city)}` : '';
+        dom.resultsList.innerHTML = `
+          <div class="empty-results-box" style="padding: 40px 16px; text-align: center; color: var(--text-muted); width: 100%;">
+            <div style="font-size: 38px; margin-bottom: 12px;">⚠️</div>
+            <h4 style="font-weight: 800; color: var(--text-main); font-size: 16px; margin-bottom: 6px;">
+              Відділення або поштомат №${escapeHtml(missingTargetBranch.number)}${cityPart} не знайдено.
+            </h4>
+            <p style="font-size: 13px; max-width: 500px; margin: 0 auto; line-height: 1.5; color: var(--text-muted);">
+              Перевірте правильність введеного номера.
+            </p>
+          </div>
+        `;
+      } else {
+        dom.resultsList.innerHTML = `
+          <div style="padding: 36px 16px; text-align: center; color: var(--text-muted); width: 100%;">
+            <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
+            <h4 style="font-weight: 800; color: var(--text-main); font-size: 16px; margin-bottom: 6px;">
+              Населений пункт або відділення не знайдено
+            </h4>
+            <p style="font-size: 13px; max-width: 500px; margin: 0 auto; line-height: 1.5;">
+              За запитом «${escapeHtml(query || state.searchQuery)}» нічого не знайдено. Перевірте правильність написання міста або номера відділення.
+            </p>
+          </div>
+        `;
+      }
       return;
     }
 
     // РЕЖИМ 1: КОРИСТУВАЧ ОБРАВ КОНКРЕТНЕ ВІДДІЛЕННЯ (або є 1 точний результат)
     // Повну картку показуємо тільки коли вже вибрано конкретну адресу!
+    // Зайві елементи масового списку (ліміти 5/10/20, фільтри) ховаємо для 100% фокусу на картці.
     if (state.selectedBranch) {
+      if (dom.limitSelector) dom.limitSelector.style.display = 'none';
+      if (dom.resultsTypeFilters) dom.resultsTypeFilters.style.display = 'none';
       dom.resultsCount.textContent = `1 обране відділення`;
       const branch = state.selectedBranch;
 
@@ -1040,7 +1077,7 @@
         if (btnBack) {
           btnBack.addEventListener('click', () => {
             state.selectedBranch = null;
-            renderSearchResults(branches, query, didYouMeanText);
+            renderSearchResults(branches, query, didYouMeanText, missingTargetBranch);
           });
         }
       }
@@ -1048,6 +1085,14 @@
     }
 
     // РЕЖИМ 2: ПОШУК ПО АДРЕСІ — ПОКАЗУЄМО СУТО ЗБІГИ АДРЕСИ В 1 КОЛОНКУ (як в LP-CRM)
+    if (dom.limitSelector) dom.limitSelector.style.display = '';
+    if (dom.resultsTypeFilters) {
+      dom.resultsTypeFilters.style.display = '';
+      const postomatPill = dom.resultsTypeFilters.querySelector('[data-type="postomat"]');
+      if (postomatPill) {
+        postomatPill.style.display = state.currentService === 'ukrposhta' ? 'none' : '';
+      }
+    }
     dom.resultsCount.textContent = `${filtered.length} збігів адреси`;
 
     let toDisplay = filtered;
@@ -1866,8 +1911,12 @@
       clearTimeout(liveSearchDebounceTimer);
 
       if (val.length >= 2) {
-        // Підказки міст показуємо ТІЛЬКИ якщо користувач вводить суто текст назви населеного пункту
+        // ПРАВИЛО 2: Розділення станів "Введення міста" та "Видача результатів"
+        // Поки користувач вводить лише назву міста (без цифр):
+        // Працює ВИКЛЮЧНО випадаючий поп-ап міст. На фоні під поп-апом приховано рендер випадкових відділень!
         if (!/\d/.test(val)) {
+          dom.searchResultsSection.classList.add('hidden');
+
           // Дебаунс 300мс для підказок міст (стабільний плавний відгук без race conditions)
           autocompleteDebounceTimer = setTimeout(() => {
             if (currentSignal.aborted) return;
@@ -1890,17 +1939,20 @@
             }
           }, 300);
         } else {
+          // Якщо в запиті з'явилася хоча б одна цифра (номер відділення чи поштомату),
+          // негайно закриваємо підказки міст та запускаємо пошук конкретного відділення/поштомату
           closeAutocomplete();
+          liveSearchDebounceTimer = setTimeout(() => {
+            if (!currentSignal.aborted) {
+              executeSearch(val, false, false); // isExplicitSubmit = false
+            }
+          }, 300);
         }
-
-        // Дебаунс 450мс для фонового оновлення списку карток (не конфліктує з поп-апом)
-        liveSearchDebounceTimer = setTimeout(() => {
-          if (!currentSignal.aborted) {
-            executeSearch(val, false, false); // isExplicitSubmit = false
-          }
-        }, 450);
       } else {
         closeAutocomplete();
+        if (val.length === 0) {
+          dom.searchResultsSection.classList.add('hidden');
+        }
       }
     });
 

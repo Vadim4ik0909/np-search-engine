@@ -190,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 15;
+  let totalTests = 16;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -759,6 +759,98 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 15:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 16: Повний рефакторинг UX (Empty State, розділення станів вводу та лаконічність карток)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 16: UX-рефакторинг (Empty state без спаму іншими відділеннями, розділення станів та приховування лімітів 5/10/20)');
+  try {
+    const searchResultsSection = elementsById['searchResultsSection'];
+    const resultsList = elementsById['resultsList'];
+    const resultsCount = elementsById['resultsCount'];
+    const limitSelector = elementsById['limitSelector'];
+    const resultsTypeFilters = elementsById['resultsTypeFilters'];
+
+    // 1. ПЕРЕВІРКА СТАНУ "ВВЕДЕННЯ МІСТА": при введенні тільки назви міста без цифр ("тернопіль")
+    // випадаючий поп-ап активний, а секція результатів прихована (ніяких випадкових карток на фоні)
+    searchInput.value = 'тернопіль';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(400);
+
+    if (dropdown.classList.contains('hidden')) {
+      throw new Error('Поп-ап міст повинен бути відкритий при введенні назви міста');
+    }
+    if (!searchResultsSection.classList.contains('hidden')) {
+      throw new Error('Секція результатів повинна бути ПРИХОВАНА на фоні під час набору міста без вибору');
+    }
+
+    // 2. ПЕРЕВІРКА ПРАВИЛА EMPTY STATE: неіснуючий номер відділення у місті ("київ 99999")
+    // КАТЕГОРИЧНО ЗАБОРОНЕНО показувати сотні інших відділень. Тільки 1 повідомлення.
+    searchInput.value = 'київ 99999';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    if (!dropdown.classList.contains('hidden')) {
+      throw new Error('Поп-ап міст повинен бути закритий при наявності номера');
+    }
+    if (searchResultsSection.classList.contains('hidden')) {
+      throw new Error('Секція результатів повинна бути видима для показу сповіщення Empty State');
+    }
+
+    const countText = resultsCount.textContent || '';
+    if (!countText.includes('0')) {
+      throw new Error(`Очікувалось '0 відділень', отримано: "${countText}"`);
+    }
+
+    // Перевіряємо повну відсутність карток інших відділень
+    const branchCards = resultsList.querySelectorAll('.branch-card');
+    const matchRows = resultsList.querySelectorAll('.address-match-row');
+    if (branchCards.length > 0 || matchRows.length > 0) {
+      throw new Error(`СПАМ ВИДАЧІ: знайдено ${branchCards.length + matchRows.length} невідповідних карток відділень замість 0!`);
+    }
+
+    // Перевіряємо текст сповіщення
+    const listHtml = resultsList.innerHTML || '';
+    if (!listHtml.includes('99999') || !listHtml.includes('не знайдено')) {
+      throw new Error(`Очікувалось точне сповіщення про неіснуюче відділення, отримано HTML: ${listHtml}`);
+    }
+    if (!listHtml.includes('Перевірте правильність введеного номера')) {
+      throw new Error('Очікувався рядок "Перевірте правильність введеного номера."');
+    }
+
+    // Перевіряємо, що перемикачі ліміту та фільтри приховані при empty state
+    if (limitSelector.style.display !== 'none') {
+      throw new Error('limitSelector повинен бути прихований (display: none) при empty state');
+    }
+    if (resultsTypeFilters.style.display !== 'none') {
+      throw new Error('resultsTypeFilters повинен бути прихований (display: none) при empty state');
+    }
+
+    // 3. ПЕРЕВІРКА ЛАКОНІЧНОСТІ КАРТКИ ТОЧНОГО ЗБІГУ ("київ 111")
+    searchInput.value = 'київ 111';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    if (limitSelector.style.display !== 'none') {
+      throw new Error('limitSelector повинен бути прихований (display: none) для точного збігу однієї картки');
+    }
+    if (resultsTypeFilters.style.display !== 'none') {
+      throw new Error('resultsTypeFilters повинен бути прихований (display: none) для точного збігу однієї картки');
+    }
+
+    const selectedContainer = resultsList.querySelector('.selected-branch-container');
+    if (!selectedContainer) {
+      throw new Error('Очікувався контейнер вибраної картки .selected-branch-container');
+    }
+    if (resultsList.querySelectorAll('.address-match-row').length > 0) {
+      throw new Error('Масовий список .address-match-row не повинен рендеритися при виборі 1 точного відділення');
+    }
+
+    console.log('  ✓ Успіх: Empty State надійно блокує спам неіснуючими відділеннями, стан набору міста ізольовано від фону, а перемикачі ліміту приховані для чистого фокусу на картці.\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 16:', err.message, '\n');
   }
 
   console.log('===============================================================');
