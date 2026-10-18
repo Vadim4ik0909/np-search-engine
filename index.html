@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.7.1</span>
+          <span class="version-tag">v8.9.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,24 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.7.0 -->
+        <!-- Версія 8.9.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.9.0</span>
+            <span class="version-state">Smart Omnibox: Multi-token AND та Ваговий Скоринг</span>
+            <span class="version-date">18 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Комбінований пошук Multi-token AND:</strong> одночасне звуження за містом, номером, вулицею, районом та областю з гарантованим входженням усіх токенів.</li>
+            <li><strong>Ваговий скоринг (Scoring):</strong> номер відділення (+200), точне місто (+100/префікс +50), вулиця (+40), область (+20), район (+15), обласні центри (+10).</li>
+            <li><strong>Автоконвертація розкладки en ➔ ua:</strong> миттєве розпізнавання помилкових запитів на кшталт <code>«retd 15»</code> або <code>«rbtd 1»</code> ➔ <code>«Київ №15»</code>.</li>
+            <li><strong>Очищення стоп-слів та прийменників:</strong> автоматична фільтрація службових слів («відділення», «вул», «у», «в», «до», «№»).</li>
+            <li><strong>100% успішність автотестів (10 / 10):</strong> верифіковано розрізнення однойменних міст («Підгайці Тернопільська» vs «Підгайці Волинська»), точні відділення та швидкість відгуку.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.7.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.7.0</span>
             <span class="version-state">CI/CD синхронізація та універсальний нормалізований індекс</span>

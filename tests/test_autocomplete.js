@@ -189,7 +189,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 6;
+  let totalTests = 10;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -203,6 +203,22 @@ async function runTests() {
   global.Event = class { constructor(t) { this.type = t; } };
   global.CustomEvent = class extends global.Event {};
   global.fetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, data: [] }) });
+  global.BroadcastChannel = class MockBroadcastChannel {
+    constructor(name) { this.name = name; }
+    postMessage() {}
+    close() {}
+    addEventListener() {}
+    removeEventListener() {}
+  };
+
+  // Захисний таймаут: завершити процес примусово через 10 секунд, якщо щось заблокується
+  const watchdogTimer = setTimeout(() => {
+    console.error('\n⏱️ ТАЙМАУТ: Тести перевищили допустимий ліміт виконання (10с).');
+    process.exit(1);
+  }, 10000);
+  if (watchdogTimer.unref) watchdogTimer.unref();
+
+  console.time('⏱️ Час виконання тестів');
 
   // Load Engines and App Code
   const fuzzyCode = fs.readFileSync(path.join(__dirname, '..', 'data', 'fuzzySearch.js'), 'utf8');
@@ -459,13 +475,104 @@ async function runTests() {
     console.error('  ✗ Провал Тесту 6:', err.message, '\n');
   }
 
+  // --------------------------------------------------------------------------
+  // ТЕСТ 7: Пошук "київ 15" (повертає саме 15-те відділення Києва)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 7: Комбінований пошук "київ 15" (перевірка пріоритету відділення #15)');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const results = window.SmartSearchEngine.searchBranches('київ 15', pool);
+    if (!results || results.length === 0) {
+      throw new Error('Жодного відділення не знайдено за запитом "київ 15"');
+    }
+    const top = results[0];
+    if (top.city !== 'Київ' || top.number.toString() !== '15') {
+      throw new Error(`Очікувався Київ відділення №15, отримано: ${top.city} №${top.number}`);
+    }
+    console.log(`  ✓ Успіх: Перший результат: ${top.city} №${top.number} (${top.street || top.name}).\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 7:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 8: "підгайці тернопільська" vs "підгайці волинська"
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 8: Розрізнення однойменних міст за областю ("підгайці тернопільська" vs "підгайці волинська")');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const resTernopil = window.SmartSearchEngine.searchBranches('підгайці тернопільська', pool);
+    if (!resTernopil || resTernopil.length === 0) {
+      throw new Error('Не знайдено відділення для "підгайці тернопільська"');
+    }
+    const topT = resTernopil[0];
+    if (topT.city !== 'Підгайці' || !topT.oblast.includes('Тернопільськ')) {
+      throw new Error(`Очікувалися Підгайці Тернопільської обл, отримано: ${topT.city} (${topT.oblast})`);
+    }
+
+    const resVolyn = window.SmartSearchEngine.searchBranches('підгайці волинська', pool);
+    if (!resVolyn || resVolyn.length === 0) {
+      throw new Error('Не знайдено відділення для "підгайці волинська"');
+    }
+    const topV = resVolyn[0];
+    if (topV.city !== 'Підгайці' || !topV.oblast.includes('Волинськ')) {
+      throw new Error(`Очікувалися Підгайці Волинської обл, отримано: ${topV.city} (${topV.oblast})`);
+    }
+
+    console.log(`  ✓ Успіх: Коректно розрізнено: ${topT.city} (${topT.oblast} обл.) та ${topV.city} (${topV.oblast} обл.).\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 8:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 9: Пошук за вулицею та номером ("хрещатик 15")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 9: Пошук за вулицею та номером "хрещатик 15"');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const results = window.SmartSearchEngine.searchBranches('хрещатик 15', pool);
+    if (!results || results.length === 0) {
+      throw new Error('Не знайдено відділення за запитом "хрещатик 15"');
+    }
+    const top = results[0];
+    const streetLower = (top.street || top.address || top.name || '').toLowerCase();
+    if (!streetLower.includes('хрещатик') || top.number.toString() !== '15') {
+      throw new Error(`Очікувалося відділення №15 на Хрещатику, отримано: ${top.city} №${top.number} (${top.street})`);
+    }
+    console.log(`  ✓ Успіх: Знайдено за назвою вулиці: ${top.city} №${top.number} (${top.street}).\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 9:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 10: Пошук з помилковою розкладкою ("retd 1")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 10: Автоконвертація розкладки en -> ua ("retd 1" -> Київ №1)');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const results = window.SmartSearchEngine.searchBranches('retd 1', pool);
+    if (!results || results.length === 0) {
+      throw new Error('Не знайдено відділення за запитом "retd 1"');
+    }
+    const top = results[0];
+    if (top.city !== 'Київ' || top.number.toString() !== '1') {
+      throw new Error(`Очікувався Київ №1, отримано: ${top.city} №${top.number}`);
+    }
+    console.log(`  ✓ Успіх: Розкладку сконвертовано: "retd 1" -> ${top.city} №${top.number} (${top.street || top.name}).\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 10:', err.message, '\n');
+  }
+
   console.log('===============================================================');
   console.log(`📊 РЕЗУЛЬТАТ: ${passedTests} / ${totalTests} ТЕСТІВ ПРОЙДЕНО УСПІШНО!`);
+  console.timeEnd('⏱️ Час виконання тестів');
   console.log('===============================================================');
 
-  if (passedTests !== totalTests) {
-    process.exit(1);
-  }
+  clearTimeout(watchdogTimer);
+  process.exit(passedTests === totalTests ? 0 : 1);
 }
 
 runTests().catch(err => {
