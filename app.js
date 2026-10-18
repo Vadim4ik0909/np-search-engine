@@ -624,6 +624,7 @@
         const hasExactTarget = staticMatches.some(b => b.number && b.number.toString() === parsed.targetBranchNumber.toString());
         if (hasExactTarget) {
           results = staticMatches;
+          didYouMeanText = null;
         }
       } else {
         // Пошук за вулицею, містом або аліасом без фіксованого номера

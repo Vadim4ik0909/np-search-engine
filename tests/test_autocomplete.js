@@ -190,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 13;
+  let totalTests = 14;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -656,6 +656,62 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 13:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 14: Інтелектуальна нормалізація запиту ("коломи я 6" -> Коломия №6)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 14: Google-like нормалізація запиту ("коломи я 6" -> Коломия №6, склеювання розірваних слів та пріоритет номера)');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Вводимо "коломи я 6" в рядок пошуку та перевіряємо відсутність помилки "не знайдено"
+    searchInput.value = 'коломи я 6';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const didYouMeanBox = elementsById['didYouMeanBox'];
+    if (didYouMeanBox && !didYouMeanBox.classList.contains('hidden')) {
+      const text = didYouMeanBox.textContent || '';
+      if (text.includes('не знайдено')) {
+        throw new Error(`didYouMeanBox показує помилку: "${text}" замість знайденого відділення №6`);
+      }
+    }
+
+    // 2. Перевіряємо видачу SmartSearchEngine для "коломи я 6"
+    const results1 = window.SmartSearchEngine.searchBranches('коломи я 6', pool);
+    if (!results1 || results1.length === 0) {
+      throw new Error('Не знайдено жодного відділення для запиту "коломи я 6"');
+    }
+    const top1 = results1[0];
+    if (top1.city !== 'Коломия' || top1.number.toString() !== '6') {
+      throw new Error(`Очікувалось відділення №6 у Коломиї, отримано: ${top1.city} №${top1.number}`);
+    }
+    if (!top1.street || !top1.street.includes('Моцарта')) {
+      throw new Error(`Очікувалась вул. Моцарта, отримано: ${top1.street}`);
+    }
+
+    // 3. Перевіряємо очистку пунктуації: "нова пошта --- коломи я 6"
+    const results2 = window.SmartSearchEngine.searchBranches('нова пошта --- коломи я 6', pool);
+    if (!results2 || results2.length === 0 || results2[0].city !== 'Коломия' || results2[0].number.toString() !== '6') {
+      throw new Error('Запит "нова пошта --- коломи я 6" не повернув відділення №6 у Коломиї');
+    }
+
+    // 4. Перевіряємо нечітке співпадіння / русифіковані або типові помилки: "каломия 6" та "коломыя 6"
+    const results3 = window.SmartSearchEngine.searchBranches('каломия 6', pool);
+    if (!results3 || results3.length === 0 || results3[0].city !== 'Коломия' || results3[0].number.toString() !== '6') {
+      throw new Error('Запит "каломия 6" не повернув відділення №6 у Коломиї');
+    }
+
+    const results4 = window.SmartSearchEngine.searchBranches('коломыя 6', pool);
+    if (!results4 || results4.length === 0 || results4[0].city !== 'Коломия' || results4[0].number.toString() !== '6') {
+      throw new Error('Запит "коломыя 6" не повернув відділення №6 у Коломиї');
+    }
+
+    console.log(`  ✓ Успіх: Запит "коломи я 6" (а також "нова пошта --- коломи я 6", "каломия 6", "коломыя 6") безпомилково повертає Відділення №6 у м. Коломия (${top1.street}), попередження "не знайдено" відсутнє.\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 14:', err.message, '\n');
   }
 
   console.log('===============================================================');
