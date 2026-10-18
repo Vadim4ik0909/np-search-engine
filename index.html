@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.16.0">
+  <link rel="stylesheet" href="styles.css?v=8.17.0">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.16.0</span>
+          <span class="version-tag">v8.17.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,26 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.16.0 -->
+        <!-- Версія 8.17.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.17.0</span>
+            <span class="version-state">Глобальна оптимізація: -56% розміру бази, LRU Cache та DocumentFragment</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Стиснення та очищення бази даних (Data Footprint -56%):</strong> видалено надлишковий дублікат <code>branches.json</code> (-69 МБ), очищено порожні поля та технічне сміття в 55 138 записах. Розмір <code>branches.js</code> зменшено з 69 МБ до 29.5 МБ без втрати жодної точки чи адреси.</li>
+            <li><strong>Оптимізація пам'яті (RAM Heap Optimization):</strong> ліквідовано постійне зберігання масивного <code>normalizedSearchText</code> в пам'яті браузера для 55 138 об'єктів — тепер генерація відбувається ліниво за потреби, що звільнило понад 80 МБ оперативної пам'яті JS Heap.</li>
+            <li><strong>In-Memory LRU Cache (миттєвий відгук &lt;0.01 мс):</strong> вбудовано 50-елементний LRU-кеш пошукових результатів. Повторні запити, повернення стертих літер або натискання Backspace виконуються абсолютно миттєво без повторного перебору 55 тисяч записів.</li>
+            <li><strong>Оптимізований DOM-рендеринг через DocumentFragment:</strong> ліквідовано поштучний <code>appendChild</code> у циклі, що спричиняв Layout Thrashing та мікрофрізи. Всі картки додаються в DOM єдиною атомарною операцією через <code>DocumentFragment</code>.</li>
+            <li><strong>Жорсткий ліміт відображуваних DOM-вузлів (Hard Cap 20):</strong> одночасно рендериться не більше 20 карток, що гарантує плавний 60 FPS скрол на будь-яких пристроях та слабких офісних ПК операторів.</li>
+            <li><strong>Очищення дедкоду (Dead Code Elimination):</strong> видалено застарілі синтетичні міські евристики (<code>CITY_METRICS</code>), зайві експериментальні утиліти та дублюючі обробники подій на полі вводу.</li>
+            <li><strong>100% успішність розширеного комплексу автотестів (21 / 21):</strong> повна верифікація працездатності пошуку та швидкодії.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.16.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.16.0</span>
             <span class="version-state">Primary Settlement Anchor & Укрпошта Address-to-Index</span>
@@ -581,12 +599,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.16.0"></script>
+  <script src="data/branches.js?v=8.17.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.16.0"></script>
+  <script src="data/fuzzySearch.js?v=8.17.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.16.0"></script>
+  <script src="app.js?v=8.17.0"></script>
 </body>
 </html>

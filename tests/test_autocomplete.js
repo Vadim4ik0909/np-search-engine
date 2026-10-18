@@ -72,6 +72,15 @@ class MockElement {
   removeAttribute(k) { delete this.attributes[k]; }
 
   appendChild(child) {
+    if (child.tagName === 'FRAGMENT') {
+      const moved = [...child.children];
+      child.children = [];
+      moved.forEach(c => {
+        this.children.push(c);
+        c.parentElement = this;
+      });
+      return child;
+    }
     this.children.push(child);
     child.parentElement = this;
     return child;
@@ -175,6 +184,7 @@ function createMockEnvironment() {
     },
     querySelectorAll() { return []; },
     createElement(tag) { return new MockElement(tag); },
+    createDocumentFragment() { return new MockElement('fragment'); },
     body: new MockElement('body'),
     addEventListener(event, fn) {
       if (!docListeners[event]) docListeners[event] = [];

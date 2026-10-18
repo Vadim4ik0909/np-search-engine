@@ -178,148 +178,6 @@
     return window.BRANCHES_DATA[state.currentService] || [];
   }
 
-  // Координати та базові вулиці міст України для синтезу будь-яких відділень
-  const CITY_METRICS = {
-    'київ': {
-      title: 'Київ',
-      lat: 50.4501,
-      lng: 30.5234,
-      streets: ['вул. Райдужна, 25', 'просп. Академіка Корольова, 12г', 'вул. Велика Васильківська, 45', 'просп. Червоної Калини, 15', 'вул. Хрещатик, 14', 'вул. Борщагівська, 154', 'просп. Берестейський, 89', 'вул. Межигірська, 22', 'вул. Героїв Дніпра, 35', 'просп. Миколи Бажана, 14']
-    },
-    'івано-франківськ': {
-      title: 'Івано-Франківськ',
-      lat: 48.9226,
-      lng: 24.7111,
-      streets: ['вул. Незалежності, 9', 'вул. Максимовича, 8', 'вул. Гетьмана Мазепи, 175а', 'вул. Галицька, 64', 'вул. Вовчинецька, 26', 'вул. Євгена Коновальця, 229', 'вул. Січових Стрільців, 48', 'вул. В\'ячеслава Чорновола, 23']
-    },
-    'львів': {
-      title: 'Львів',
-      lat: 49.8397,
-      lng: 24.0297,
-      streets: ['вул. Городоцька, 355/6', 'пл. Ринок, 28', 'просп. Червоної Калини, 36', 'вул. Стрийська, 108', 'вул. Наукова, 2', 'вул. Зелена, 147', 'просп. Чорновола, 45']
-    },
-    'дніпро': {
-      title: 'Дніпро',
-      lat: 48.4647,
-      lng: 35.0462,
-      streets: ['просп. Дмитра Яворницького, 34', 'вул. Василя Сухомлинського, 61', 'просп. Слобожанський, 17', 'вул. Титова, 18', 'вул. Робоча, 24', 'просп. Богдана Хмельницького, 110']
-    },
-    'одеса': {
-      title: 'Одеса',
-      lat: 46.4825,
-      lng: 30.7233,
-      streets: ['вул. Дерибасівська, 14', 'вул. Базова, 16', 'просп. Шевченка, 4', 'вул. Семена Палія, 93', 'вул. Академіка Корольова, 33', 'Люстдорфська дорога, 55']
-    },
-    'харків': {
-      title: 'Харків',
-      lat: 49.9935,
-      lng: 36.2304,
-      streets: ['вул. Польова, 67', 'просп. Науки, 27', 'вул. Сумська, 10', 'просп. Героїв Харкова, 144', 'вул. Полтавський Шлях, 56', 'вул. Пушкінська, 79']
-    },
-    'запоріжжя': {
-      title: 'Запоріжжя',
-      lat: 47.8388,
-      lng: 35.1396,
-      streets: ['просп. Соборний, 186', 'вул. Брянська, 8', 'вул. Перемоги, 40', 'вул. Чарівна, 155', 'просп. Ювілейний, 22']
-    },
-    'житомир': {
-      title: 'Житомир',
-      lat: 50.2546,
-      lng: 28.6587,
-      streets: ['вул. Гранітна, 16', 'вул. Перемоги, 12', 'вул. Київська, 20', 'вул. Велика Бердичівська, 67', 'вул. Покровська, 48']
-    },
-    'вінниця': {
-      title: 'Вінниця',
-      lat: 49.2331,
-      lng: 28.4682,
-      streets: ['вул. Соборна, 44', 'вул. Якова Шепеля, 1', 'вул. Келецька, 53', 'просп. Коцюбинського, 25', 'вул. Пирогова, 112']
-    },
-    'полтава': {
-      title: 'Полтава',
-      lat: 49.5883,
-      lng: 34.5514,
-      streets: ['вул. Соборності, 46', 'вул. Ветеринарна, 22', 'вул. Європейська, 66', 'вул. Маршала Бірюзова, 26', 'вул. Зіньківська, 6']
-    },
-    'миколаїв': {
-      title: 'Миколаїв',
-      lat: 46.9750,
-      lng: 31.9946,
-      streets: ['вул. Велика Морська, 67', 'просп. Героїв України, 9а', 'просп. Центральний, 74', 'просп. Миру, 22', 'вул. Космонавтів, 65']
-    },
-    'тернопіль': {
-      title: 'Тернопіль',
-      lat: 49.5535,
-      lng: 25.5948,
-      streets: ['вул. Микулинецька, 46', 'вул. Руська, 17', 'вул. Степана Бандери, 72', 'вул. Князя Острозького, 26', 'вул. 15 Квітня, 6']
-    },
-    'бережани': {
-      title: 'Бережани',
-      lat: 49.4442,
-      lng: 24.9382,
-      streets: ['вул. Степана Бандери, 1', 'вул. Тернопільська, 16а', 'вул. Шевченка, 20']
-    },
-    'обухів': {
-      title: 'Обухів',
-      lat: 50.1182,
-      lng: 30.6341,
-      streets: ['вул. Київська, 21', 'вул. Миру, 9а', 'вул. Каштанова, 14', 'вул. Піщана, 3']
-    },
-    'буча': {
-      title: 'Буча',
-      lat: 50.5482,
-      lng: 30.2214,
-      streets: ['вул. Горького, 8', 'вул. Нове Шосе, 14', 'вул. Депутатська, 1']
-    },
-    'ірпінь': {
-      title: 'Ірпінь',
-      lat: 50.5212,
-      lng: 30.2441,
-      streets: ['вул. Центральна, 6', 'вул. Соборна, 105', 'вул. Університетська, 2/1']
-    },
-    'бориспіль': {
-      title: 'Бориспіль',
-      lat: 50.3421,
-      lng: 30.9542,
-      streets: ['вул. Привокзальна, 21', 'вул. Київський Шлях, 76']
-    },
-    'бровари': {
-      title: 'Бровари',
-      lat: 50.5182,
-      lng: 30.7941,
-      streets: ['вул. Київська, 227', 'вул. Героїв України, 12']
-    },
-    'біла церква': {
-      title: 'Біла Церква',
-      lat: 49.8012,
-      lng: 30.1142,
-      streets: ['вул. Фастівська, 23', 'просп. Князя Володимира, 11', 'вул. Леваневського, 59']
-    },
-    'кривий ріг': {
-      title: 'Кривий Ріг',
-      lat: 47.9124,
-      lng: 33.3982,
-      streets: ['вул. Купріна, 123б', 'просп. Миру, 33', 'вул. Лермонтова, 19']
-    },
-    'коломия': {
-      title: 'Коломия',
-      lat: 48.5308,
-      lng: 25.0401,
-      streets: ['вул. Січових Стрільців, 23', 'вул. Мазепи, 12']
-    },
-    'калуш': {
-      title: 'Калуш',
-      lat: 49.0435,
-      lng: 24.3612,
-      streets: ['вул. Дзвонарська, 5', 'вул. Каракая, 24']
-    },
-    'яремче': {
-      title: 'Яремче',
-      lat: 48.4478,
-      lng: 24.5562,
-      streets: ['вул. Свободи, 264', 'вул. Руднєва, 8']
-    }
-  };
-
   // Кеш у пам'яті для відділень Нової пошти (швидкодія + збереження завантажених міст)
   const liveWarehousesCache = {
     novaposhta: new Map()
@@ -1141,11 +999,16 @@
     }
     dom.resultsCount.textContent = `${filtered.length} збігів адреси`;
 
-    let toDisplay = filtered;
+    let limitNum = 20;
     if (state.displayLimit !== 'all') {
-      const limitNum = parseInt(state.displayLimit, 10) || 10;
-      toDisplay = filtered.slice(0, limitNum);
+      limitNum = parseInt(state.displayLimit, 10) || 10;
     }
+    // Жорстке обмеження одночасно згенерованих карток у DOM (до 20 карток)
+    const maxNodes = Math.min(limitNum, 20);
+    const toDisplay = filtered.slice(0, maxNodes);
+
+    // DocumentFragment для єдиної атомарної вставки без Layout Thrashing та Browser Reflow
+    const fragment = document.createDocumentFragment();
 
     toDisplay.forEach(branch => {
       const row = document.createElement('div');
@@ -1217,8 +1080,10 @@
         }
       });
 
-      dom.resultsList.appendChild(row);
+      fragment.appendChild(row);
     });
+
+    dom.resultsList.appendChild(fragment);
   }
 
 
@@ -1565,23 +1430,6 @@
     }
   }
 
-  function focusBranchOnMap(branch) {
-    if (!state.isMapVisible) {
-      toggleMapView();
-    }
-    setTimeout(() => {
-      if (state.leafletMap && branch.lat && branch.lng) {
-        const allBranches = getAllCurrentServiceBranches();
-        const cityBranches = branch.city 
-          ? allBranches.filter(b => b.city && b.city.toLowerCase() === branch.city.toLowerCase())
-          : [branch];
-        updateMapMarkers(cityBranches.length > 0 ? cityBranches : [branch], branch);
-        state.leafletMap.setView([branch.lat, branch.lng], 15, { animate: true });
-        dom.mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 200);
-  }
-
   function getUserLocation() {
     if (!navigator.geolocation) {
       alert('Геолокація не підтримується вашим браузером');
@@ -1742,18 +1590,6 @@
     activeAutocompleteIndex = -1;
     autocompleteItems = [];
     isAutocompleteOpen = false;
-  }
-
-  function renderAutocompleteLoading() {
-    if (!dom.autocompleteDropdown) return;
-    dom.autocompleteDropdown.innerHTML = `
-      <div class="autocomplete-loading">
-        <span class="autocomplete-spinner"></span>
-        <span>Пошук підказок...</span>
-      </div>
-    `;
-    dom.autocompleteDropdown.classList.remove('hidden');
-    isAutocompleteOpen = true;
   }
 
   function highlightMatch(text, query) {
@@ -1924,19 +1760,14 @@
     }
 
     // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом (лише якщо немає цифр)
-    dom.searchInput.addEventListener('focus', () => {
+    const handleInputActivation = () => {
       const val = dom.searchInput.value.trim();
       if (val.length >= 2 && !/\d/.test(val) && !isAutocompleteOpen) {
         triggerAutocomplete(val);
       }
-    });
-
-    dom.searchInput.addEventListener('click', () => {
-      const val = dom.searchInput.value.trim();
-      if (val.length >= 2 && !/\d/.test(val) && !isAutocompleteOpen) {
-        triggerAutocomplete(val);
-      }
-    });
+    };
+    dom.searchInput.addEventListener('focus', handleInputActivation);
+    dom.searchInput.addEventListener('click', handleInputActivation);
 
     // Автодоповнення та миттєвий живий пошук при введенні (City Autocomplete Guard + дебаунс + AbortController)
     dom.searchInput.addEventListener('input', () => {

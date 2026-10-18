@@ -364,6 +364,21 @@
     { name: 'Нові Білокоровичі', oblast: 'Житомирська', raion: 'Коростенський', type: 'смт', lat: 51.1167, lng: 28.0500, postalCodes: ['11051', '11055'], aliases: ['нові білокоровичі', 'нові-білокоровичі', 'новые белокоровичи', 'нови билокоровичи', 'білокоровичі'], streets: ['вул. Довженка', 'вул. Центральна'] }
   ];
 
+  // O(1) індексація населених пунктів за назвою та аліасами для миттєвого пошуку
+  const _settlementsByName = new Map();
+  const _settlementsByAlias = new Map();
+  for (let i = 0; i < UKRAINE_SETTLEMENTS.length; i++) {
+    const s = UKRAINE_SETTLEMENTS[i];
+    const sLow = s.name.toLowerCase();
+    _settlementsByName.set(sLow, s);
+    _settlementsByAlias.set(sLow, s);
+    if (Array.isArray(s.aliases)) {
+      for (let j = 0; j < s.aliases.length; j++) {
+        _settlementsByAlias.set(s.aliases[j].toLowerCase(), s);
+      }
+    }
+  }
+
   // 4. ДАМЕРАУ-ЛЕВЕНШТЕЙН (Відстань редагування для виправлення одруків та перестановок)
   function damerauLevenshtein(a, b) {
     if (!a || !b) return (a || '').length + (b || '').length;
@@ -937,75 +952,6 @@
       return parts.join(' — ');
     }
 
-    // Допоміжний метод: форматування відділення/поштомату у форматі:
-    // Title: [Місто] — [Відділення/Поштомат №X] (вул. ...)
-    // Subtitle: [Місто/Село] — [Район р-н] — [Область обл.] — [Вулиця, Номер/Опис]
-    function formatBranchAutocomplete(b) {
-      const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')) || b.typeClass === 'poshtomat';
-      const typeLabel = isPost ? `Поштомат №${b.number}` : `Відділення №${b.number}`;
-
-      let street = b.street || '';
-      if (!street) {
-        if (b.name && b.name.includes(':')) {
-          street = b.name.split(':')[1].trim();
-        } else {
-          street = b.address || '';
-        }
-      }
-      const city = b.city || '';
-      street = street.replace(new RegExp(`^${city}[,\\s]*`, 'i'), '').trim();
-      if (street && !/^(вул|просп|проспект|пл|площа|бульв|бульвар|урочище|набережна|пров|провулок)/i.test(street)) {
-        street = 'вул. ' + street;
-      }
-
-      let sType = b.settlementType || '';
-      let oblast = b.oblast || '';
-      let raion = b.raion || '';
-
-      if ((!sType || !oblast || !raion) && Array.isArray(UKRAINE_SETTLEMENTS)) {
-        const found = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
-        if (found) {
-          if (!sType) sType = found.type;
-          if (!oblast) oblast = found.oblast;
-          if (!raion) raion = found.raion;
-        }
-      }
-      if (!sType) sType = 'місто';
-
-      // 1. Головний рядок (Title): Назва населеного пункту (з підсвічуванням збігів) та номер відділення/поштомату / вулиця з номером будинку
-      const title = street ? `${city} — ${typeLabel} (${street})` : `${city} — ${typeLabel}`;
-
-      // 2. Підрядковий опис (Subtitle): [Місто/Село] — [Район р-н] — [Область обл.] — [Вулиця, Номер/Опис]
-      const subParts = [];
-      subParts.push(`${sType} ${city}`);
-
-      if (raion) {
-        const rClean = raion.replace(/\s*(?:район|р-н)$/i, '').trim();
-        if (rClean && !rClean.toLowerCase().includes(city.toLowerCase())) {
-          subParts.push(`${rClean} р-н`);
-        }
-      }
-
-      if (oblast) {
-        const oClean = oblast.replace(/\s*(?:область|обл\.?)$/i, '').trim();
-        if (oClean) {
-          subParts.push(`${oClean} обл.`);
-        }
-      }
-
-      const branchDesc = street ? `${typeLabel}, ${street}` : typeLabel;
-      subParts.push(branchDesc);
-
-      const subtitle = subParts.join(' — ');
-
-      return {
-        title,
-        subtitle,
-        isPost,
-        typeLabel,
-        street
-      };
-    }
 
     // КРОК 3: Якщо додано цифри або ключове слово відділення/поштомату —
     // поп-ап міст миттєво закривається, щоб не перекривати картки знайдених відділень
@@ -1119,6 +1065,15 @@
     { city: 'Бережани', newName: 'Бандери', oldName: 'Леніна', fullNew: 'вул. Степана Бандери', fullOld: 'вул. Леніна' }
   ];
 
+  // O(1) індексація перейменувань вулиць за містом
+  const _renamedByCity = new Map();
+  for (let i = 0; i < RENAMED_REGISTRY.length; i++) {
+    const r = RENAMED_REGISTRY[i];
+    const c = (r.city || '').toLowerCase();
+    if (!_renamedByCity.has(c)) _renamedByCity.set(c, []);
+    _renamedByCity.get(c).push(r);
+  }
+
   function detectRenaming(cityName, fullAddressText) {
     if (!fullAddressText) return null;
     const lower = fullAddressText.toLowerCase();
@@ -1138,8 +1093,11 @@
       }
     }
 
-    // 2. Пошук у довіднику перейменувань
-    for (let r of RENAMED_REGISTRY) {
+    // 2. Пошук у довіднику перейменувань (швидкий пошук за містом або повний перебір)
+    const cKey = (cityName || '').toLowerCase();
+    const candidates = _renamedByCity.get(cKey) || RENAMED_REGISTRY;
+    for (let i = 0; i < candidates.length; i++) {
+      const r = candidates[i];
       if (!cityName || cityName.toLowerCase().includes(r.city.toLowerCase()) || r.city.toLowerCase().includes(cityName.toLowerCase())) {
         if (lower.includes(r.newName.toLowerCase())) {
           return {
@@ -1169,12 +1127,10 @@
       if (c === 'поляниця') parts.push('буковель');
       if (c === 'київ') parts.push('киев', 'kyiv', 'kiev', 'retd', 'rbtd', 'куев');
 
-      // Аліаси з UKRAINE_SETTLEMENTS
-      if (Array.isArray(UKRAINE_SETTLEMENTS)) {
-        const foundS = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === c);
-        if (foundS && foundS.aliases) {
-          parts.push(...foundS.aliases);
-        }
+      // O(1) отримання аліасів
+      const foundS = _settlementsByName.get(c);
+      if (foundS && foundS.aliases) {
+        parts.push(...foundS.aliases);
       }
     }
 
@@ -1217,16 +1173,17 @@
     if (item.name) parts.push(item.name);
     if (item.postalCode) parts.push(item.postalCode);
 
-    // 6. Перейменування вулиць (декомунізація / історичні назви)
-    const fullAddr = ((item.street || '') + ' ' + (item.address || '')).toLowerCase();
-    if (Array.isArray(RENAMED_REGISTRY)) {
-      for (let r of RENAMED_REGISTRY) {
-        if (!r.city || r.city.toLowerCase() === (item.city || '').toLowerCase()) {
-          if (fullAddr.includes(r.newName.toLowerCase())) {
-            parts.push(r.oldName, r.fullOld);
-          } else if (fullAddr.includes(r.oldName.toLowerCase())) {
-            parts.push(r.newName, r.fullNew);
-          }
+    // 6. Перейменування вулиць (O(1) за містом)
+    const cLow = (item.city || '').toLowerCase();
+    const cityRenamed = _renamedByCity.get(cLow);
+    if (cityRenamed && cityRenamed.length > 0) {
+      const fullAddr = ((item.street || '') + ' ' + (item.address || '')).toLowerCase();
+      for (let i = 0; i < cityRenamed.length; i++) {
+        const r = cityRenamed[i];
+        if (fullAddr.includes(r.newName.toLowerCase())) {
+          parts.push(r.oldName, r.fullOld);
+        } else if (fullAddr.includes(r.oldName.toLowerCase())) {
+          parts.push(r.newName, r.fullNew);
         }
       }
     }
@@ -1408,9 +1365,22 @@
     return { city, number, oblast, raion, streetTokens, settlementOblast };
   }
 
-  // 9. НОВА ФУНКЦІЯ ПОШУКУ ВІДДІЛЕНЬ З ПІДТРИМКОЮ ФАСЕТНОГО ПОШУКУ, КОНТЕКСТНОЇ ІЗОЛЯЦІЇ ТА СКОРИНГУ
+  // 9. ОПТИМІЗОВАНИЙ ДВИГУН ПОШУКУ З LRU КЕШУВАННЯМ ТА ВАГОВИМ СКОРИНГОМ
+  const SEARCH_LRU_LIMIT = 50;
+  const _searchLruCache = new Map();
+
   function searchBranches(rawQuery, branches, limit = 20) {
     if (!rawQuery || !Array.isArray(branches) || branches.length === 0) return [];
+
+    // Швидкісний In-Memory LRU Cache (0 ms відгук при Backspace або повторі запиту)
+    const serviceTag = (branches[0] && branches[0].id && branches[0].id.startsWith('up-')) ? 'up' : 'np';
+    const cacheKey = rawQuery.trim().toLowerCase() + '|' + serviceTag + '|' + limit;
+    if (_searchLruCache.has(cacheKey)) {
+      const cached = _searchLruCache.get(cacheKey);
+      _searchLruCache.delete(cacheKey);
+      _searchLruCache.set(cacheKey, cached);
+      return cached;
+    }
 
     // Інтелектуальна нормалізація токенів (очищення пунктуації, склеювання розірваних слів, нечітке зіставлення міст)
     const norm = normalizeSearchTokens(rawQuery);
@@ -1423,8 +1393,6 @@
     const detectedCityName = facets.city ? facets.city.toLowerCase() : (norm.detectedCity ? norm.detectedCity.name.toLowerCase() : null);
 
     // 1. КОНТЕКСТНА ІЗОЛЯЦІЯ (Context Isolation)
-    // Якщо визначено місто — фільтрація відділень має йти ВИКЛЮЧНО по цьому місту,
-    // без підмішування інших міст чи областей.
     let candidateBranches = branches;
     if (detectedCityName) {
       const cityFiltered = branches.filter(b => (b.city || '').toLowerCase() === detectedCityName);
@@ -1433,8 +1401,7 @@
       }
     }
 
-    // Якщо вказана область (або місто однозначно належить до області, якщо є однойменні міста),
-    // звужуємо пошук по області
+    // Якщо вказана область, звужуємо пошук по області
     const targetOblast = facets.oblast ? facets.oblast.toLowerCase() : (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
     if (targetOblast) {
       const oblClean = targetOblast.replace(/\s*(?:область|обл\.?)$/i, '').replace(/(?:ська|цька|зька)$/i, '');
@@ -1446,22 +1413,24 @@
 
     const matched = [];
 
+    // Попередня компіляція та класифікація токенів ДО старту циклу (Zero-Allocation inside 55k loop)
     const tokenMeta = tokens.map(tok => {
       const isDigit = /^\d+$/.test(tok);
+      const isLongDigit = isDigit && tok.length >= 4 && tok.length <= 5;
       return {
         tok,
         isDigit,
+        isLongDigit,
         regex: isDigit ? new RegExp('(?<!\\d)' + tok + '(?!\\d)', 'u') : null
       };
     });
 
+    const longDigitTokens = tokenMeta.filter(tm => tm.isLongDigit).map(tm => tm.tok);
+    const facetsIsLongNum = facets.number && /^\d{4,5}$/.test(facets.number);
+
     for (let i = 0; i < candidateBranches.length; i++) {
       const b = candidateBranches[i];
       let searchTarget = b.normalizedSearchText;
-      if (!searchTarget) {
-        searchTarget = buildNormalizedSearchText(b);
-        b.normalizedSearchText = searchTarget;
-      }
 
       const isPostomat = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || (b.name && b.name.toLowerCase().includes('поштомат'));
       const bNum = (b.number || '').toString();
@@ -1490,12 +1459,23 @@
         if (tm.isDigit) {
           if (bNum === tok) continue;
           if (isPostomat && bNum.startsWith(tok)) continue;
-          // Фолбек для Укрпошти: у невеликих населених пунктах відділення має 5-значний індекс (наприклад 11051),
-          // а клієнти вказують номер "1" або "2" ("житомир нові білокоровичі 1").
-          // Якщо відділення належить до знайденого населеного пункту і це Укрпошта, одиночна цифра не відсікає його!
+          // Фолбек для Укрпошти: одиночна цифра не відсікає відділення мікропункту
           const isUkrposhtaBranch = (b.id && b.id.startsWith('up-')) || /^\d{5}$/.test(bNum) || (b.postalCode && /^\d{5}$/.test(b.postalCode));
           if (isUkrposhtaBranch && tok.length <= 2 && detectedCityName && bCity === detectedCityName) {
             continue;
+          }
+
+          // Швидка перевірка: якщо цифри немає ні в номері, ні в вулиці, ні в індексі, ні в назві
+          const bPost = (b.postalCode || '').toString();
+          const bNameLower = (b.name || '').toLowerCase();
+          if (!bNum.includes(tok) && !bStreet.includes(tok) && !bPost.includes(tok) && !bNameLower.includes(tok)) {
+            matchesAll = false;
+            break;
+          }
+
+          if (!searchTarget) {
+            searchTarget = buildNormalizedSearchText(b);
+            b.normalizedSearchText = searchTarget;
           }
           if (!searchTarget.includes(tok) || !tm.regex.test(searchTarget)) {
             matchesAll = false;
@@ -1526,9 +1506,13 @@
             continue;
           }
 
+          if (!searchTarget) {
+            searchTarget = buildNormalizedSearchText(b);
+            b.normalizedSearchText = searchTarget;
+          }
           if (searchTarget.includes(tok)) continue;
 
-          // Швидке відсікання: якщо навіть перші 3 літери слова не зустрічаються в записі, це не наше відділення
+          // Швидке відсікання
           if (tok.length >= 3 && !searchTarget.includes(tok.slice(0, 3))) {
             matchesAll = false;
             break;
@@ -1552,10 +1536,9 @@
       let score = 0;
 
       // 1. Прямий пошук поштоматів та індексів Укрпошти за довгим номером (4-5 цифр):
-      // Точний збіг номера поштомату або поштового індексу b.number / b.postalCode === token (+2000 балів)
       const bPostal = (b.postalCode || '').toString();
-      const hasExactLongNum = tokens.some(tok => /^\d{4,5}$/.test(tok) && (bNum === tok || bPostal === tok)) ||
-                              (facets.number && /^\d{4,5}$/.test(facets.number) && (bNum === facets.number || bPostal === facets.number));
+      const hasExactLongNum = (longDigitTokens.length > 0 && longDigitTokens.some(tok => bNum === tok || bPostal === tok)) ||
+                              (facetsIsLongNum && (bNum === facets.number || bPostal === facets.number));
       if (hasExactLongNum) {
         score += 2000;
       }
@@ -1569,9 +1552,10 @@
         }
       }
 
-      for (let t = 0; t < tokens.length; t++) {
-        const tok = tokens[t];
-        if (/^\d+$/.test(tok)) {
+      for (let t = 0; t < tokenMeta.length; t++) {
+        const tm = tokenMeta[t];
+        const tok = tm.tok;
+        if (tm.isDigit) {
           if (bNum === tok || bPostal === tok) {
             score += 350;
           } else if (isPostomat && bNum.startsWith(tok)) {
@@ -1633,8 +1617,16 @@
 
     matched.sort((a, b) => b.score - a.score);
 
-    // Ранній вихід з лімітом (за замовчуванням limit = 20)
-    return matched.slice(0, limit).map(m => m.branch);
+    const finalResults = matched.slice(0, limit).map(m => m.branch);
+
+    // Збереження в LRU Cache
+    if (_searchLruCache.size >= SEARCH_LRU_LIMIT) {
+      const oldestKey = _searchLruCache.keys().next().value;
+      _searchLruCache.delete(oldestKey);
+    }
+    _searchLruCache.set(cacheKey, finalResults);
+
+    return finalResults;
   }
 
   // Зворотна сумісність: фільтрація використовує новий скоринговий рушій
