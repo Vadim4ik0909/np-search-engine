@@ -11,7 +11,8 @@ const fs = require('fs');
 const path = require('path');
 
 const API_KEY = process.env.NP_API_KEY || '';
-const MAX_PAGES = process.env.SYNC_PAGES ? parseInt(process.env.SYNC_PAGES, 10) : 10; // 10 сторінок по 500 = 5000 відділень за замовчуванням
+const API_KEY = process.env.NP_API_KEY || '';
+const MAX_PAGES = process.env.SYNC_PAGES ? parseInt(process.env.SYNC_PAGES, 10) : 100; // До 100 сторінок по 500 = до 50 000 відділень і поштоматів
 const PAGE_SIZE = 500;
 
 function queryApi(model, method, props) {
@@ -68,12 +69,12 @@ function buildNormalizedSearchText(item) {
     if (c.endsWith('а')) parts.push(c.slice(0, -1) + 'і', c.slice(0, -1) + 'у');
   }
 
-  // Область і район
+  // Область і район (без обрізання суфіксів, щоб не плутати область із містом!)
   if (item.oblast) {
-    parts.push(item.oblast, item.oblast.replace(/ська$/i, ''));
+    parts.push(item.oblast, item.oblast + ' область', item.oblast + ' обл');
   }
   if (item.raion) {
-    parts.push(item.raion, item.raion.replace(/ський$/i, ''));
+    parts.push(item.raion, item.raion + ' район', item.raion + ' р-н');
   }
   if (item.settlementType) {
     parts.push(item.settlementType);

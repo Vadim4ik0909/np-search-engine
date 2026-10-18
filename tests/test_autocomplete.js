@@ -189,7 +189,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 10;
+  let totalTests = 12;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -564,6 +564,67 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 10:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 11: Пошук поштоматів ("львів поштомат 33159" та "33159")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 11: Пошук поштомату за комбінованим запитом ("львів поштомат 33159") та номером ("33159")');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Пошук "львів поштомат 33159"
+    const rCombo = window.SmartSearchEngine.searchBranches('львів поштомат 33159', pool);
+    if (!rCombo || rCombo.length === 0) {
+      throw new Error('Не знайдено поштомат за запитом "львів поштомат 33159"');
+    }
+    const topCombo = rCombo[0];
+    if (topCombo.city !== 'Львів' || topCombo.number.toString() !== '33159' || topCombo.typeClass !== 'poshtomat') {
+      throw new Error(`Очікувався Львів поштомат №33159, отримано: ${topCombo.city} №${topCombo.number} (${topCombo.typeClass})`);
+    }
+
+    // 2. Пошук виключно за 5-значним номером "33159"
+    const rNum = window.SmartSearchEngine.searchBranches('33159', pool);
+    if (!rNum || rNum.length === 0) {
+      throw new Error('Не знайдено поштомат за запитом "33159"');
+    }
+    const topNum = rNum[0];
+    if (topNum.number.toString() !== '33159' || topNum.typeClass !== 'poshtomat') {
+      throw new Error(`Очікувався поштомат №33159 при пошуку за номером, отримано: №${topNum.number}`);
+    }
+
+    console.log(`  ✓ Успіх: "львів поштомат 33159" та "33159" миттєво знаходять Поштомат №33159 (${topCombo.city}, ${topCombo.street}).\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 11:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 12: Автокомпліт міст не перекриває екран при наявності номера у запиті
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 12: Перевірка автокомпліту (поп-ап вибору міст не блокує видачу при наявності номера)');
+  try {
+    // 1. Запит з номером поштомату "львів поштомат 33159"
+    const suggestions1 = window.SmartSearchEngine.getAutocompleteSuggestions('львів поштомат 33159', 'novaposhta');
+    const hasCitySuggestions1 = suggestions1.some(s => s.type === 'місто' || s.type === 'село' || s.type === 'смт');
+    if (hasCitySuggestions1) {
+      throw new Error('Поп-ап міст не повинен з\'являтися при запиті з номером поштомату "львів поштомат 33159"');
+    }
+    if (suggestions1.length > 0 && suggestions1[0].branchObj.number.toString() !== '33159') {
+      throw new Error('Першою підказкою повинен бути саме шуканий поштомат №33159');
+    }
+
+    // 2. Запит лише з номером "33159"
+    const suggestions2 = window.SmartSearchEngine.getAutocompleteSuggestions('33159', 'novaposhta');
+    const hasCitySuggestions2 = suggestions2.some(s => s.type === 'місто' || s.type === 'село' || s.type === 'смт');
+    if (hasCitySuggestions2) {
+      throw new Error('Поп-ап міст не повинен показуватися при введенні лише номера "33159"');
+    }
+
+    console.log('  ✓ Успіх: Список міст не перекриває видачу при наявності номера у запиті, відображається суто цільовий поштомат.\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 12:', err.message, '\n');
   }
 
   console.log('===============================================================');

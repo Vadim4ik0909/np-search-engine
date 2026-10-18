@@ -795,8 +795,10 @@
       }
     }
 
-    // Якщо це пошук за літерами або є місце для підказок міст
-    if (suggestions.length < 7) {
+    // ВАЖЛИВО: Автокомпліт міст показується ТІЛЬКИ тоді, коли користувач вводить виключно назву міста
+    // БЕЗ номера відділення чи поштомату! Якщо введено цифри або ключове слово відділення/поштомату —
+    // список міст категорично НЕ повинен перекривати видачу.
+    if (!hasDigits && !hasPostomatKeyword && !hasBranchKeyword && suggestions.length < 7) {
       const firstToken = tokens[0];
       for (let s of UKRAINE_SETTLEMENTS) {
         const sLower = s.name.toLowerCase();
@@ -1023,6 +1025,9 @@
     clean = clean.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
                  .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
 
+    const hasPostomatKeyword = /(?:поштомат|почтомат|пм)\b/i.test(clean);
+    const hasBranchKeyword = /(?:відділення|відділ|вд|склад)\b/i.test(clean);
+
     const cleanLower = clean.toLowerCase().replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
     if (!cleanLower) return [];
 
@@ -1056,6 +1061,14 @@
       const bOblast = (b.oblast || '').toLowerCase();
       const bRaion = (b.raion || '').toLowerCase();
 
+      // Фільтр категорій: якщо явно вказано 'поштомат' або 'відділення'
+      if (hasPostomatKeyword && !isPostomat) {
+        continue;
+      }
+      if (hasBranchKeyword && isPostomat) {
+        continue;
+      }
+
       // Multi-token AND: кожен введений токен має обов'язково збігатися
       let matchesAll = true;
       for (let t = 0; t < tokens.length; t++) {
@@ -1079,14 +1092,14 @@
 
       if (!matchesAll) continue;
 
-      // Ваговий скоринг (Scoring) за вимогами користувача:
+      // Ваговий скоринг (Scoring):
       let score = 0;
       for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];
         if (/^\d+$/.test(tok)) {
-          // Точний збіг номера відділення: +200 балів
+          // Точний збіг номера: для 4-6 значних номерів або запиту лише з одного числа
           if (bNum === tok) {
-            score += 200;
+            score += (tok.length >= 4 || tokens.length === 1 ? 300 : 200);
           } else if (isPostomat && bNum.startsWith(tok)) {
             score += 100;
           }
@@ -1113,6 +1126,11 @@
             score += 15;
           }
         }
+      }
+
+      // Додатковий скоринг при явному слові 'поштомат'
+      if (hasPostomatKeyword && isPostomat) {
+        score += 150;
       }
 
       // Обласний центр / велике місто: +10 балів
