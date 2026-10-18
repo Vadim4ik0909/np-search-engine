@@ -23,6 +23,7 @@ class MockElement {
     this.value = '';
     this._innerHTML = '';
     this.listeners = {};
+    this.style = {};
   }
 
   get className() {
@@ -189,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 12;
+  let totalTests = 13;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -236,9 +237,9 @@ async function runTests() {
   }
 
   // --------------------------------------------------------------------------
-  // ТЕСТ 1: Поступовий набір "ки" -> "київ" -> "київ 11" (без спонтанного закриття, структурований формат)
+  // ТЕСТ 1: Поступовий набір "ки" -> "київ" (перевірка стабільності поп-апу без мерехтіння)
   // --------------------------------------------------------------------------
-  console.log('▶ ТЕСТ 1: Поступовий набір тексту "ки" -> "київ" -> "київ 11"');
+  console.log('▶ ТЕСТ 1: Поступовий набір тексту "ки" -> "київ"');
   try {
     // 1. Вводимо "К" (< 2 символів -> поп-ап закритий)
     searchInput.value = 'К';
@@ -260,7 +261,7 @@ async function runTests() {
       throw new Error('Очікувалися підказки для "ки"');
     }
 
-    // 3. Чекаємо 500мс (фоновий пошук списку знизу)
+    // 3. Чекаємо 500мс (фоновий пошук списку знизу не закриває поп-ап для тексту міст)
     await sleep(500);
     if (dropdown.classList.contains('hidden')) {
       throw new Error('ПОМИЛКА: Фоновий пошук закрив поп-ап під час очікування!');
@@ -274,28 +275,20 @@ async function runTests() {
       throw new Error('Поп-ап повинен залишатися відкритим при введенні "київ"');
     }
 
-    // 5. Вводимо "київ 11" (пошук конкретного відділення)
-    searchInput.value = 'київ 11';
-    searchInput.dispatchEvent({ type: 'input' });
-    await sleep(350);
-    if (dropdown.classList.contains('hidden')) {
-      throw new Error('Поп-ап повинен залишатися відкритим при "київ 11"');
+    const itemsKyiv = dropdown.querySelectorAll('.autocomplete-item');
+    if (itemsKyiv.length === 0) {
+      throw new Error('Очікувалися підказки для Києва');
     }
-
-    const items11 = dropdown.querySelectorAll('.autocomplete-item');
-    if (items11.length === 0) {
-      throw new Error('Очікувалося відділення №11 для Києва');
-    }
-    const item11 = items11[0];
-    const subText = item11.querySelector('.autocomplete-sub').innerHTML;
+    const itemKyiv = itemsKyiv[0];
+    const subText = itemKyiv.querySelector('.autocomplete-sub').innerHTML;
     const plainSub = subText.replace(/<[^>]+>/g, '');
 
-    // Перевірка формату адреси: Місто — Область — Відділення/вулиця
-    if (!plainSub.includes('Київ') || !plainSub.includes('Київська обл.') || !plainSub.includes('№11')) {
+    // Перевірка формату адреси: Місто — Область
+    if (!plainSub.includes('Київ') || !plainSub.includes('Київська обл.')) {
       throw new Error(`Очікувався повний географічний ланцюжок у Subtitle, отримано: "${subText}"`);
     }
 
-    console.log('  ✓ Успіх: Поп-ап стабільно відкритий під час усього набору "ки" -> "київ" -> "київ 11", адреса структурована без помилок.\n');
+    console.log('  ✓ Успіх: Поп-ап стабільно відкритий під час набору "ки" -> "київ", адреса структурована без помилок.\n');
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 1:', err.message, '\n');
@@ -625,6 +618,44 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 12:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 13: City Autocomplete Guard & Пріоритет номера відділення ("Київ 111")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 13: City Autocomplete Guard при введенні "Київ 111" (автозакриття поп-апу та активна картка результату)');
+  try {
+    // 1. Вводимо "Київ 111" в рядок пошуку
+    searchInput.value = 'Київ 111';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(500);
+
+    // 2. Перевіряємо, що випадаючий поп-ап автоматично закритий/прихований (не накладається на картку)
+    if (!dropdown.classList.contains('hidden')) {
+      throw new Error('Поп-ап підказок міст повинен бути негайно закритий (hidden) при введенні цифри у запиті "Київ 111"');
+    }
+
+    // 3. Перевіряємо, що секція результатів видима
+    const searchResultsSection = elementsById['searchResultsSection'];
+    if (searchResultsSection.classList.contains('hidden')) {
+      throw new Error('Секція результатів пошуку повинна бути видима');
+    }
+
+    // 4. Перевіряємо, що знайдено точне відділення #111 у Києві
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const branchResults = window.SmartSearchEngine.searchBranches('Київ 111', pool);
+    if (!branchResults || branchResults.length === 0) {
+      throw new Error('Не знайдено відділення за запитом "Київ 111"');
+    }
+    const topBranch = branchResults[0];
+    if (topBranch.city !== 'Київ' || topBranch.number.toString() !== '111') {
+      throw new Error(`Очікувався Київ відділення №111, отримано: ${topBranch.city} №${topBranch.number}`);
+    }
+
+    console.log(`  ✓ Успіх: При "Київ 111" поп-ап повністю прихований (classList.contains('hidden')), активна картка відділення №${topBranch.number} (${topBranch.street}).\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 13:', err.message, '\n');
   }
 
   console.log('===============================================================');

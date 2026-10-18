@@ -688,7 +688,7 @@
     } else {
       state.selectedBranch = null;
     }
-    if (isExplicitSubmit) {
+    if (isExplicitSubmit || /\d/.test(rawQuery) || state.selectedBranch) {
       closeAutocomplete();
     }
     renderSearchResults(results, rawQuery, didYouMeanText);
@@ -1659,7 +1659,7 @@
   function renderAutocomplete(suggestions, query) {
     if (!dom.autocompleteDropdown) return;
 
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < 2 || /\d/.test(query)) {
       closeAutocomplete();
       return;
     }
@@ -1799,7 +1799,10 @@
     });
 
     function triggerAutocomplete(val) {
-      if (!val || val.length < 2) return;
+      if (!val || val.length < 2 || /\d/.test(val)) {
+        closeAutocomplete();
+        return;
+      }
       let cityPool = null;
       const candidate = val.split(/[, ]+/)[0].toLowerCase();
       if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
@@ -1811,28 +1814,35 @@
       }
     }
 
-    // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом
+    // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом (лише якщо немає цифр)
     dom.searchInput.addEventListener('focus', () => {
       const val = dom.searchInput.value.trim();
-      if (val.length >= 2 && !isAutocompleteOpen) {
+      if (val.length >= 2 && !/\d/.test(val) && !isAutocompleteOpen) {
         triggerAutocomplete(val);
       }
     });
 
     dom.searchInput.addEventListener('click', () => {
       const val = dom.searchInput.value.trim();
-      if (val.length >= 2 && !isAutocompleteOpen) {
+      if (val.length >= 2 && !/\d/.test(val) && !isAutocompleteOpen) {
         triggerAutocomplete(val);
       }
     });
 
-    // Автодоповнення та миттєвий живий пошук при введенні (дебаунс 300мс + AbortController)
+    // Автодоповнення та миттєвий живий пошук при введенні (City Autocomplete Guard + дебаунс + AbortController)
     dom.searchInput.addEventListener('input', () => {
       const val = dom.searchInput.value.trim();
       if (val.length > 0) {
         dom.btnClearSearch.classList.remove('hidden');
       } else {
         dom.btnClearSearch.classList.add('hidden');
+        closeAutocomplete();
+      }
+
+      // City Autocomplete Guard:
+      // Якщо в інпуті з'являється хоча б одна цифра (наприклад, "Київ 1", "Київ 111", "33159") —
+      // поп-ап підказок міст ПОВИНЕН НЕГАЙНО ЗАКРИВАТИСЯ, щоб не перекривати картки знайдених відділень.
+      if (/\d/.test(val)) {
         closeAutocomplete();
       }
 
@@ -1847,28 +1857,37 @@
       clearTimeout(liveSearchDebounceTimer);
 
       if (val.length >= 2) {
-        // Дебаунс 300мс для підказок міст/відділень (стабільний плавний відгук без race conditions)
-        autocompleteDebounceTimer = setTimeout(() => {
-          if (currentSignal.aborted) return;
-
-          let cityPool = null;
-          const candidate = val.split(/[, ]+/)[0].toLowerCase();
-          if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
-            cityPool = liveWarehousesCache.novaposhta.get(candidate);
-          }
-
-          if (window.SmartSearchEngine) {
-            const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
-            if (!currentSignal.aborted) {
-              renderAutocomplete(suggestions, val);
+        // Підказки міст показуємо ТІЛЬКИ якщо користувач вводить суто текст назви населеного пункту
+        if (!/\d/.test(val)) {
+          // Дебаунс 300мс для підказок міст (стабільний плавний відгук без race conditions)
+          autocompleteDebounceTimer = setTimeout(() => {
+            if (currentSignal.aborted) return;
+            if (/\d/.test(dom.searchInput.value)) {
+              closeAutocomplete();
+              return;
             }
-          }
-        }, 300);
+
+            let cityPool = null;
+            const candidate = val.split(/[, ]+/)[0].toLowerCase();
+            if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
+              cityPool = liveWarehousesCache.novaposhta.get(candidate);
+            }
+
+            if (window.SmartSearchEngine) {
+              const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
+              if (!currentSignal.aborted && !/\d/.test(dom.searchInput.value)) {
+                renderAutocomplete(suggestions, val);
+              }
+            }
+          }, 300);
+        } else {
+          closeAutocomplete();
+        }
 
         // Дебаунс 450мс для фонового оновлення списку карток (не конфліктує з поп-апом)
         liveSearchDebounceTimer = setTimeout(() => {
           if (!currentSignal.aborted) {
-            executeSearch(val, false, false); // isExplicitSubmit = false (НЕ закриває автокомпліт!)
+            executeSearch(val, false, false); // isExplicitSubmit = false
           }
         }, 450);
       } else {
