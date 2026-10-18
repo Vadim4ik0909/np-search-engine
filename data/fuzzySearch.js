@@ -199,11 +199,13 @@
     { name: 'Заліщики', oblast: 'Тернопільська', raion: 'Чортківський', type: 'місто', lat: 48.6472, lng: 25.7333, postalCodes: ['48600'], aliases: ['заліщики', 'залещики'], streets: ['вул. Степана Бандери', 'вул. 40 років Перемоги'] },
     { name: 'Козова', oblast: 'Тернопільська', raion: 'Тернопільський', type: 'смт', lat: 49.4319, lng: 25.1486, postalCodes: ['47600'], aliases: ['козова'], streets: ['вул. Грушевського', 'вул. Франка'] },
     { name: 'Підволочиськ', oblast: 'Тернопільська', raion: 'Тернопільський', type: 'смт', lat: 49.5250, lng: 26.1417, postalCodes: ['47800'], aliases: ['підволочиськ', 'подволочиск'], streets: ['вул. Данила Галицького'] },
+    { name: 'Підгайці', oblast: 'Тернопільська', raion: 'Тернопільський', type: 'місто', lat: 49.2740, lng: 25.1320, postalCodes: ['48000'], aliases: ['підгайці', 'підгайці тернопіль'], streets: ['вул. Шевченка', 'вул. Бережанська'] },
     { name: 'Ланівці', oblast: 'Тернопільська', raion: 'Кременецький', type: 'місто', lat: 49.8667, lng: 26.0833, postalCodes: ['47400'], aliases: ['ланівці', 'лановцы'], streets: ['вул. Незалежності'] },
     { name: 'Зборів', oblast: 'Тернопільська', raion: 'Тернопільський', type: 'місто', lat: 49.6639, lng: 25.1431, postalCodes: ['47200'], aliases: ['зборів', 'зборов'], streets: ['вул. Богдана Хмельницького'] },
 
     // --- ЛЬВІВСЬКА ОБЛАСТЬ ---
     { name: 'Львів', oblast: 'Львівська', raion: 'Львівський', type: 'місто', lat: 49.8397, lng: 24.0297, postalCodes: ['79000', '79001'], aliases: ['львів', 'львов', 'львив', 'lviv', 'львув', 'сихів'], streets: ['вул. Городоцька', 'пл. Ринок', 'просп. Червоної Калини', 'вул. Стрийська', 'вул. Наукова', 'вул. Зелена', 'просп. Чорновола'] },
+    { name: 'Миколаїв', oblast: 'Львівська', raion: 'Стрийський', type: 'місто', lat: 49.5233, lng: 23.9856, postalCodes: ['81600'], aliases: ['миколаїв львівська', 'миколаїв стрийський'], streets: ['вул. Шевченка', 'вул. Львівська'] },
     { name: 'Дрогобич', oblast: 'Львівська', raion: 'Дрогобицький', type: 'місто', lat: 49.3514, lng: 23.5042, postalCodes: ['82100'], aliases: ['дрогобич', 'дрогобыч', 'drohobych'], streets: ['вул. Пилипа Орлика', 'вул. Стрийська', 'вул. Самбірська'] },
     { name: 'Стрий', oblast: 'Львівська', raion: 'Стрийський', type: 'місто', lat: 49.2558, lng: 23.8569, postalCodes: ['82400'], aliases: ['стрий', 'стрый', 'stryi'], streets: ['вул. Шевченка', 'вул. Богдана Хмельницького'] },
     { name: 'Трускавець', oblast: 'Львівська', raion: 'Дрогобицький', type: 'місто', lat: 49.2789, lng: 23.5047, postalCodes: ['82200'], aliases: ['трускавець', 'трускавец', 'truskavets'], streets: ['вул. Суховоля', 'вул. Стебницька', 'вул. Мазепи'] },
@@ -283,7 +285,10 @@
     { name: 'Абрикосівка', oblast: 'Хмельницька', raion: 'Кам\'янець-Подільський', type: 'село', lat: 48.6500, lng: 26.6833, postalCodes: ['32353'], aliases: ['абрикосівка', 'абрикосовка'], streets: ['вул. Центральна'] },
     { name: 'Авангард', oblast: 'Одеська', raion: 'Одеський', type: 'смт', lat: 46.4750, lng: 30.6167, postalCodes: ['67806'], aliases: ['авангард'], streets: ['вул. Ангарська', 'вул. Європейська'] },
     { name: 'Луцьк', oblast: 'Волинська', raion: 'Луцький', type: 'місто', lat: 50.7472, lng: 25.3254, postalCodes: ['43000'], aliases: ['луцьк', 'луцк', 'lutsk'], streets: ['просп. Волі', 'вул. Лесі Українки'] },
+    { name: 'Підгайці', oblast: 'Волинська', raion: 'Луцький', type: 'село', lat: 50.7167, lng: 25.3980, postalCodes: ['45602'], aliases: ['підгайці', 'підгайці луцький', 'підгайці волинь'], streets: ['вул. Шкільна', 'вул. Дубнівська'] },
     { name: 'Ковель', oblast: 'Волинська', raion: 'Ковельський', type: 'місто', lat: 51.2167, lng: 24.7167, postalCodes: ['45000'], aliases: ['ковель'], streets: ['вул. Незалежності'] },
+    { name: 'Олександрівка', oblast: 'Кіровоградська', raion: 'Кропивницький', type: 'смт', lat: 48.9619, lng: 32.2356, postalCodes: ['27300'], aliases: ['олександрівка', 'олександрівка кіровоград'], streets: ['вул. Незалежності', 'вул. Шевченка'] },
+    { name: 'Олександрівка', oblast: 'Одеська', raion: 'Одеський', type: 'смт', lat: 46.3314, lng: 30.6328, postalCodes: ['68090'], aliases: ['олександрівка', 'олександрівка одеса'], streets: ['вул. Перемоги', 'вул. Центральна'] },
     { name: 'Ужгород', oblast: 'Закарпатська', raion: 'Ужгородський', type: 'місто', lat: 48.6208, lng: 22.2879, postalCodes: ['88000'], aliases: ['ужгород', 'uzhhorod'], streets: ['вул. Корзо', 'вул. Собранецька', 'просп. Свободи'] },
     { name: 'Мукачево', oblast: 'Закарпатська', raion: 'Мукачівський', type: 'місто', lat: 48.4411, lng: 22.7178, postalCodes: ['89600'], aliases: ['мукачево', 'мукачеве', 'mukachevo'], streets: ['вул. Миру', 'вул. Ярослава Мудрого'] },
     { name: 'Берегове', oblast: 'Закарпатська', raion: 'Берегівський', type: 'місто', lat: 48.2047, lng: 22.6433, postalCodes: ['90200'], aliases: ['берегове', 'берегово'], streets: ['пл. Кошута', 'вул. Мукачівська'] },
@@ -643,96 +648,177 @@
   // 7. LP-CRM ІНТЕРАКТИВНИЙ АВТОКОМПЛІТ (Підказки під час введення)
   function getAutocompleteSuggestions(query, currentService, liveCityBranches = null) {
     if (!query || query.trim().length < 2) return [];
-    const q = fixKeyboardLayout(query.trim()).toLowerCase();
+    const qClean = fixKeyboardLayout(query.trim());
+    const qLower = qClean.toLowerCase();
+    const normalizedQuery = qLower.replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (!normalizedQuery || normalizedQuery.length < 2) return [];
+
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+
     const suggestions = [];
     const seen = new Set();
 
-    // Перевіряємо, чи користувач ввів назву конкретного міста
-    let detectedCityName = null;
-    for (let s of UKRAINE_SETTLEMENTS) {
-      const sLower = s.name.toLowerCase();
-      if (q.startsWith(sLower) || q.includes(sLower)) {
-        detectedCityName = s.name;
-        break;
+    const hasDigits = /\d+/.test(normalizedQuery);
+    const hasPostomatKeyword = /(?:поштомат|почтомат|пм)/i.test(normalizedQuery);
+    const hasBranchKeyword = /(?:відділення|відділ|вд|склад)/i.test(normalizedQuery);
+
+    // Допоміжний метод: опис населеного пункту у форматі:
+    // [Місто/Село] — [Район р-н] — [Область обл.]
+    function formatSettlementSubtitle(s) {
+      const parts = [];
+      const sType = s.type ? s.type.trim() : 'місто';
+      parts.push(`${sType} ${s.name}`);
+
+      if (s.raion) {
+        const rClean = s.raion.replace(/\s*(?:район|р-н)$/i, '').trim();
+        if (rClean && !rClean.toLowerCase().includes(s.name.toLowerCase())) {
+          parts.push(`${rClean} р-н`);
+        }
       }
-      if (s.aliases && s.aliases.some(a => q.startsWith(a) || q.includes(a))) {
-        detectedCityName = s.name;
-        break;
+
+      if (s.oblast) {
+        const oClean = s.oblast.replace(/\s*(?:область|обл\.?)$/i, '').trim();
+        if (oClean) {
+          parts.push(`${oClean} обл.`);
+        }
+      }
+
+      return parts.join(' — ');
+    }
+
+    // Допоміжний метод: форматування відділення/поштомату у форматі:
+    // Title: [Місто] — [Відділення/Поштомат №X] (вул. ...)
+    // Subtitle: [Місто/Село] — [Район р-н] — [Область обл.] — [Вулиця, Номер/Опис]
+    function formatBranchAutocomplete(b) {
+      const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')) || b.typeClass === 'poshtomat';
+      const typeLabel = isPost ? `Поштомат №${b.number}` : `Відділення №${b.number}`;
+
+      let street = b.street || '';
+      if (!street) {
+        if (b.name && b.name.includes(':')) {
+          street = b.name.split(':')[1].trim();
+        } else {
+          street = b.address || '';
+        }
+      }
+      const city = b.city || '';
+      street = street.replace(new RegExp(`^${city}[,\\s]*`, 'i'), '').trim();
+      if (street && !/^(вул|просп|проспект|пл|площа|бульв|бульвар|урочище|набережна|пров|провулок)/i.test(street)) {
+        street = 'вул. ' + street;
+      }
+
+      let sType = b.settlementType || '';
+      let oblast = b.oblast || '';
+      let raion = b.raion || '';
+
+      if ((!sType || !oblast || !raion) && Array.isArray(UKRAINE_SETTLEMENTS)) {
+        const found = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
+        if (found) {
+          if (!sType) sType = found.type;
+          if (!oblast) oblast = found.oblast;
+          if (!raion) raion = found.raion;
+        }
+      }
+      if (!sType) sType = 'місто';
+
+      // 1. Головний рядок (Title): Назва населеного пункту (з підсвічуванням збігів) та номер відділення/поштомату / вулиця з номером будинку
+      const title = street ? `${city} — ${typeLabel} (${street})` : `${city} — ${typeLabel}`;
+
+      // 2. Підрядковий опис (Subtitle): [Місто/Село] — [Район р-н] — [Область обл.] — [Вулиця, Номер/Опис]
+      const subParts = [];
+      subParts.push(`${sType} ${city}`);
+
+      if (raion) {
+        const rClean = raion.replace(/\s*(?:район|р-н)$/i, '').trim();
+        if (rClean && !rClean.toLowerCase().includes(city.toLowerCase())) {
+          subParts.push(`${rClean} р-н`);
+        }
+      }
+
+      if (oblast) {
+        const oClean = oblast.replace(/\s*(?:область|обл\.?)$/i, '').trim();
+        if (oClean) {
+          subParts.push(`${oClean} обл.`);
+        }
+      }
+
+      const branchDesc = street ? `${typeLabel}, ${street}` : typeLabel;
+      subParts.push(branchDesc);
+
+      const subtitle = subParts.join(' — ');
+
+      return {
+        title,
+        subtitle,
+        isPost,
+        typeLabel,
+        street
+      };
+    }
+
+    // Чи введено місто та номер (або вулицю) / ключове слово відділення/поштомату:
+    // Якщо так — шукаємо точні збіги відділень/адрес
+    const isBranchSearch = hasDigits || hasPostomatKeyword || hasBranchKeyword || (tokens.length >= 2 && !qLower.includes('область') && !qLower.includes('район'));
+
+    if (isBranchSearch) {
+      const pool = (Array.isArray(liveCityBranches) && liveCityBranches.length > 0)
+        ? liveCityBranches
+        : ((window.BRANCHES_DATA && window.BRANCHES_DATA[currentService]) || []);
+
+      const matches = filterBranchesByNormalizedSearch(qClean, pool);
+      for (let i = 0; i < matches.length; i++) {
+        const b = matches[i];
+        const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')) || b.typeClass === 'poshtomat';
+        const key = `${b.city}-${b.number}-${isPost ? 'p' : 'b'}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          const formatted = formatBranchAutocomplete(b);
+          suggestions.push({
+            type: formatted.isPost ? 'postomat' : 'branch',
+            title: formatted.title,
+            subtitle: formatted.subtitle,
+            value: `${b.city} ${formatted.isPost ? 'поштомат ' : 'відділення '}${b.number}`,
+            textToFill: `${b.city} ${formatted.isPost ? 'поштомат ' : 'відділення '}${b.number}`,
+            badge: formatted.isPost ? 'Поштомат' : 'Відділення',
+            icon: formatted.isPost ? '📦' : '🏢',
+            branchObj: b
+          });
+        }
+        if (suggestions.length >= 7) break;
       }
     }
 
-    // 1. Пошук населених пунктів (якщо користувач тільки починає писати назву міста без номерів)
-    const hasBranchNumber = /\d+/.test(q);
-    if (!hasBranchNumber) {
+    // Якщо це пошук за літерами або є місце для підказок міст
+    if (suggestions.length < 7) {
+      const firstToken = tokens[0];
       for (let s of UKRAINE_SETTLEMENTS) {
         const sLower = s.name.toLowerCase();
-        const matchName = sLower.startsWith(q) || sLower.includes(q);
-        const matchAlias = s.aliases && s.aliases.some(a => a.startsWith(q) || a.includes(q));
+        const matchExact = sLower.startsWith(firstToken) || sLower.includes(firstToken) || sLower.startsWith(normalizedQuery) || sLower.includes(normalizedQuery);
+        const matchAlias = s.aliases && s.aliases.some(a => a.startsWith(firstToken) || a.includes(firstToken));
 
-        if (matchName || matchAlias) {
-          if (!seen.has(sLower)) {
-            seen.add(sLower);
-            const raionPart = s.raion && s.raion !== s.name + 'ський' ? `${s.raion} р-н, ` : '';
-            const subtitle = `${raionPart}${s.oblast} обл.`;
+        if (matchExact || matchAlias) {
+          const sKey = `${s.name.toLowerCase()}-${(s.raion || '').toLowerCase()}-${(s.oblast || '').toLowerCase()}`;
+          if (!seen.has(sKey)) {
+            seen.add(sKey);
+            const subtitle = formatSettlementSubtitle(s);
             suggestions.push({
               type: s.type || 'місто',
               title: s.name,
               subtitle: subtitle,
               value: s.name,
-              textToFill: s.name,
+              textToFill: s.name + ' ',
               badge: s.type || 'місто',
-              icon: '📍'
+              icon: '📍',
+              settlementObj: s
             });
           }
         }
-        if (suggestions.length >= 6) break;
+        if (suggestions.length >= 7) break;
       }
     }
 
-    // 2. Якщо введено цифри або ключове слово "поштомат"
-    const digitMatch = q.match(/\d+/);
-    const isQueryPostomat = q.includes('поштомат') || q.includes('почтомат');
-
-    if (digitMatch || isQueryPostomat || q.includes('відділ')) {
-      const numQuery = digitMatch ? digitMatch[0] : '';
-      const pool = (Array.isArray(liveCityBranches) && liveCityBranches.length > 0)
-        ? liveCityBranches
-        : ((window.BRANCHES_DATA && window.BRANCHES_DATA[currentService]) || []);
-
-      for (let b of pool) {
-        const bCityLower = (b.city || '').toLowerCase();
-        // КРИТИЧНО: Якщо в запиті визначено місто (наприклад, Ужгород) — суворо відхиляємо будь-які інші міста (Київ, Львів тощо)
-        if (detectedCityName && !bCityLower.includes(detectedCityName.toLowerCase())) {
-          continue;
-        }
-
-        const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')) || b.typeClass === 'poshtomat';
-        if (isQueryPostomat && !isPost) continue;
-
-        const bNum = (b.number || '').toString();
-        const matchNum = numQuery ? (bNum === numQuery || bNum.startsWith(numQuery)) : true;
-        const matchCity = detectedCityName ? true : (!numQuery || numQuery.length < 2 || q.includes(bCityLower));
-
-        if (matchNum && matchCity) {
-          const key = `${b.city}-${b.number}-${isPost ? 'p' : 'b'}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            suggestions.push({
-              type: isPost ? 'postomat' : 'branch',
-              title: isPost ? `Поштомат №${b.number}` : `Відділення №${b.number}`,
-              subtitle: `${b.city}, ${b.address || b.street}`,
-              value: `${b.city} ${isPost ? 'поштомат ' : 'відділення '}${b.number}`,
-              textToFill: `${b.city} ${isPost ? 'поштомат ' : 'відділення '}${b.number}`,
-              badge: isPost ? 'Поштомат' : 'Відділення',
-              icon: isPost ? '📦' : '🏢'
-            });
-          }
-        }
-        if (suggestions.length >= 8) break;
-      }
-    }
-
-    return suggestions.slice(0, 6);
+    return suggestions;
   }
 
   // 7. ДОВІДНИК ПЕРЕЙМЕНОВАНИХ ВУЛИЦЬ ТА МІСТ (ЗВІРКА З LP-CRM ТА ДЕКОМУНІЗАЦІЯ)

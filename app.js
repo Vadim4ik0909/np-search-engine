@@ -565,7 +565,7 @@
     dom.searchInput.setSelectionRange(len, len);
   }
 
-  async function executeSearch(query, shouldRecordAnalytics = true) {
+  async function executeSearch(query, shouldRecordAnalytics = true, isExplicitSubmit = false) {
     const rawQuery = (query || '').trim();
     if (!rawQuery) return;
 
@@ -688,7 +688,9 @@
     } else {
       state.selectedBranch = null;
     }
-    closeAutocomplete();
+    if (isExplicitSubmit) {
+      closeAutocomplete();
+    }
     renderSearchResults(results, rawQuery, didYouMeanText);
 
     // Запис у найчастіші запити та історію
@@ -969,7 +971,7 @@
         e.preventDefault();
         dom.searchInput.value = didYouMeanText + ' ';
         dom.btnClearSearch.classList.remove('hidden');
-        executeSearch(didYouMeanText, true);
+        executeSearch(didYouMeanText, true, true);
         focusSearchInputAtEnd(true);
         setTimeout(() => focusSearchInputAtEnd(true), 25);
       });
@@ -1174,7 +1176,7 @@
         e.preventDefault();
         dom.searchInput.value = item.query + ' ';
         dom.btnClearSearch.classList.remove('hidden');
-        executeSearch(item.query, true);
+        executeSearch(item.query, true, true);
         focusSearchInputAtEnd(true);
         setTimeout(() => focusSearchInputAtEnd(true), 25);
       });
@@ -1287,7 +1289,7 @@
         switchService(item.service);
         dom.searchInput.value = item.query + ' ';
         dom.btnClearSearch.classList.remove('hidden');
-        executeSearch(item.query, true);
+        executeSearch(item.query, true, true);
         focusSearchInputAtEnd(true);
         setTimeout(() => focusSearchInputAtEnd(true), 25);
       });
@@ -1621,6 +1623,8 @@
 
   let activeAutocompleteIndex = -1;
   let autocompleteItems = [];
+  let isAutocompleteOpen = false;
+  let activeAutocompleteAbortController = null;
 
   function closeAutocomplete() {
     if (!dom.autocompleteDropdown) return;
@@ -1628,11 +1632,24 @@
     dom.autocompleteDropdown.innerHTML = '';
     activeAutocompleteIndex = -1;
     autocompleteItems = [];
+    isAutocompleteOpen = false;
+  }
+
+  function renderAutocompleteLoading() {
+    if (!dom.autocompleteDropdown) return;
+    dom.autocompleteDropdown.innerHTML = `
+      <div class="autocomplete-loading">
+        <span class="autocomplete-spinner"></span>
+        <span>Пошук підказок...</span>
+      </div>
+    `;
+    dom.autocompleteDropdown.classList.remove('hidden');
+    isAutocompleteOpen = true;
   }
 
   function highlightMatch(text, query) {
     if (!text || !query) return escapeHtml(text || '');
-    const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2);
+    const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2 || /^\d+$/.test(t));
     if (tokens.length === 0) return escapeHtml(text);
     const pattern = tokens.map(t => escapeRegex(t)).join('|');
     const regex = new RegExp(`(${pattern})`, 'giu');
@@ -1641,14 +1658,31 @@
 
   function renderAutocomplete(suggestions, query) {
     if (!dom.autocompleteDropdown) return;
-    if (!suggestions || suggestions.length === 0) {
+
+    if (!query || query.trim().length < 2) {
       closeAutocomplete();
       return;
     }
 
-    autocompleteItems = suggestions;
-    activeAutocompleteIndex = -1;
     dom.autocompleteDropdown.innerHTML = '';
+    activeAutocompleteIndex = -1;
+
+    // Якщо нічого не знайдено — показуємо охайне повідомлення «Нічого не знайдено», не закриваючи поп-ап
+    if (!suggestions || suggestions.length === 0) {
+      autocompleteItems = [];
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'autocomplete-empty';
+      emptyEl.innerHTML = `
+        <span style="display:inline-block; margin-right:6px;">🔍</span>
+        <span>За запитом «<strong>${escapeHtml(query)}</strong>» міст чи відділень не знайдено</span>
+      `;
+      dom.autocompleteDropdown.appendChild(emptyEl);
+      dom.autocompleteDropdown.classList.remove('hidden');
+      isAutocompleteOpen = true;
+      return;
+    }
+
+    autocompleteItems = suggestions;
 
     suggestions.forEach((item, idx) => {
       const el = document.createElement('div');
@@ -1669,27 +1703,34 @@
       }
 
       const highlightedTitle = highlightMatch(item.title, query);
+      const highlightedSub = highlightMatch(item.subtitle, query);
 
       el.innerHTML = `
         <div class="autocomplete-item-main">
           <div class="autocomplete-icon">${iconHtml}</div>
           <div class="autocomplete-content">
             <span class="autocomplete-title">${highlightedTitle}</span>
-            <span class="autocomplete-sub">${escapeHtml(item.subtitle)}</span>
+            <span class="autocomplete-sub">${highlightedSub}</span>
           </div>
         </div>
         <span class="autocomplete-badge ${badgeClass}">${escapeHtml(item.badge || item.type)}</span>
       `;
 
-      el.addEventListener('mousedown', (e) => {
+      // Запобігаємо втраті фокусу інпутом при виборі підказки
+      const handleSelect = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         selectAutocompleteItem(item);
-      });
+      };
+
+      el.addEventListener('mousedown', handleSelect);
+      el.addEventListener('pointerdown', handleSelect);
 
       dom.autocompleteDropdown.appendChild(el);
     });
 
     dom.autocompleteDropdown.classList.remove('hidden');
+    isAutocompleteOpen = true;
   }
 
   function selectAutocompleteItem(item) {
@@ -1702,7 +1743,10 @@
     dom.searchInput.value = fill;
     dom.btnClearSearch.classList.remove('hidden');
     closeAutocomplete();
-    executeSearch(fill.trim(), true);
+    if (item.branchObj) {
+      state.selectedBranch = item.branchObj;
+    }
+    executeSearch(fill.trim(), true, true);
     if (isSettlement) {
       focusSearchInputAtEnd(true);
       setTimeout(() => focusSearchInputAtEnd(true), 25);
@@ -1740,16 +1784,49 @@
     dom.btnNovaPoshta.addEventListener('click', () => switchService('novaposhta'));
     dom.btnUkrposhta.addEventListener('click', () => switchService('ukrposhta'));
 
+    let autocompleteDebounceTimer = null;
     let liveSearchDebounceTimer = null;
 
     dom.searchForm.addEventListener('submit', e => {
       e.preventDefault();
+      clearTimeout(autocompleteDebounceTimer);
       clearTimeout(liveSearchDebounceTimer);
+      if (activeAutocompleteAbortController) {
+        activeAutocompleteAbortController.abort();
+      }
       closeAutocomplete();
-      executeSearch(dom.searchInput.value, true);
+      executeSearch(dom.searchInput.value, true, true);
     });
 
-    // Автодоповнення та миттєвий живий пошук при введенні (200мс надшвидкий відгук)
+    function triggerAutocomplete(val) {
+      if (!val || val.length < 2) return;
+      let cityPool = null;
+      const candidate = val.split(/[, ]+/)[0].toLowerCase();
+      if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
+        cityPool = liveWarehousesCache.novaposhta.get(candidate);
+      }
+      if (window.SmartSearchEngine) {
+        const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
+        renderAutocomplete(suggestions, val);
+      }
+    }
+
+    // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом
+    dom.searchInput.addEventListener('focus', () => {
+      const val = dom.searchInput.value.trim();
+      if (val.length >= 2 && !isAutocompleteOpen) {
+        triggerAutocomplete(val);
+      }
+    });
+
+    dom.searchInput.addEventListener('click', () => {
+      const val = dom.searchInput.value.trim();
+      if (val.length >= 2 && !isAutocompleteOpen) {
+        triggerAutocomplete(val);
+      }
+    });
+
+    // Автодоповнення та миттєвий живий пошук при введенні (дебаунс 300мс + AbortController)
     dom.searchInput.addEventListener('input', () => {
       const val = dom.searchInput.value.trim();
       if (val.length > 0) {
@@ -1759,31 +1836,52 @@
         closeAutocomplete();
       }
 
-      if (val.length >= 2 && window.SmartSearchEngine) {
-        // Отримуємо кешовані відділення міста (якщо вже завантажувалися у сесії)
-        let cityPool = null;
-        const candidate = val.split(/[, ]+/)[0].toLowerCase();
-        if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
-          cityPool = liveWarehousesCache.novaposhta.get(candidate);
-        }
-        const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
-        renderAutocomplete(suggestions, val);
+      // Скасовуємо попередній незавершений запит автокомпліту
+      if (activeAutocompleteAbortController) {
+        activeAutocompleteAbortController.abort();
+      }
+      activeAutocompleteAbortController = new AbortController();
+      const currentSignal = activeAutocompleteAbortController.signal;
+
+      clearTimeout(autocompleteDebounceTimer);
+      clearTimeout(liveSearchDebounceTimer);
+
+      if (val.length >= 2) {
+        // Дебаунс 300мс для підказок міст/відділень (стабільний плавний відгук без race conditions)
+        autocompleteDebounceTimer = setTimeout(() => {
+          if (currentSignal.aborted) return;
+
+          let cityPool = null;
+          const candidate = val.split(/[, ]+/)[0].toLowerCase();
+          if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
+            cityPool = liveWarehousesCache.novaposhta.get(candidate);
+          }
+
+          if (window.SmartSearchEngine) {
+            const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
+            if (!currentSignal.aborted) {
+              renderAutocomplete(suggestions, val);
+            }
+          }
+        }, 300);
+
+        // Дебаунс 450мс для фонового оновлення списку карток (не конфліктує з поп-апом)
+        liveSearchDebounceTimer = setTimeout(() => {
+          if (!currentSignal.aborted) {
+            executeSearch(val, false, false); // isExplicitSubmit = false (НЕ закриває автокомпліт!)
+          }
+        }, 450);
       } else {
         closeAutocomplete();
-      }
-
-      // Живий пошук при введенні номера або запиту (200мс)
-      clearTimeout(liveSearchDebounceTimer);
-      if (val.length >= 2) {
-        liveSearchDebounceTimer = setTimeout(() => {
-          executeSearch(val, false);
-        }, 200);
       }
     });
 
     // Навігація клавішами в autocomplete (ArrowUp, ArrowDown, Enter, Esc)
     dom.searchInput.addEventListener('keydown', (e) => {
-      if (!dom.autocompleteDropdown || dom.autocompleteDropdown.classList.contains('hidden')) {
+      if (!dom.autocompleteDropdown || dom.autocompleteDropdown.classList.contains('hidden') || autocompleteItems.length === 0) {
+        if (e.key === 'Escape') {
+          closeAutocomplete();
+        }
         return;
       }
 
@@ -1808,16 +1906,16 @@
           selectAutocompleteItem(autocompleteItems[activeAutocompleteIndex]);
         }
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         closeAutocomplete();
       }
     });
 
-    dom.searchInput.addEventListener('blur', () => {
-      setTimeout(closeAutocomplete, 220);
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!dom.searchInput.contains(e.target) && dom.autocompleteDropdown && !dom.autocompleteDropdown.contains(e.target)) {
+    // Закриття автокомпліту ТІЛЬКИ при явному кліку поза межами інпута й поп-апу (без конфліктів фокусу blur)
+    document.addEventListener('pointerdown', (e) => {
+      const isInputClick = dom.searchInput && dom.searchInput.contains(e.target);
+      const isDropdownClick = dom.autocompleteDropdown && dom.autocompleteDropdown.contains(e.target);
+      if (!isInputClick && !isDropdownClick) {
         closeAutocomplete();
       }
     });
@@ -1837,7 +1935,7 @@
         setTimeout(() => focusSearchInputAtEnd(true), 25);
 
         if (val.length > 0) {
-          executeSearch(dom.searchInput.value, true);
+          executeSearch(dom.searchInput.value, true, true);
         } else {
           dom.searchInput.dispatchEvent(new Event('input'));
         }
