@@ -17,7 +17,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.18.0">
+  <link rel="stylesheet" href="styles.css?v=8.18.2">
 </head>
 <body data-service="novaposhta">
 
@@ -208,7 +208,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.18.1</span>
+          <span class="version-tag">v8.18.2</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +237,26 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.18.1 -->
+        <!-- Версія 8.18.2 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.18.2</span>
+            <span class="version-state">Виправлення 5 критичних крайових випадків за результатами стрес-тестування</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Нормалізація розірваних індексів:</strong> автоматичне склеювання розірваних 5-значних поштових індексів (наприклад, <code>«79 049»</code> -&gt; <code>«79049»</code>) до передачі токенів у пошуковий рушій.</li>
+            <li><strong>Розширені маркери поштоматів:</strong> додано підтримку токенів <code>«пм»</code>, <code>«п/м»</code>, <code>«пошт»</code>. Запит на кшталт <code>«пм 22104 одеса»</code> точно розпізнає номер поштомату 22104 та забезпечує цільову фільтрацію поштоматів (+2000 балів).</li>
+            <li><strong>Аліаси для Кам'янець-Подільського:</strong> додано розпізнавання популярних скорочень та аліасів <code>«камподільський»</code>, <code>«камподільськ»</code>, <code>«кампод»</code>, <code>«кам-под»</code>, <code>«кам янець»</code>, <code>«камянець»</code>.</li>
+            <li><strong>Блокуючий штраф за чужу область (-2500 балів):</strong> при явній вказівці області або її центру/скорочення (<code>«рівне»</code>, <code>«кіров»</code>, <code>«хмель»</code>) однойменні населені пункти з інших областей отримують блокуючий штраф (село/місто Олександрія Рівненської області гарантовано перемагає місто Олександрія Кіровоградської області).</li>
+            <li><strong>Пріоритет вулиці над номером:</strong> якщо в запиті вказано слово-вулицю (наприклад, <code>«145 драгоманов київ»</code>), а відділення №145 розташоване на іншій вулиці, пріоритет надається відділенням та поштоматам саме на цільовій вулиці Драгоманова зі штрафуванням за невідповідність вулиці.</li>
+            <li><strong>Захист малих сіл від поглинання обласним центром:</strong> для запитів типу <code>«іванівка житомир 1»</code> назва обласного центру сприймається як уточнення області/району, захищаючи село від заміни на обласний центр.</li>
+            <li><strong>100% успішність розширеного комплексу автотестів (23 / 23):</strong> верифіковано всі крайові випадки стрес-тестування та UI-сценарії.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.18.1 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.18.1</span>
             <span class="version-state">Прямий індексний пошук Укрпошти (Postal Code Direct Match)</span>
@@ -630,12 +648,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.18.0"></script>
+  <script src="data/branches.js?v=8.18.2"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.18.0"></script>
+  <script src="data/fuzzySearch.js?v=8.18.2"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.18.0"></script>
+  <script src="app.js?v=8.18.2"></script>
 </body>
 </html>

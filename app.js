@@ -496,6 +496,11 @@
           exactMatches = staticMatches;
         }
 
+        const hasStreetInQuery = Boolean(
+          parsed.detectedStreet ||
+          (engine && engine.extractFacets && (engine.extractFacets(rawQuery).streetTokens || []).length > 0)
+        );
+
         if (exactMatches.length > 0) {
           results = exactMatches;
           didYouMeanText = null;
@@ -504,7 +509,15 @@
           if (prefixMatches.length > 0) {
             results = prefixMatches;
             didYouMeanText = null;
+          } else if (hasStreetInQuery && staticMatches.length > 0) {
+            results = staticMatches;
+            didYouMeanText = null;
           }
+        } else if (hasStreetInQuery && staticMatches.length > 0) {
+          // Якщо точного номера немає серед результатів, але вказано слово-вулицю (випадок "145 драгоманов київ"),
+          // відображаємо результат скорингового рушія за цією вулицею
+          results = staticMatches;
+          didYouMeanText = null;
         }
       } else {
         // Пошук за вулицею, містом або аліасом без фіксованого номера

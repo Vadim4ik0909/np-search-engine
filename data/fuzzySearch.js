@@ -31,6 +31,12 @@
     return res;
   }
 
+  // 1.05. Перевірка маркерів поштомату (поштомат, почтомат, пошт, п/м, пм)
+  function isPostomatKeyword(text) {
+    if (!text) return false;
+    return /(?<!\p{L})(?:поштомат|поштомата|поштомати|почтомат|пошт|п\/м|пм)(?!\p{L})/iu.test(text);
+  }
+
   // 1.1 Нормалізація українських відмінків (місцевий, давальний, родовий тощо)
   function normalizeLocativeCase(word) {
     if (!word || word.length < 3) return word;
@@ -148,6 +154,7 @@
     { name: 'Рівненська', aliases: ['рівн', 'ровн'] },
     { name: 'Закарпатська', aliases: ['закарп', 'ужг'] },
     { name: 'Волинська', aliases: ['волин', 'вол'] },
+    { name: 'Кіровоградська', aliases: ['кіров', 'киров', 'кіровогр', 'кроп', 'кіровоград', 'кропивницький'] },
     { name: 'Київська', aliases: ['київськ', 'кв'] }
   ];
 
@@ -346,7 +353,7 @@
     { name: 'Берегове', oblast: 'Закарпатська', raion: 'Берегівський', type: 'місто', lat: 48.2047, lng: 22.6433, postalCodes: ['90200'], aliases: ['берегове', 'берегово'], streets: ['пл. Кошута', 'вул. Мукачівська'] },
     { name: 'Хуст', oblast: 'Закарпатська', raion: 'Хустський', type: 'місто', lat: 48.1750, lng: 23.2981, postalCodes: ['90400'], aliases: ['хуст', 'khust'], streets: ['вул. Карпатської Січі'] },
     { name: 'Хмельницький', oblast: 'Хмельницька', raion: 'Хмельницький', type: 'місто', lat: 49.4230, lng: 26.9871, postalCodes: ['29000'], aliases: ['хмельницький', 'хмельницкий', 'khmelnytskyi'], streets: ['вул. Проскурівська', 'вул. Подільська', 'просп. Миру'] },
-    { name: 'Кам\'янець-Подільський', oblast: 'Хмельницька', raion: 'Кам\'янець-Подільський', type: 'місто', lat: 48.6833, lng: 26.5833, postalCodes: ['32300'], aliases: ['кам\'янець-подільський', 'камянець-подільський', 'каменец-подольский', 'камянець'], streets: ['вул. Соборна', 'вул. Князів Коріатовичів'] },
+    { name: 'Кам\'янець-Подільський', oblast: 'Хмельницька', raion: 'Кам\'янець-Подільський', type: 'місто', lat: 48.6833, lng: 26.5833, postalCodes: ['32300'], aliases: ['кам\'янець-подільський', 'камянець-подільський', 'каменец-подольский', 'камподільський', 'камподільськ', 'кампод', 'кам-под', 'кам янець', 'камянець'], streets: ['вул. Соборна', 'вул. Князів Коріатовичів'] },
     { name: 'Славута', oblast: 'Хмельницька', raion: 'Шепетівський', type: 'місто', lat: 50.2917, lng: 26.8603, postalCodes: ['30000'], aliases: ['славута', 'slavuta', 'славуті', 'у славуті', 'в славуті', 'славуту'], streets: ['вул. Кузовкова', 'вул. Соборності', 'вул. Миру', 'вул. Ярослава Мудрого'] },
     { name: 'Гриців', oblast: 'Хмельницька', raion: 'Шепетівський', type: 'смт', lat: 49.9825, lng: 27.2099, postalCodes: ['30455'], aliases: ['гриців', 'грицев', 'hrytsiv', 'грицеві', 'грицові'], streets: ['вул. Київська', 'вул. Суворова', 'вул. Миру', 'вул. Центральна', 'вул. Героїв Майдану'] },
     { name: 'Черкаси', oblast: 'Черкаська', raion: 'Черкаський', type: 'місто', lat: 49.4444, lng: 32.0598, postalCodes: ['18000'], aliases: ['черкаси', 'черкассы', 'cherkasy'], streets: ['бульв. Шевченка', 'вул. Смілянська'] },
@@ -361,6 +368,8 @@
     { name: 'Охтирка', oblast: 'Сумська', raion: 'Охтирський', type: 'місто', lat: 50.3167, lng: 34.9000, postalCodes: ['42700'], aliases: ['охтирка', 'ахтырка'], streets: ['вул. Незалежності'] },
     { name: 'Кропивницький', oblast: 'Кіровоградська', raion: 'Кропивницький', type: 'місто', lat: 48.5079, lng: 32.2623, postalCodes: ['25000'], aliases: ['кропивницький', 'кировоград', 'kropyvnytskyi'], streets: ['вул. Велика Перспективна', 'вул. Соборна'] },
     { name: 'Олександрія', oblast: 'Кіровоградська', raion: 'Олександрійський', type: 'місто', lat: 48.6667, lng: 33.1167, postalCodes: ['28000'], aliases: ['олександрія', 'александрия'], streets: ['просп. Соборний'] },
+    { name: 'Олександрія', oblast: 'Рівненська', raion: 'Рівненський', type: 'село', lat: 50.7325, lng: 26.3452, postalCodes: ['35320'], aliases: ['олександрія', 'александрия'], streets: ['вул. Свято-Преображенська'] },
+    { name: 'Іванівка', oblast: 'Житомирська', raion: 'Житомирський', type: 'село', lat: 50.2998, lng: 28.5194, postalCodes: ['12415'], aliases: ['іванівка', 'ивановка'], streets: ['вул. Лесі Українки', 'вул. Островського'] },
     { name: 'Нові Білокоровичі', oblast: 'Житомирська', raion: 'Коростенський', type: 'смт', lat: 51.1167, lng: 28.0500, postalCodes: ['11051', '11055'], aliases: ['нові білокоровичі', 'нові-білокоровичі', 'новые белокоровичи', 'нови билокоровичи', 'білокоровичі'], streets: ['вул. Довженка', 'вул. Центральна'] }
   ];
 
@@ -539,6 +548,12 @@
 
     let text = rawQuery.trim();
 
+    // 0. Склеювання розірваних поштових індексів (Space-separated Postal Code: "79 049" -> "79049")
+    text = text.replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2');
+
+    // Склеювання маркерів поштоматів (п/м -> пм)
+    text = text.replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм');
+
     // 1. Очищення пунктуації та мусорних символів (дефіси, тире, підкреслення, повтори знаків)
     // Наприклад: "нова пошта --- коломи я 6" -> "нова пошта коломи я 6"
     text = text.replace(/[-_–—~*+=/\\#№!?:;.,]{2,}/g, ' ');
@@ -555,8 +570,8 @@
     text = text.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
                .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
 
-    const hasPostomatKeyword = /(?:поштомат|почтомат|пм)\b/i.test(text);
-    const hasBranchKeyword = /(?:відділення|відділ|вд|склад)\b/i.test(text);
+    const hasPostomatKeyword = isPostomatKeyword(text);
+    const hasBranchKeyword = /(?<!\p{L})(?:відділення|відділ|вд|склад)(?!\p{L})/iu.test(text);
 
     const cleanLower = text.toLowerCase().replace(/[^a-zа-яіїєґ0-9\s-]/gi, ' ').replace(/\s+/g, ' ').trim();
     if (!cleanLower) return { tokens: [], cleanText: '', hasPostomatKeyword, hasBranchKeyword, detectedCity: null };
@@ -614,8 +629,13 @@
             // Region disambiguation: check if foundSingle is in detectedCity's oblast
             const oblStem = detectedCity.name.toLowerCase().slice(0, 5);
             const singleObl = (foundSingle.oblast || '').toLowerCase();
-            if (singleObl.includes(oblStem)) {
+            const isRegionalCenter = REGIONAL_CENTERS.has(foundSingle.name.toLowerCase());
+            const targetOblastMatches = (detectedCity.oblast || '').toLowerCase().includes(foundSingle.name.toLowerCase().slice(0, 5));
+            if (singleObl.includes(oblStem) && !isRegionalCenter) {
               detectedCity = foundSingle;
+              mergedTokens.push(foundSingle.name.toLowerCase());
+            } else if (isRegionalCenter && targetOblastMatches) {
+              // Захист села від поглинання обласним центром: залишаємо село якорем
               mergedTokens.push(foundSingle.name.toLowerCase());
             } else {
               // Primary Settlement Anchor: anchor is already fixed!
@@ -664,6 +684,10 @@
     let corrected = fixKeyboardLayout(rawQuery.trim());
     const isLayoutFixed = corrected.toLowerCase() !== rawQuery.trim().toLowerCase();
 
+    // Склеювання розірваних поштових індексів ("79 049" -> "79049") та маркерів поштоматів
+    corrected = corrected.replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2')
+                         .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм');
+
     // Автоматично розділяємо склеєні літери та цифри (наприклад, «підгайці1» -> «підгайці 1», «київ2» -> «київ 2»)
     corrected = corrected.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
                          .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
@@ -673,14 +697,14 @@
                          .replace(/([,;])\s*(?:у|в|по|на|біля)\s+/giu, '$1 ');
 
     // Крок 2. Виявлення поштомату та номера відділення
-    let isPostomat = /(?<!\p{L})(?:поштомат|поштомата|поштомати|почтомат|пм)(?!\p{L})/iu.test(corrected);
+    let isPostomat = isPostomatKeyword(corrected);
     let targetBranchNumber = null;
 
     // 2.1. Пріоритет: Явне зазначення відділення або поштомату
-    const explicitBranchMatch = corrected.match(/(?:поштомат|почтомат|пм|відділення|віділення|відділ|№|#)\s*(?:№|#)?\s*(\b\d{1,6}\b)/iu);
+    const explicitBranchMatch = corrected.match(/(?:поштомат|поштомата|поштомати|почтомат|пошт|п\/м|пм|відділення|віділення|відділ|№|#)\s*(?:№|#)?\s*(\b\d{1,6}\b)/iu);
     if (explicitBranchMatch) {
       targetBranchNumber = explicitBranchMatch[1];
-      if (parseInt(targetBranchNumber, 10) >= 1000 || /(?:поштомат|почтомат|пм)/iu.test(corrected)) {
+      if (parseInt(targetBranchNumber, 10) >= 1000 || isPostomatKeyword(corrected)) {
         isPostomat = true;
       }
     }
@@ -764,7 +788,7 @@
       .replace(/(?<!\p{L})(київська|львівська|івано-франківська|тернопільська|дніпропетровська|одеська|харківська|вінницька|полтавська|житомирська|запорізька|миколаївська|черкаська|чернігівська|рівненська|волинська|закарпатська|чернівецька|хмельницька|сумська|кіровоградська|донецька|луганська|херсонська)(?!\p{L})\s*(?:область|обл)?/giu, ' ')
       .replace(/(?<!\p{L})([А-Яа-яІіЇїЄє]+(?:ський|цький|зький|ського|цького|зького))(?!\p{L})\s*(?:район|району|р-н)?/giu, ' ')
       .replace(/(?<!\p{L})(?:нова\s+пошта|нової\s+пошти|укрпошта|укрпошти)(?!\p{L})/giu, ' ')
-      .replace(/(?<!\p{L})(?:область|області|обл|район|району|р-н|р-он|смт|селище|село|с|місто|м|відділення|віділення|відділ|поштомат|поштомата|поштомати|почтомат|пм|пошта|вулиця|вул|просп|проспект|бульв|бульвар)(?!\p{L})/giu, ' ')
+      .replace(/(?<!\p{L})(?:область|області|обл|район|району|р-н|р-он|смт|селище|село|с|місто|м|відділення|віділення|відділ|поштомат|поштомата|поштомати|почтомат|пошт|п\/м|пм|пошта|вулиця|вул|просп|проспект|бульв|бульвар)(?!\p{L})/giu, ' ')
       .replace(/[№#]/g, ' ')
       .replace(/\b\d+\b/g, ' ');
 
@@ -1160,7 +1184,7 @@
     // 4. Категорія відділення
     const isPost = item.typeClass === 'poshtomat' || item.type === 'poshtomat' || (item.name && item.name.toLowerCase().includes('поштомат'));
     if (isPost) {
-      parts.push('поштомат', 'почтомат', 'пм');
+      parts.push('поштомат', 'почтомат', 'пошт', 'пм');
     } else {
       parts.push('відділення', 'поштове', 'вантажне', 'склад');
     }
@@ -1206,7 +1230,7 @@
 
   // Стоп-слова та прийменники
   const STOP_WORDS = new Set([
-    'відділення', 'відділ', 'відд', 'вд', 'склад', 'поштомат', 'почтомат', 'пм',
+    'відділення', 'відділ', 'відд', 'вд', 'склад', 'поштомат', 'почтомат', 'пошт', 'п/м', 'пм',
     'пункт', 'приймання', 'видачі', 'вулиця', 'вул', 'просп', 'проспект', 'бульвар',
     'бульв', 'провулок', 'пров', 'площа', 'пл', 'шосе', '№', '#', 'номер',
     'нова', 'пошта', 'пошти', 'нової', 'нп', 'укрпошта', 'укрпошти',
@@ -1250,12 +1274,14 @@
       return { city: null, number: null, oblast: null, raion: null, streetTokens: [], settlementOblast: null };
     }
     let text = fixKeyboardLayout(query.trim())
+      .replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2')
+      .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм')
       .replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
       .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
 
     // 1. Номер відділення або поштомату
     let number = null;
-    const explicitBranchMatch = text.match(/(?:поштомат|почтомат|пм|відділення|віділення|відділ|№|#)\s*(?:№|#)?\s*(\b\d{1,6}\b)/iu);
+    const explicitBranchMatch = text.match(/(?:поштомат|поштомата|поштомати|почтомат|пошт|п\/м|пм|відділення|віділення|відділ|№|#)\s*(?:№|#)?\s*(\b\d{1,6}\b)/iu);
     if (explicitBranchMatch) {
       number = explicitBranchMatch[1];
       text = text.replace(explicitBranchMatch[0], ' ');
@@ -1287,7 +1313,7 @@
     }
 
     // 4. Очищення службових слів
-    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|село|місто|відділення|поштомат|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
+    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|село|місто|відділення|віділення|відділ|поштомат|поштомата|поштомати|почтомат|пошт|пм|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
       .replace(/[,.-]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -1324,11 +1350,23 @@
       const second = foundSettlementsInOrder[1];
       const firstStem = first.s.name.toLowerCase().slice(0, 5);
       const secondObl = (second.s.oblast || '').toLowerCase();
+      const secondStem = second.s.name.toLowerCase().slice(0, 5);
+      const isSecondRegionalCenter = REGIONAL_CENTERS.has(second.s.name.toLowerCase());
+      const isFirstRegionalCenter = REGIONAL_CENTERS.has(first.s.name.toLowerCase());
+      const existsInTargetOblast = UKRAINE_SETTLEMENTS.some(s => s.name.toLowerCase() === first.s.name.toLowerCase() && (s.oblast || '').toLowerCase().includes(secondStem));
 
-      // Якщо друге місто належить до області першого міста (наприклад: "житомир нові білокоровичі", "хмельницький славута"):
-      if (secondObl.includes(firstStem)) {
+      if (secondObl.includes(firstStem) || (isFirstRegionalCenter && !isSecondRegionalCenter)) {
+        // Якщо друге місто належить до області першого міста (наприклад: "житомир нові білокоровичі", "хмельницький славута"):
         oblast = second.s.oblast;
         city = second.s.name;
+        settlementOblast = second.s.oblast;
+        text = text.replace(new RegExp('(?<!\\p{L})' + first.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ');
+        text = text.replace(new RegExp('(?<!\\p{L})' + second.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ').trim();
+      } else if (isSecondRegionalCenter && existsInTargetOblast) {
+        // Наприклад: "іванівка житомир 1", "олександрія рівне"
+        // Перше слово — дійсне село/місто, а друге — обласний центр як уточнення області
+        city = first.s.name;
+        oblast = second.s.oblast;
         settlementOblast = second.s.oblast;
         text = text.replace(new RegExp('(?<!\\p{L})' + first.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ');
         text = text.replace(new RegExp('(?<!\\p{L})' + second.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ').trim();
@@ -1343,6 +1381,7 @@
 
     // Якщо місто знайдено і є кілька однойменних міст у різних областях,
     // звіряємо з вказаним районом або областю для точної ідентифікації
+    let isDisambiguatedStreet = false;
     if (city && (raion || oblast)) {
       const rKey = (raion || '').replace(/(?:ський|цький|зький)$/i, '').toLowerCase();
       const oKey = (oblast || '').replace(/(?:ська|цька|зька)$/i, '').toLowerCase();
@@ -1354,13 +1393,25 @@
       const sFound = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() && matchesTargetRegion(s));
       if (sFound) {
         settlementOblast = sFound.oblast;
+      } else if (oblast && detectedO && detectedO.rawMatched && !/(?:область|обл)/i.test(query)) {
+        // Якщо для цього міста немає жодного збігу у знайденій області,
+        // перевіряємо, чи є токен назвою вулиці в цьому місті (наприклад, "гриців 1 київська" -> вул. Київська у Грицеві)
+        const currentSettlement = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
+        const rawLow = detectedO.rawMatched.toLowerCase();
+        const isStreetOfCity = currentSettlement && Array.isArray(currentSettlement.streets) &&
+          currentSettlement.streets.some(st => st.toLowerCase().includes(rawLow) || rawLow.includes(st.toLowerCase().replace(/^(?:вул\.?|просп\.?|пров\.?)\s*/i, '')));
+        if (isStreetOfCity) {
+          oblast = null;
+          isDisambiguatedStreet = true;
+          text = text + ' ' + detectedO.rawMatched;
+        }
       }
     }
 
     // 6. Залишок — токени вулиці / адреси
     const streetTokens = text.split(/\s+/)
       .map(w => w.trim().toLowerCase())
-      .filter(w => w.length >= 2 && !STOP_WORDS.has(w) && !isOblastToken(w));
+      .filter(w => w.length >= 2 && !STOP_WORDS.has(w) && (!isOblastToken(w) || isDisambiguatedStreet));
 
     return { city, number, oblast, raion, streetTokens, settlementOblast };
   }
@@ -1402,22 +1453,25 @@
     const hasExplicitNumber = numTokens.length > 0;
 
     // Підготовка токенів області / скорочень
-    let queryOblastName = targetOblast;
-    if (!queryOblastName) {
-      for (let t of tokens) {
-        const obl = isOblastToken(t);
-        if (obl) {
-          queryOblastName = obl.toLowerCase();
-          break;
-        }
-      }
-    }
+    let explicitOblast = facets.oblast ? facets.oblast.toLowerCase() : null;
+    const hasExplicitOblast = Boolean(explicitOblast);
+    let queryOblastName = explicitOblast || (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
     const queryOblastClean = queryOblastName ? queryOblastName.replace(/(?:ська|цька|зька| область| обл\.?)$/gi, '').slice(0, 4) : null;
     const queryRaionClean = facets.raion ? facets.raion.toLowerCase().replace(/(?:ський|цький|зький| район| р-н)$/gi, '').slice(0, 4) : null;
 
     // Підготовка кандидатів у назву вулиці (без цифр, без міста, без області)
+    const oblStem = (queryOblastClean || '').toLowerCase();
+    const isOblastOrCenter = (t) => {
+      if (facets.streetTokens && facets.streetTokens.includes(t)) return false;
+      if (isOblastToken(t)) return true;
+      if (oblStem && t.startsWith(oblStem)) return true;
+      if (facets.oblast && t.toLowerCase() === facets.oblast.toLowerCase()) return true;
+      if (REGIONAL_CENTERS.has(t) && facets.oblast && facets.oblast.toLowerCase().includes(t.slice(0, 4))) return true;
+      return false;
+    };
+
     const streetCandidates = (facets.streetTokens || []).concat(
-      tokens.filter(t => !/^\d+$/.test(t) && t !== detectedCityName && !isOblastToken(t) && !STOP_WORDS.has(t))
+      tokens.filter(t => !/^\d+$/.test(t) && t !== detectedCityName && !isOblastOrCenter(t) && !STOP_WORDS.has(t))
     );
     const uniqueStreetTokens = Array.from(new Set(streetCandidates)).filter(t => t.length >= 2);
     const cityStem = detectedCityName ? detectedCityName.slice(0, 4) : null;
@@ -1447,7 +1501,29 @@
         else score -= 1000;
       }
 
-      // 1. ТОЧНИЙ НОМЕР ВІДДІЛЕННЯ / ПОШТОМАТУ ТА ІНДЕКС УКРПОШТИ:
+      // 1. ВУЛИЦЯ:
+      // - Точний збіг слова з вулицею: +600 балів.
+      // - Входження кореня слова у назву вулиці (b.street): +400 балів.
+      // - Якщо у запиті вказано слово-вулицю, а відділення розташоване на іншій вулиці:
+      //   * Знижувати бал (-800 балів за невідповідність вулиці при зазначеній вулиці).
+      let streetMatched = false;
+      if (uniqueStreetTokens.length > 0) {
+        for (let t = 0; t < uniqueStreetTokens.length; t++) {
+          const tok = uniqueStreetTokens[t];
+          if (bStreet.includes(tok)) {
+            streetMatched = true;
+            score += 600;
+          } else if (matchStreetOrAddress(b, tok)) {
+            streetMatched = true;
+            score += 400;
+          }
+        }
+        if (!streetMatched) {
+          score -= 800; // штраф за невідповідність вулиці
+        }
+      }
+
+      // 2. ТОЧНИЙ НОМЕР ВІДДІЛЕННЯ / ПОШТОМАТУ ТА ІНДЕКС УКРПОШТИ:
       // - Якщо вкладка Укрпошта і 5-значний індекс (b.postalCode === token або b.number === token): +2500 балів.
       // - Якщо введено 4-5 цифр (поштомат) і b.number === token: +2000 балів.
       // - Якщо b.number === token (звичайне відділення): +1000 балів.
@@ -1487,12 +1563,16 @@
           // Виняток для Укрпошти у селах: номер 1 не штрафує відділення села, якщо індекс 5-значний
           const isUkrMicro = isUkrposhta && numTokens.some(t => t.length <= 2) && detectedCityName && bCity === detectedCityName;
           if (!isUkrMicro) {
-            score -= 600;
+            if (streetMatched) {
+              score -= 100; // пом'якшений штраф, якщо вулиця точна
+            } else {
+              score -= 600;
+            }
           }
         }
       }
 
-      // 2. НАСЕЛЕНИЙ ПУНКТ (Місто / Село / СМТ):
+      // 3. НАСЕЛЕНИЙ ПУНКТ (Місто / Село / СМТ):
       // - Точний збіг назви міста (b.city === token): +800 балів.
       // - Нечіткий збіг або корінь міста (Levenshtein <= 1 чи стем): +400 балів (-50 за одруківку).
       // - Якщо місто вказано, а відділення з іншого міста: мінус 1000 балів (жорсткий штраф).
@@ -1524,12 +1604,15 @@
         }
       }
 
-      // 3. ОБЛАСТЬ / РАЙОН:
+      // 4. ОБЛАСТЬ / РАЙОН:
       // - Збіг області (включно зі скороченнями): +300 балів.
+      // - Блокуючий штраф (-2500 балів) за невідповідність явно вказаній області чи центру області.
       // - Збіг району: +250 балів.
       if (queryOblastClean) {
         if (bOblast.includes(queryOblastClean)) {
           score += 300;
+        } else if (hasExplicitOblast) {
+          score -= 2500; // блокуючий штраф за чужу область при явно зазначеній області/центрі
         } else {
           score -= 800; // штраф за іншу область при явно вказаній
         }
@@ -1538,18 +1621,6 @@
       if (queryRaionClean) {
         if (bRaion.includes(queryRaionClean)) {
           score += 250;
-        }
-      }
-
-      // 4. ВУЛИЦЯ:
-      // - Точний збіг слова з вулицею: +500 балів.
-      // - Входження кореня слова у назву вулиці (b.street): +350 балів.
-      for (let t = 0; t < uniqueStreetTokens.length; t++) {
-        const tok = uniqueStreetTokens[t];
-        if (bStreet.includes(tok)) {
-          score += 500;
-        } else if (matchStreetOrAddress(b, tok)) {
-          score += 350;
         }
       }
 
@@ -1623,6 +1694,7 @@
     searchBranches,
     filterBranchesByNormalizedSearch,
     isOblastToken,
+    isPostomatKeyword,
     OBLAST_SHORT_ALIASES,
     OBLASTS,
     UKRAINE_SETTLEMENTS,

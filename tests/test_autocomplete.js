@@ -212,7 +212,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 22;
+  let totalTests = 23;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1253,6 +1253,85 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 22:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 23: Стрес-тестування критичних крайових випадків (v8.18.2)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 23: Стрес-тестування критичних крайових випадків (v8.18.2)');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+    const upPool = window.BRANCHES_DATA.ukrposhta;
+    const btnNovaPoshta = elementsById['btnNovaPoshta'];
+    const btnUkrposhta = elementsById['btnUkrposhta'];
+    const searchInput = elementsById['searchInput'];
+    const resultsList = elementsById['resultsList'];
+
+    // 1. Нормалізація розірваних індексів ("79 049" -> 79049)
+    const normSplit = window.SmartSearchEngine.normalizeSearchTokens("79 049");
+    if (!normSplit.tokens.includes("79049") || normSplit.tokens.includes("79")) {
+      throw new Error(`Розірваний індекс '79 049' не склеївся у 79049: ${JSON.stringify(normSplit.tokens)}`);
+    }
+    const resSplitUP = window.SmartSearchEngine.searchBranches("79 049", upPool, 5);
+    if (!resSplitUP || resSplitUP.length === 0 || resSplitUP[0].postalCode !== "79049") {
+      throw new Error("Пошук '79 049' не повернув відділення з індексом 79049");
+    }
+
+    // 2. Склеювання маркерів поштоматів ("пм", "п/м", "пошт", "пм 22104 одеса")
+    if (!window.SmartSearchEngine.isPostomatKeyword("пм") ||
+        !window.SmartSearchEngine.isPostomatKeyword("п/м") ||
+        !window.SmartSearchEngine.isPostomatKeyword("пошт")) {
+      throw new Error("Маркери поштомату 'пм', 'п/м', 'пошт' не розпізнано функцією isPostomatKeyword");
+    }
+    const resPM = window.SmartSearchEngine.searchBranches("пм 22104 одеса", pool, 5);
+    if (!resPM || resPM.length === 0 || resPM[0].number !== "22104" || resPM[0].city !== "Одеса") {
+      throw new Error(`Запит 'пм 22104 одеса' не повернув поштомат 22104 у м. Одеса: ${JSON.stringify(resPM[0])}`);
+    }
+
+    // 3. Аліаси та скорочення для Кам'янець-Подільський
+    const kamAliases = ["камподільський", "камподільськ", "кампод", "кам-под", "кам янець", "камянець"];
+    for (let alias of kamAliases) {
+      const normKam = window.SmartSearchEngine.normalizeSearchTokens(alias + " 1");
+      if (!normKam.detectedCity || normKam.detectedCity.name !== "Кам'янець-Подільський") {
+        throw new Error(`Аліас '${alias}' не розпізнано як Кам'янець-Подільський (отримано: ${normKam.detectedCity ? normKam.detectedCity.name : 'null'})`);
+      }
+    }
+
+    // 4. Пріоритет області над тезками (Олександрія Рівне vs Кіровоград)
+    const resRivne = window.SmartSearchEngine.searchBranches("олександрія рівне", pool, 5);
+    if (!resRivne || resRivne.length === 0 || resRivne[0].oblast !== "Рівненська") {
+      throw new Error(`Запит 'олександрія рівне' повернув іншу область: ${resRivne[0] ? resRivne[0].oblast : 'null'}`);
+    }
+    const resKirov = window.SmartSearchEngine.searchBranches("олександрія кіров", pool, 5);
+    if (!resKirov || resKirov.length === 0 || resKirov[0].oblast !== "Кіровоградська") {
+      throw new Error(`Запит 'олександрія кіров' повернув іншу область: ${resKirov[0] ? resKirov[0].oblast : 'null'}`);
+    }
+
+    // 5. Вулиця проти номера (випадок "145 драгоманов київ")
+    const resDrag = window.SmartSearchEngine.searchBranches("145 драгоманов київ", pool, 5);
+    if (!resDrag || resDrag.length === 0 || !resDrag[0].street.includes("Драгоманов")) {
+      throw new Error(`Запит '145 драгоманов київ' не віддав пріоритет вул. Драгоманова: отримано ${resDrag[0] ? resDrag[0].street : 'null'}`);
+    }
+
+    // 6. Захист малих сіл від поглинання обласним центром ("іванівка житомир 1")
+    const resIvan = window.SmartSearchEngine.searchBranches("іванівка житомир 1", pool, 5);
+    if (!resIvan || resIvan.length === 0 || resIvan[0].city !== "Іванівка" || resIvan[0].oblast !== "Житомирська" || resIvan[0].number !== "1") {
+      throw new Error(`Запит 'іванівка житомир 1' не повернув с. Іванівка №1: отримано ${resIvan[0] ? resIvan[0].city + ' №' + resIvan[0].number : 'null'}`);
+    }
+
+    // UI перевірка: пошук "145 драгоманов київ"
+    searchInput.value = '145 драгоманов київ';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+    const htmlRes = resultsList.innerHTML;
+    if (!htmlRes.includes('Драгоманов')) {
+      throw new Error("UI картки результатів для '145 драгоманов київ' не містять вул. Драгоманова");
+    }
+
+    console.log("  ✓ Успіх: Усі 5+ критичних крайових випадків (розірвані індекси, маркери поштоматів, аліаси Кам'янця, блокуючий штраф області, пріоритет вулиці над номером, захист сіл) перевірено та успішно пройдено!\\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 23:', err.message, '\\n');
   }
 
   console.log('===============================================================');
