@@ -532,7 +532,8 @@
         postalCode: null,
         oblast: null,
         settlement: null,
-        didYouMeanText: null
+        didYouMeanText: null,
+        facets: { city: null, number: null, oblast: null, raion: null, streetTokens: [], settlementOblast: null }
       };
     }
 
@@ -781,7 +782,8 @@
       detectedStreet,
       matchedSettlement,
       confidence: highestScore,
-      didYouMeanText
+      didYouMeanText,
+      facets: extractFacets(rawQuery)
     };
   }
 
@@ -897,67 +899,71 @@
       };
     }
 
-    // Чи введено місто та номер (або вулицю) / ключове слово відділення/поштомату:
-    // Якщо так — шукаємо точні збіги відділень/адрес
-    const isBranchSearch = hasDigits || hasPostomatKeyword || hasBranchKeyword || (tokens.length >= 2 && !qLower.includes('область') && !qLower.includes('район'));
+    // КРОК 3: Якщо додано цифри або ключове слово відділення/поштомату —
+    // поп-ап міст миттєво закривається, щоб не перекривати картки знайдених відділень
+    if (hasDigits || hasPostomatKeyword || hasBranchKeyword) {
+      return [];
+    }
 
-    if (isBranchSearch) {
-      const pool = (Array.isArray(liveCityBranches) && liveCityBranches.length > 0)
-        ? liveCityBranches
-        : ((window.BRANCHES_DATA && window.BRANCHES_DATA[currentService]) || []);
-
-      const matches = filterBranchesByNormalizedSearch(qClean, pool);
-      for (let i = 0; i < matches.length; i++) {
-        const b = matches[i];
-        const isPost = b.type === 'poshtomat' || (b.name && b.name.includes('Поштомат')) || b.typeClass === 'poshtomat';
-        const key = `${b.city}-${b.number}-${isPost ? 'p' : 'b'}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          const formatted = formatBranchAutocomplete(b);
-          suggestions.push({
-            type: formatted.isPost ? 'postomat' : 'branch',
-            title: formatted.title,
-            subtitle: formatted.subtitle,
-            value: `${b.city} ${formatted.isPost ? 'поштомат ' : 'відділення '}${b.number}`,
-            textToFill: `${b.city} ${formatted.isPost ? 'поштомат ' : 'відділення '}${b.number}`,
-            badge: formatted.isPost ? 'Поштомат' : 'Відділення',
-            icon: formatted.isPost ? '📦' : '🏢',
-            branchObj: b
-          });
-        }
-        if (suggestions.length >= 7) break;
+    // КРОК 2: Введено точну назву міста — показуємо суто знайдений населений пункт
+    // (або кілька варіантів з областями/районами, якщо назви міст однакові, наприклад "Підгайці")
+    const exactMatches = [];
+    for (let s of UKRAINE_SETTLEMENTS) {
+      const sLower = s.name.toLowerCase();
+      const sNorm = normalizeLocativeCase(sLower);
+      const isExact = sLower === normalizedQuery || sNorm === normalizedQuery ||
+                      (s.aliases && s.aliases.some(a => a === normalizedQuery));
+      if (isExact) {
+        exactMatches.push(s);
       }
     }
 
-    // ВАЖЛИВО: Автокомпліт міст показується ТІЛЬКИ тоді, коли користувач вводить виключно назву міста
-    // БЕЗ номера відділення чи поштомату! Якщо введено цифри або ключове слово відділення/поштомату —
-    // список міст категорично НЕ повинен перекривати видачу.
-    if (!hasDigits && !hasPostomatKeyword && !hasBranchKeyword && suggestions.length < 7) {
-      const firstToken = tokens[0];
-      for (let s of UKRAINE_SETTLEMENTS) {
-        const sLower = s.name.toLowerCase();
-        const matchExact = sLower.startsWith(firstToken) || sLower.includes(firstToken) || sLower.startsWith(normalizedQuery) || sLower.includes(normalizedQuery);
-        const matchAlias = s.aliases && s.aliases.some(a => a.startsWith(firstToken) || a.includes(firstToken));
-
-        if (matchExact || matchAlias) {
-          const sKey = `${s.name.toLowerCase()}-${(s.raion || '').toLowerCase()}-${(s.oblast || '').toLowerCase()}`;
-          if (!seen.has(sKey)) {
-            seen.add(sKey);
-            const subtitle = formatSettlementSubtitle(s);
-            suggestions.push({
-              type: s.type || 'місто',
-              title: s.name,
-              subtitle: subtitle,
-              value: s.name,
-              textToFill: s.name + ' ',
-              badge: s.type || 'місто',
-              icon: '📍',
-              settlementObj: s
-            });
-          }
+    if (exactMatches.length > 0) {
+      for (let s of exactMatches) {
+        const sKey = `${s.name.toLowerCase()}-${(s.raion || '').toLowerCase()}-${(s.oblast || '').toLowerCase()}`;
+        if (!seen.has(sKey)) {
+          seen.add(sKey);
+          const subtitle = formatSettlementSubtitle(s);
+          suggestions.push({
+            type: s.type || 'місто',
+            title: s.name,
+            subtitle: subtitle,
+            value: s.name,
+            textToFill: s.name + ' ',
+            badge: s.type || 'місто',
+            icon: '📍',
+            settlementObj: s
+          });
         }
-        if (suggestions.length >= 7) break;
       }
+      return suggestions;
+    }
+
+    // КРОК 1: Ввід перших 2-3 літер без цифр — показуємо ТІЛЬКИ поп-ап міст з ПРЕФІКСНИМИ збігами
+    const firstToken = tokens[0];
+    for (let s of UKRAINE_SETTLEMENTS) {
+      const sLower = s.name.toLowerCase();
+      const matchPrefix = sLower.startsWith(firstToken) || sLower.startsWith(normalizedQuery) ||
+                          (s.aliases && s.aliases.some(a => a.startsWith(firstToken) || a.startsWith(normalizedQuery)));
+
+      if (matchPrefix) {
+        const sKey = `${s.name.toLowerCase()}-${(s.raion || '').toLowerCase()}-${(s.oblast || '').toLowerCase()}`;
+        if (!seen.has(sKey)) {
+          seen.add(sKey);
+          const subtitle = formatSettlementSubtitle(s);
+          suggestions.push({
+            type: s.type || 'місто',
+            title: s.name,
+            subtitle: subtitle,
+            value: s.name,
+            textToFill: s.name + ' ',
+            badge: s.type || 'місто',
+            icon: '📍',
+            settlementObj: s
+          });
+        }
+      }
+      if (suggestions.length >= 7) break;
     }
 
     return suggestions;
@@ -1139,19 +1145,138 @@
     'пункт', 'приймання', 'видачі', 'вулиця', 'вул', 'просп', 'проспект', 'бульвар',
     'бульв', 'провулок', 'пров', 'площа', 'пл', 'шосе', '№', '#', 'номер',
     'нова', 'пошта', 'пошти', 'нової', 'нп', 'укрпошта', 'укрпошти',
-    'у', 'в', 'на', 'по', 'до', 'з', 'із', 'зі', 'біля', 'для', 'та', 'і'
+    'у', 'в', 'на', 'по', 'до', 'з', 'із', 'зі', 'біля', 'для', 'та', 'і',
+    'район', 'району', 'р-н', 'р-он', 'область', 'області', 'обл', 'смт', 'селище', 'село', 'місто'
   ]);
 
   function matchesWord(tok, w) {
     if (w === tok) return true;
-    const isAdjective = /(?:ська|ської|ську|ською|ський|ського|ському|цький|цького|зький|зького)$/i.test(w);
-    if (isAdjective) {
-      if (!/(?:ськ|цьк|зьк)/i.test(tok)) return false;
+    const tokAdj = /(?:ська|ської|ську|ською|ський|ського|ському|цький|цького|зький|зького)$/i.test(tok);
+    const wAdj = /(?:ська|ської|ську|ською|ський|ського|ському|цький|цького|зький|зького)$/i.test(w);
+    if (tokAdj && wAdj) {
+      const tokStem = tok.replace(/(?:ська|ської|ську|ською|ський|ського|ському|цький|цького|зький|зького)$/i, '');
+      const wStem = w.replace(/(?:ська|ської|ську|ською|ський|ського|ському|цький|цького|зький|зького)$/i, '');
+      if (tokStem === wStem) return true;
     }
+    if (wAdj && !/(?:ськ|цьк|зьк)/i.test(tok)) return false;
     return tok.length >= 3 && w.startsWith(tok);
   }
 
-  // 9. НОВА ФУНКЦІЯ ПОШУКУ ВІДДІЛЕНЬ З ПІДТРИМКОЮ КОМБІНОВАНИХ ЗАПИТІВ ТА СКОРИНГУ
+  // Морфологічний стемінг українських слів (виділення основи для пошуку вулиць)
+  function getUkrainianStem(word) {
+    if (!word || word.length < 4) return word;
+    const w = word.toLowerCase();
+    return w.replace(/(?:ського|ської|ському|ських|ською|ський|ська|ське|ські|цького|цької|цькому|цьких|цькою|цький|цька|цьке|цькі|зького|зької|зькому|зьких|зькою|зький|зька|зьке|зькі|ова|ева|єва|ової|евої|євої|овою|евою|євою|івка|івку|івці|івки|а|я|у|ю|і|и|е|є|ої|ей|ій)$/iu, '');
+  }
+
+  // Перевірка збігу вулиці з урахуванням кореня/морфології
+  function matchStreetOrAddress(branch, token) {
+    if (!branch || !token) return false;
+    const sLower = ((branch.street || '') + ' ' + (branch.address || '')).toLowerCase();
+    if (sLower.includes(token)) return true;
+    const stem = getUkrainianStem(token);
+    if (stem && stem.length >= 3 && sLower.includes(stem)) return true;
+    return false;
+  }
+
+  // 8.1. ВИДІЛЕННЯ СУТНОСТЕЙ (SMART ENTITY EXTRACTION) ДЛЯ ФАСЕТНОГО ПОШУКУ
+  function extractFacets(query) {
+    if (!query) {
+      return { city: null, number: null, oblast: null, raion: null, streetTokens: [], settlementOblast: null };
+    }
+    let text = fixKeyboardLayout(query.trim())
+      .replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
+      .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
+
+    // 1. Номер відділення або поштомату
+    let number = null;
+    const explicitBranchMatch = text.match(/(?:поштомат|почтомат|пм|відділення|віділення|відділ|№|#)\s*(?:№|#)?\s*(\b\d{1,6}\b)/iu);
+    if (explicitBranchMatch) {
+      number = explicitBranchMatch[1];
+      text = text.replace(explicitBranchMatch[0], ' ');
+    } else {
+      const numMatch = text.match(/\b\d{1,6}\b/);
+      if (numMatch) {
+        number = numMatch[0];
+        text = text.replace(numMatch[0], ' ');
+      }
+    }
+
+    // 2. Область
+    let oblast = null;
+    const detectedO = detectOblast(text);
+    if (detectedO) {
+      oblast = detectedO.name;
+      text = text.replace(new RegExp('(?<!\\p{L})' + detectedO.name + '(?:ська|ської|ській|ською)?\\s*(?:область|обл\\.?)?(?!\\p{L})', 'giu'), ' ');
+    }
+
+    // 3. Район
+    let raion = null;
+    const detectedR = detectRaion(text);
+    if (detectedR) {
+      raion = detectedR;
+      text = text.replace(new RegExp('(?<!\\p{L})' + detectedR + '(?:ський|ського|ському|ським)?\\s*(?:район|р-н)?(?!\\p{L})', 'giu'), ' ');
+    }
+
+    // 4. Очищення службових слів
+    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|село|місто|відділення|поштомат|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
+      .replace(/[,.-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // 5. Виділення міста
+    let city = null;
+    let settlementOblast = null;
+    const words = text.split(/\s+/).filter(Boolean);
+
+    if (words.length >= 2) {
+      const two = (words[0] + ' ' + words[1]).toLowerCase();
+      const s2 = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === two || (s.aliases && s.aliases.includes(two)));
+      if (s2) {
+        city = s2.name;
+        settlementOblast = s2.oblast;
+        text = text.replace(new RegExp('(?<!\\p{L})' + words[0] + '\\s+' + words[1] + '(?!\\p{L})', 'iu'), ' ').trim();
+      }
+    }
+
+    if (!city) {
+      for (const w of words) {
+        const wNorm = normalizeLocativeCase(w.toLowerCase());
+        const matchedS = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === wNorm || s.name.toLowerCase() === w.toLowerCase() || (s.aliases && s.aliases.includes(wNorm)));
+        if (matchedS) {
+          city = matchedS.name;
+          settlementOblast = matchedS.oblast;
+          text = text.replace(new RegExp('(?<!\\p{L})' + w + '(?!\\p{L})', 'iu'), ' ').trim();
+          break;
+        }
+      }
+    }
+
+    // Якщо місто знайдено і є кілька однойменних міст у різних областях,
+    // звіряємо з вказаним районом або областю для точної ідентифікації
+    if (city && (raion || oblast)) {
+      const rKey = (raion || '').replace(/(?:ський|цький|зький)$/i, '').toLowerCase();
+      const oKey = (oblast || '').replace(/(?:ська|цька|зька)$/i, '').toLowerCase();
+      const matchesTargetRegion = (s) => {
+        const sO = (s.oblast || '').toLowerCase();
+        const sR = (s.raion || '').toLowerCase();
+        return (oKey && sO.includes(oKey)) || (rKey && (sR.includes(rKey) || sO.includes(rKey)));
+      };
+      const sFound = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() && matchesTargetRegion(s));
+      if (sFound) {
+        settlementOblast = sFound.oblast;
+      }
+    }
+
+    // 6. Залишок — токени вулиці / адреси
+    const streetTokens = text.split(/\s+/)
+      .map(w => w.trim().toLowerCase())
+      .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
+
+    return { city, number, oblast, raion, streetTokens, settlementOblast };
+  }
+
+  // 9. НОВА ФУНКЦІЯ ПОШУКУ ВІДДІЛЕНЬ З ПІДТРИМКОЮ ФАСЕТНОГО ПОШУКУ, КОНТЕКСТНОЇ ІЗОЛЯЦІЇ ТА СКОРИНГУ
   function searchBranches(rawQuery, branches, limit = 20) {
     if (!rawQuery || !Array.isArray(branches) || branches.length === 0) return [];
 
@@ -1160,9 +1285,32 @@
     let tokens = norm.tokens;
     if (tokens.length === 0) return [];
 
+    const facets = extractFacets(rawQuery);
     const hasPostomatKeyword = norm.hasPostomatKeyword;
     const hasBranchKeyword = norm.hasBranchKeyword;
-    const detectedCityName = norm.detectedCity ? norm.detectedCity.name.toLowerCase() : null;
+    const detectedCityName = facets.city ? facets.city.toLowerCase() : (norm.detectedCity ? norm.detectedCity.name.toLowerCase() : null);
+
+    // 1. КОНТЕКСТНА ІЗОЛЯЦІЯ (Context Isolation)
+    // Якщо визначено місто — фільтрація відділень має йти ВИКЛЮЧНО по цьому місту,
+    // без підмішування інших міст чи областей.
+    let candidateBranches = branches;
+    if (detectedCityName) {
+      const cityFiltered = branches.filter(b => (b.city || '').toLowerCase() === detectedCityName);
+      if (cityFiltered.length > 0) {
+        candidateBranches = cityFiltered;
+      }
+    }
+
+    // Якщо вказана область (або місто однозначно належить до області, якщо є однойменні міста),
+    // звужуємо пошук по області
+    const targetOblast = facets.oblast ? facets.oblast.toLowerCase() : (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
+    if (targetOblast) {
+      const oblClean = targetOblast.replace(/\s*(?:область|обл\.?)$/i, '').replace(/(?:ська|цька|зька)$/i, '');
+      const oblFiltered = candidateBranches.filter(b => (b.oblast || '').toLowerCase().includes(oblClean));
+      if (oblFiltered.length > 0) {
+        candidateBranches = oblFiltered;
+      }
+    }
 
     const matched = [];
 
@@ -1175,8 +1323,8 @@
       };
     });
 
-    for (let i = 0; i < branches.length; i++) {
-      const b = branches[i];
+    for (let i = 0; i < candidateBranches.length; i++) {
+      const b = candidateBranches[i];
       let searchTarget = b.normalizedSearchText;
       if (!searchTarget) {
         searchTarget = buildNormalizedSearchText(b);
@@ -1205,6 +1353,8 @@
       for (let t = 0; t < tokenMeta.length; t++) {
         const tm = tokenMeta[t];
         const tok = tm.tok;
+        if (STOP_WORDS.has(tok)) continue;
+
         if (tm.isDigit) {
           if (bNum === tok) continue;
           if (isPostomat && bNum.startsWith(tok)) continue;
@@ -1214,10 +1364,21 @@
           }
         } else {
           // Якщо токен є назвою знайденого міста, перевіряємо місто відділення
-          if (detectedCityName && tok === detectedCityName) {
-            if (bCity === detectedCityName || bCity.includes(detectedCityName)) {
-              continue;
-            }
+          if (detectedCityName && (tok === detectedCityName || tok === bCity)) {
+            continue;
+          }
+
+          // Якщо токен є областю чи районом, перевіряємо збіг
+          if (targetOblast && (bOblast.includes(tok) || tok.includes(targetOblast.slice(0, 5)))) {
+            continue;
+          }
+          if (facets.raion && (bRaion.includes(tok) || tok.includes(facets.raion.toLowerCase().slice(0, 5)))) {
+            continue;
+          }
+
+          // Перевірка збігу вулиці з морфологією кореня (getUkrainianStem)
+          if (matchStreetOrAddress(b, tok)) {
+            continue;
           }
 
           if (searchTarget.includes(tok)) continue;
@@ -1244,41 +1405,51 @@
 
       // Ваговий скоринг (Scoring):
       let score = 0;
+
+      // Точний збіг номера відділення / поштомату (найвищий абсолютний пріоритет: +1000 балів)
+      if (facets.number) {
+        if (bNum === facets.number) {
+          score += 1000;
+        } else if (isPostomat && bNum.startsWith(facets.number)) {
+          score += 200;
+        }
+      }
+
       for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];
         if (/^\d+$/.test(tok)) {
-          // Точний збіг номера відділення / поштомату: найвищий абсолютний пріоритет (+350 балів)
           if (bNum === tok) {
             score += 350;
           } else if (isPostomat && bNum.startsWith(tok)) {
             score += 120;
           } else {
-            // Номер знайдено лише в адресі (будинок, корпус, під'їзд), а не як номер самого відділення:
             score += 15;
           }
         } else {
           // Збіг назви міста:
-          if (detectedCityName && tok === detectedCityName && bCity === detectedCityName) {
-            score += 120;
+          if (detectedCityName && (tok === detectedCityName || bCity === detectedCityName)) {
+            score += 150;
           } else if (bCity === tok) {
             score += 100;
           } else if (bCity.startsWith(tok)) {
             score += 50;
           }
 
-          // Збіг по назві вулиці: +40 балів
-          if (bStreet.includes(tok)) {
-            score += 40;
+          // Збіг по назві вулиці (з урахуванням кореня):
+          if (matchStreetOrAddress(b, tok)) {
+            score += 250;
+          } else if (bStreet.includes(tok)) {
+            score += 80;
           }
 
-          // Збіг по області: +20 балів
+          // Збіг по області:
           if (bOblast.includes(tok)) {
-            score += 20;
+            score += 50;
           }
 
-          // Збіг по району: +15 балів
+          // Збіг по району:
           if (bRaion.includes(tok)) {
-            score += 15;
+            score += 40;
           }
         }
       }
@@ -1319,6 +1490,9 @@
     detectRenaming,
     findSettlementByNameOrFuzzy,
     normalizeSearchTokens,
+    extractFacets,
+    getUkrainianStem,
+    matchStreetOrAddress,
     parseQuery,
     getAutocompleteSuggestions,
     buildNormalizedSearchText,

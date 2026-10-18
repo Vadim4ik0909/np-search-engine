@@ -190,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 16;
+  let totalTests = 17;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -851,6 +851,63 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 16:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 17: Smart Faceted Search (довільний порядок сутностей, ізоляція міст та стемінг вулиць)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 17: Smart Faceted Search (довільний порядок сутностей, ізоляція міст та стемінг вулиць)');
+  try {
+    const branches = window.BRANCHES_DATA.novaposhta;
+
+    // 1. "Підгайці Тернопільська 1" та "Підгайці Тернопільський район 1"
+    const p1 = window.SmartSearchEngine.searchBranches('Підгайці Тернопільська 1', branches, 5);
+    if (p1.length === 0 || p1[0].city !== 'Підгайці' || p1[0].number !== '1' || !p1[0].oblast.includes('Тернопільськ')) {
+      throw new Error(`Очікувалось Підгайці №1 у Тернопільській обл., отримано: ${p1.map(b => `${b.city} №${b.number} (${b.oblast})`).join(', ')}`);
+    }
+    // Перевіряємо повну ізоляцію контексту (жодних відділень з Волинської області)
+    if (p1.some(b => b.oblast.includes('Волинськ'))) {
+      throw new Error('Виявлено витік з Волинської області при запиті для Тернопільської області!');
+    }
+
+    const p2 = window.SmartSearchEngine.searchBranches('Підгайці Тернопільський район 1', branches, 5);
+    if (p2.length === 0 || p2[0].city !== 'Підгайці' || p2[0].number !== '1' || !p2[0].oblast.includes('Тернопільськ')) {
+      throw new Error(`Очікувалось Підгайці №1 для Тернопільського р-ну, отримано: ${p2.map(b => `${b.city} №${b.number} (${b.oblast})`).join(', ')}`);
+    }
+
+    // 2. "Київ Хрещатик 15" та "Хрещатик 15 Київ"
+    const k1 = window.SmartSearchEngine.searchBranches('Київ Хрещатик 15', branches, 5);
+    if (k1.length === 0 || k1[0].city !== 'Київ' || k1[0].number !== '15' || !k1[0].street.includes('Хрещатик')) {
+      throw new Error(`Очікувалось Київ №15 (вул. Хрещатик, 15), отримано: ${k1.map(b => `${b.city} №${b.number} (${b.street})`).join(', ')}`);
+    }
+
+    const k2 = window.SmartSearchEngine.searchBranches('Хрещатик 15 Київ', branches, 5);
+    if (k2.length === 0 || k2[0].city !== 'Київ' || k2[0].number !== '15' || !k2[0].street.includes('Хрещатик')) {
+      throw new Error(`Очікувалось Київ №15 для 'Хрещатик 15 Київ', отримано: ${k2.map(b => `${b.city} №${b.number} (${b.street})`).join(', ')}`);
+    }
+
+    // 3. "Львів 4" (Ізоляція міста: жодного Броди чи Вороновиця)
+    const l1 = window.SmartSearchEngine.searchBranches('Львів 4', branches, 5);
+    if (l1.length === 0 || l1[0].city !== 'Львів' || l1[0].number !== '4') {
+      throw new Error(`Очікувалось Львів №4 на 1-му місці, отримано: ${l1.map(b => `${b.city} №${b.number}`).join(', ')}`);
+    }
+    if (l1.some(b => b.city !== 'Львів')) {
+      throw new Error(`Порушено ізоляцію міста для 'Львів 4': повернуто інші міста ${l1.filter(b => b.city !== 'Львів').map(b => b.city).join(', ')}`);
+    }
+
+    // 4. Пошук по вулиці з урахуванням морфології кореня ("корольова" -> "просп. Академіка Корольова")
+    const korBranch = branches.find(b => b.city === 'Київ' && b.street.includes('Корольова'));
+    if (korBranch) {
+      const matchRoot = window.SmartSearchEngine.matchStreetOrAddress(korBranch, 'корольова');
+      if (!matchRoot) {
+        throw new Error('matchStreetOrAddress не зміг зіставити токен "корольова" з "просп. Академіка Корольова"');
+      }
+    }
+
+    console.log('  ✓ Успіх: Фасетний пошук підтримує довільний порядок слів ("Київ Хрещатик 15" == "Хрещатик 15 Київ"), ізолює міста ("Львів 4" без витоків), розрізняє області/райони ("Підгайці Тернопільська 1") та підтримує стемінг вулиць.\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 17:', err.message, '\n');
   }
 
   console.log('===============================================================');
