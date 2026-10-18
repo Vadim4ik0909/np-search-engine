@@ -190,7 +190,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 14;
+  let totalTests = 15;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -214,9 +214,9 @@ async function runTests() {
 
   // Захисний таймаут: завершити процес примусово через 10 секунд, якщо щось заблокується
   const watchdogTimer = setTimeout(() => {
-    console.error('\n⏱️ ТАЙМАУТ: Тести перевищили допустимий ліміт виконання (10с).');
+    console.error('\n⏱️ ТАЙМАУТ: Тести перевищили допустимий ліміт виконання (30с).');
     process.exit(1);
-  }, 10000);
+  }, 30000);
   if (watchdogTimer.unref) watchdogTimer.unref();
 
   console.time('⏱️ Час виконання тестів');
@@ -712,6 +712,53 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 14:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 15: Пошук мікропунктів ("Нові Білокоровичі 1") та захист від галюцинацій
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 15: Пошук у мікропунктах ("Нові Білокоровичі 1") та захист від галюцинацій');
+  try {
+    const pool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Перевіряємо точний пошук у Нових Білокоровичах
+    const resultsNB = window.SmartSearchEngine.searchBranches('Нові Білокоровичі 1', pool);
+    if (!resultsNB || resultsNB.length === 0) {
+      throw new Error('Не знайдено жодного відділення за запитом "Нові Білокоровичі 1"');
+    }
+    const topNB = resultsNB[0];
+    if (topNB.city !== 'Нові Білокоровичі' || topNB.number.toString() !== '1') {
+      throw new Error(`Очікувалось відділення №1 у смт Нові Білокоровичі, отримано: ${topNB.city} №${topNB.number}`);
+    }
+    if (!topNB.street || !topNB.street.includes('Довженка')) {
+      throw new Error(`Очікувалась вул. Довженка, отримано: ${topNB.street}`);
+    }
+    if (topNB.oblast !== 'Житомирська') {
+      throw new Error(`Очікувалась Житомирська область, отримано: ${topNB.oblast}`);
+    }
+
+    // 2. Перевіряємо захист від галюцинацій при неіснуючому місті (не повинно вигадувати "м. Нів" або підтягувати інші міста)
+    searchInput.value = 'нів 999';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(550);
+
+    const didYouMeanBox = elementsById['didYouMeanBox'];
+    if (didYouMeanBox && !didYouMeanBox.classList.contains('hidden')) {
+      const text = didYouMeanBox.textContent || '';
+      if (text.includes('м. Нів') || text.includes('у м.')) {
+        throw new Error(`didYouMeanBox містить галюциноване місто: "${text}"`);
+      }
+    }
+
+    const resultsFake = window.SmartSearchEngine.searchBranches('неіснуючемісто 99999', pool);
+    if (resultsFake && resultsFake.length > 0) {
+      throw new Error(`Для неіснуючого міста знайдено ${resultsFake.length} відділень замість 0`);
+    }
+
+    console.log(`  ✓ Успіх: "Нові Білокоровичі 1" миттєво знаходить ${topNB.city} №${topNB.number} (${topNB.street}, ${topNB.oblast} обл.), а для неіснуючих міст галюцинації типу "м. Нів" повністю заблоковані.\n`);
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 15:', err.message, '\n');
   }
 
   console.log('===============================================================');

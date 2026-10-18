@@ -60,13 +60,14 @@
       'фастові': 'фастів', 'василькові': 'васильків', 'обухові': 'обухів',
       'борисполі': 'бориспіль', 'вишгороді': 'вишгород',
       'франківську': 'івано-франківськ', 'івано-франківську': 'івано-франківськ', 'франику': 'івано-франківськ',
-      'коломиї': 'коломия', 'калуші': 'калуш', 'яремчі': 'яремче'
+      'коломиї': 'коломия', 'калуші': 'калуш', 'яремчі': 'яремче',
+      'нові': 'нові'
     };
 
     if (EXCEPTIONS[lower]) return EXCEPTIONS[lower];
 
     if (lower.endsWith('єві')) return lower.slice(0, -3) + 'їв';
-    if (lower.endsWith('ові') || lower.endsWith('еві')) return lower.slice(0, -3) + 'ів';
+    if (lower !== 'нові' && lower.length > 4 && (lower.endsWith('ові') || lower.endsWith('еві'))) return lower.slice(0, -3) + 'ів';
     if (lower.endsWith('ому')) return lower.slice(0, -3) + 'е';
     if (lower.endsWith('ях') || lower.endsWith('ах')) return lower.slice(0, -2) + 'и';
     if (lower.endsWith('зі')) return lower.slice(0, -2) + 'га';
@@ -747,26 +748,6 @@
         }
       }
     }
-
-    // 7.4. Динамічний синтез для мікропунктів (якщо села чи селища ще немає в базі)
-    if (!matchedSettlement && stripped.length > 0) {
-      const candidateWord = stripped.split(/\s+/)[0];
-      if (candidateWord && candidateWord.length >= 3) {
-        const normCandidate = normalizeLocativeCase(candidateWord);
-        const titleName = normCandidate.charAt(0).toUpperCase() + normCandidate.slice(1);
-        matchedSettlement = {
-          name: titleName,
-          oblast: detectedOblast ? detectedOblast.name : 'Україна',
-          raion: detectedRaion || '',
-          type: /(?:село|с\.)/i.test(corrected) ? 'село' : 'селище',
-          lat: 50.4501,
-          lng: 30.5234,
-          postalCodes: postalCode ? [postalCode] : [],
-          streets: detectedStreet ? [detectedStreet] : ['вул. Центральна', 'вул. Шевченка']
-        };
-        highestScore = 0.85;
-      }
-    }
     }
 
     // 7.5. Формування підказки did-you-mean
@@ -1185,6 +1166,15 @@
 
     const matched = [];
 
+    const tokenMeta = tokens.map(tok => {
+      const isDigit = /^\d+$/.test(tok);
+      return {
+        tok,
+        isDigit,
+        regex: isDigit ? new RegExp('(?<!\\d)' + tok + '(?!\\d)', 'u') : null
+      };
+    });
+
     for (let i = 0; i < branches.length; i++) {
       const b = branches[i];
       let searchTarget = b.normalizedSearchText;
@@ -1192,7 +1182,6 @@
         searchTarget = buildNormalizedSearchText(b);
         b.normalizedSearchText = searchTarget;
       }
-      const targetWords = searchTarget.split(/\s+/);
 
       const isPostomat = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || (b.name && b.name.toLowerCase().includes('поштомат'));
       const bNum = (b.number || '').toString();
@@ -1211,13 +1200,15 @@
 
       // Multi-token AND: кожен введений токен має обов'язково збігатися
       let matchesAll = true;
-      for (let t = 0; t < tokens.length; t++) {
-        const tok = tokens[t];
-        if (/^\d+$/.test(tok)) {
-          const isExactNum = (bNum === tok);
-          const isPrefixNum = isPostomat && bNum.startsWith(tok);
-          const hasDigitInTarget = targetWords.includes(tok) || new RegExp('(?<!\\d)' + tok + '(?!\\d)', 'u').test(searchTarget);
-          if (!isExactNum && !isPrefixNum && !hasDigitInTarget) {
+      let targetWords = null;
+
+      for (let t = 0; t < tokenMeta.length; t++) {
+        const tm = tokenMeta[t];
+        const tok = tm.tok;
+        if (tm.isDigit) {
+          if (bNum === tok) continue;
+          if (isPostomat && bNum.startsWith(tok)) continue;
+          if (!searchTarget.includes(tok) || !tm.regex.test(searchTarget)) {
             matchesAll = false;
             break;
           }
@@ -1229,9 +1220,18 @@
             }
           }
 
+          if (searchTarget.includes(tok)) continue;
+
+          // Швидке відсікання: якщо навіть перші 3 літери слова не зустрічаються в записі, це не наше відділення
+          if (tok.length >= 3 && !searchTarget.includes(tok.slice(0, 3))) {
+            matchesAll = false;
+            break;
+          }
+
+          if (!targetWords) targetWords = searchTarget.split(/\s+/);
           const wordMatch = targetWords.some(w => matchesWord(tok, w));
           if (!wordMatch) {
-            const fuzzyWordMatch = tok.length >= 4 && targetWords.some(w => w.length >= 4 && damerauLevenshtein(tok, w) <= 1);
+            const fuzzyWordMatch = tok.length >= 4 && targetWords.some(w => w.length >= 4 && Math.abs(tok.length - w.length) <= 1 && damerauLevenshtein(tok, w) <= 1);
             if (!fuzzyWordMatch) {
               matchesAll = false;
               break;

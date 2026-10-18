@@ -26,3 +26,7 @@ ENV/
 .vscode/
 *.swp
 *.swo
+
+# Резервні дампи бази даних (основна база у data/branches.js)
+data/branches.json
+data/branches_registry.json

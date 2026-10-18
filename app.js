@@ -429,8 +429,15 @@
       }, signal);
 
       if (sRes && sRes.length > 0 && sRes[0].Addresses && sRes[0].Addresses.length > 0) {
-        settlements = sRes[0].Addresses;
-        break;
+        const cLower = cand.toLowerCase().trim();
+        const validAddresses = sRes[0].Addresses.filter(a => {
+          const main = (a.MainDescription || a.Present || '').toLowerCase();
+          return main.includes(cLower) || cLower.includes(main);
+        });
+        if (validAddresses.length > 0) {
+          settlements = validAddresses;
+          break;
+        }
       }
     }
 
@@ -661,12 +668,12 @@
           const liveFiltered = engine ? engine.filterBranchesByNormalizedSearch(rawQuery, liveData) : [];
           if (liveFiltered.length > 0) {
             results = liveFiltered;
-          } else if (parsed.targetBranchNumber) {
-            const cityName = parsed.matchedSettlement ? parsed.matchedSettlement.name : searchCity;
+          } else if (parsed.targetBranchNumber && parsed.matchedSettlement) {
+            const cityName = parsed.matchedSettlement.name;
             didYouMeanText = `⚠️ Відділення або поштомат №${parsed.targetBranchNumber} у м. ${cityName} не знайдено. Доступні відділення:`;
             results = liveData;
           } else {
-            results = liveData;
+            results = [];
           }
         }
       }
@@ -981,15 +988,16 @@
     }
 
     if (filtered.length === 0) {
+      if (dom.didYouMeanBox) dom.didYouMeanBox.classList.add('hidden');
       dom.resultsCount.textContent = '0 відділень';
       dom.resultsList.innerHTML = `
         <div style="padding: 36px 16px; text-align: center; color: var(--text-muted); width: 100%;">
           <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
           <h4 style="font-weight: 800; color: var(--text-main); font-size: 16px; margin-bottom: 6px;">
-            ${state.typeFilter === 'postomat' ? 'Поштоматів' : 'Відділень'} за запитом «${escapeHtml(query || state.searchQuery)}» не знайдено
+            Населений пункт або відділення не знайдено
           </h4>
           <p style="font-size: 13px; max-width: 500px; margin: 0 auto; line-height: 1.5;">
-            Спробуйте перемкнути фільтр на «Всі» або уточнити назву міста.
+            За запитом «${escapeHtml(query || state.searchQuery)}» нічого не знайдено. Перевірте правильність написання міста або номера відділення.
           </p>
         </div>
       `;
