@@ -2146,6 +2146,59 @@
   }
 
   // ==========================================================================
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.22.0)
+  // ==========================================================================
+  function initServiceWorker() {
+    if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
+      navigator.serviceWorker
+        .register('./sw.js?v=8.22.0', { updateViaCache: 'none' })
+        .then((reg) => {
+          // Примусова перевірка наявності оновлення
+          reg.update();
+
+          // Якщо є воркер у черзі очікування — негайно активувати його
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+
+          reg.addEventListener('updatefound', () => {
+            const installing = reg.installing;
+            if (installing) {
+              installing.addEventListener('statechange', () => {
+                if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                  installing.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            }
+          });
+        })
+        .catch((err) => {
+          console.warn('[SW] Реєстрація Service Worker пропущена:', err);
+        });
+
+      // Перезавантажуємо вікно один раз, коли новий контролер переймає керування
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    }
+
+    // Очищення старих кешів на рівні браузера для гарантії актуальності версії
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        keys.forEach((key) => {
+          if (key !== 'np-ukr-cache-v8.22.0') {
+            caches.delete(key);
+          }
+        });
+      }).catch(() => {});
+    }
+  }
+
+  // ==========================================================================
   // ІНІЦІАЛІЗАЦІЯ ДОДАТКУ
   // ==========================================================================
   function init() {
@@ -2155,6 +2208,7 @@
     renderFrequentChips();
     renderRecentHistory();
     initHonestOnlineCounter();
+    initServiceWorker();
 
     // Автофокус на поле пошуку для миттєвої роботи оператора без зайвих кліків
     setTimeout(() => {
