@@ -213,7 +213,8 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 30;
+  let totalTests = 31;
+  const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1725,6 +1726,62 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 30:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 31: Крайові випадки v8.24.1 — апострофи, складені топоніми, вулиця без номера
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 31: Апострофи (ʼ \' ’), складений топонім "великий дальник 3", вулиця без номера "городок рівненська штейн"');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+    const S = window.SmartSearchEngine;
+
+    // 1. Усі види апострофів дають те саме: П'ятихатки (Дніпропетровська обл.) Відділення №1
+    for (const q of ['пʼятихатки 1', "п'ятихатки 1", 'п’ятихатки 1', 'пятихатки 1']) {
+      const r = S.searchBranches(q, npPool, 5);
+      if (!r || r.length === 0) throw new Error(`Жодного результату для '${q}'`);
+      const t = r[0];
+      if (canon(t.city) !== 'пятихатки' || String(t.number) !== '1' || !String(t.oblast).includes('Дніпропетровськ')) {
+        throw new Error(`'${q}' -> очікувалось П'ятихатки №1 (Дніпропетровська), отримано: ${t.city} №${t.number} (${t.oblast})`);
+      }
+    }
+
+    // 2. Складений топонім: "великий дальник 3" -> с. Великий Дальник №3
+    const fc = S.extractFacets('великий дальник 3');
+    if (fc.city !== 'Великий Дальник' || String(fc.number) !== '3') {
+      throw new Error(`extractFacets('великий дальник 3') -> city='${fc.city}', number='${fc.number}'`);
+    }
+    for (const q of ['великий дальник 3', 'старий самбір 1', 'нова одеса 1', 'кривий ріг 1']) {
+      const r = S.searchBranches(q, npPool, 5);
+      if (!r || r.length === 0) throw new Error(`Жодного результату для '${q}'`);
+    }
+    const vd = S.searchBranches('великий дальник 3', npPool, 5)[0];
+    if (vd.city !== 'Великий Дальник' || String(vd.number) !== '3' || vd.settlementType !== 'село') {
+      throw new Error(`Очікувався с. Великий Дальник №3, отримано: ${vd.settlementType} ${vd.city} №${vd.number}`);
+    }
+
+    // 3. Вулиця без номера: топонім + область + "штейн" -> Городок №1 (вул. барона Штейнгеля)
+    const gs = S.searchBranches('городок рівненська штейн', npPool, 5);
+    if (!gs || gs.length === 0) throw new Error("Жодного результату для 'городок рівненська штейн'");
+    if (gs[0].city !== 'Городок' || String(gs[0].number) !== '1' || !gs[0].street.toLowerCase().includes('штейнгел')) {
+      throw new Error(`Очікувався Городок №1 (Штейнгеля), отримано: ${gs[0].city} №${gs[0].number}, ${gs[0].street}`);
+    }
+    if (gs.some(x => !String(x.oblast).includes('Рівнен') || !x.street.toLowerCase().includes('штейнгел'))) {
+      throw new Error('У видачі є відділення не з Рівненської області або не на вул. Штейнгеля');
+    }
+
+    // 4. Живі дані API: city приходить з суфіксом "(Рівненська обл.)" — пошук має працювати так само
+    const livePool = npPool.map(b => (b.city === 'Городок' || b.city === 'Рівне')
+      ? { ...b, city: `${b.city} (${b.oblast} обл.)` } : b);
+    const lv = S.searchBranches('городок рівненська штейн', livePool, 5);
+    if (!lv || lv.length === 0 || String(lv[0].number) !== '1' || !lv[0].city.startsWith('Городок')) {
+      throw new Error('Суфікс області в city (live API) ламає пошук "городок рівненська штейн"');
+    }
+
+    console.log('  ✓ Успіх: усі апострофи, "великий дальник 3" та "городок рівненська штейн" знаходять правильні відділення!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 31:', err.message, '\n');
   }
 
   console.log('===============================================================');

@@ -31,6 +31,39 @@
     return res;
   }
 
+  // 1.01 Уніфікація всіх видів апострофів: ' ` ʼ ʻ ʽ ’ ‘ ʹ ′ ´ ˈ
+  // Для порівняння апостроф повністю видаляється, тому "пʼятихатки" == "п'ятихатки" == "пятихатки"
+  const APOS_TEST_RE = /['`ʼʻʽ’‘ʹ′´ˈ]/;
+  const APOS_ALL_RE = /['`ʼʻʽ’‘ʹ′´ˈ]/g;
+
+  // Канонічна форма рядка для порівняння (нижній регістр, без апострофів)
+  function canonText(s) {
+    return (s == null ? '' : String(s)).toLowerCase().replace(APOS_ALL_RE, '');
+  }
+
+  // Канонічна назва населеного пункту відділення: без апострофів та без суфікса області
+  // з API Нової Пошти, напр. "Городок (Рівненська обл.)" -> "городок"
+  function canonCity(s) {
+    return canonText(s).replace(/\s*\([^)]*\)\s*$/, '').trim();
+  }
+
+  // Видалення апострофів із запиту. Запити з латиницею не чіпаємо:
+  // у розкладці QWERTY символ ' означає "є" (fixKeyboardLayout).
+  function stripApostrophes(text) {
+    if (!text) return text || '';
+    if (/[a-zA-Z]/.test(text)) return text;
+    return text.replace(APOS_ALL_RE, '');
+  }
+
+  // Ранг населеного пункту для дезамбігуації тезок (місто > смт > селище > село)
+  function settlementTypeRank(type) {
+    const t = (type || '').toLowerCase();
+    if (t === 'місто' || t === 'м.' || t === 'м') return 60;
+    if (t.includes('смт') || t.includes('міського типу')) return 40;
+    if (t.includes('селище') || t === 'сел.') return 20;
+    return 0;
+  }
+
   // 1.05. Перевірка маркерів поштомату (поштомат, почтомат, пошт, п/м, пм)
   function isPostomatKeyword(text) {
     if (!text) return false;
@@ -411,6 +444,24 @@
     }
   }
 
+  // Індекси без апострофів для словника UKRAINE_SETTLEMENTS (лише ключі, що містять апостроф)
+  const _settlementsByNameNA = new Map();
+  const _settlementsByAliasNA = new Map();
+  for (let i = 0; i < UKRAINE_SETTLEMENTS.length; i++) {
+    const s = UKRAINE_SETTLEMENTS[i];
+    const sLow = s.name.toLowerCase();
+    if (APOS_TEST_RE.test(sLow)) {
+      _settlementsByNameNA.set(canonText(sLow), s);
+      _settlementsByAliasNA.set(canonText(sLow), s);
+    }
+    if (Array.isArray(s.aliases)) {
+      for (let j = 0; j < s.aliases.length; j++) {
+        const a = s.aliases[j].toLowerCase();
+        if (APOS_TEST_RE.test(a)) _settlementsByAliasNA.set(canonText(a), s);
+      }
+    }
+  }
+
   // Реєстр усіх населених пунктів України (26 000+ сіл, смт, селищ, міст)
   let _allSettlementsRaw = [];
   if (typeof window !== 'undefined' && Array.isArray(window.ALL_SETTLEMENTS_DATA)) {
@@ -426,6 +477,8 @@
 
   // O(1) швидка хеш-таблиця для миттєвого пошуку населених пунктів за чистою назвою
   const _allSettlementsByName = new Map();
+  // Індекс назв з апострофом за ключем БЕЗ апострофа (П'ятихатки <- "пятихатки")
+  const _allSettlementsByNameNA = new Map();
   function initAllSettlementsMap(items) {
     if (!Array.isArray(items)) return;
     for (let i = 0; i < items.length; i++) {
@@ -438,6 +491,15 @@
         _allSettlementsByName.set(key, list);
       }
       list.push(s);
+      if (APOS_TEST_RE.test(key)) {
+        const keyNA = canonText(key);
+        let listNA = _allSettlementsByNameNA.get(keyNA);
+        if (!listNA) {
+          listNA = [];
+          _allSettlementsByNameNA.set(keyNA, listNA);
+        }
+        listNA.push(s);
+      }
     }
   }
   initAllSettlementsMap(_allSettlementsRaw);
@@ -446,6 +508,7 @@
     if (Array.isArray(items)) {
       _allSettlementsRaw = items;
       _allSettlementsByName.clear();
+      _allSettlementsByNameNA.clear();
       initAllSettlementsMap(items);
     }
   }
@@ -625,7 +688,7 @@
 
   function getRaionStem(raion) {
     if (!raion) return '';
-    let r = raion.toLowerCase().trim()
+    let r = canonText(raion).trim()
       .replace(/(?:район|району|р-н)/gi, '')
       .trim();
     if (CONSOLIDATED_RAION_MAP[r]) {
@@ -641,16 +704,21 @@
     const w = word.toLowerCase().trim();
     if (isOblastToken(w) && w !== 'дніпро') return null;
     const wNorm = normalizeLocativeCase(w);
+    // Форми без апострофів ("пятихатки" -> П'ятихатки, "пʼятихатки" -> П'ятихатки)
+    const wA = canonText(w);
+    const wANorm = normalizeLocativeCase(wA);
 
     // 1. Точний збіг назви або аліасу у пріоритетному словнику UKRAINE_SETTLEMENTS (185 міст) - O(1)
     const exactBase = _settlementsByName.get(w) || _settlementsByName.get(wNorm) ||
-                      _settlementsByAlias.get(w) || _settlementsByAlias.get(wNorm);
+                      _settlementsByAlias.get(w) || _settlementsByAlias.get(wNorm) ||
+                      _settlementsByNameNA.get(wA) || _settlementsByAliasNA.get(wA);
     if (exactBase) {
       return exactBase;
     }
 
     // 2. Точний збіг у повному реєстрі ALL_SETTLEMENTS (26 000+ сіл, смт, селищ, міст) - O(1)
-    const candidates = _allSettlementsByName.get(w) || _allSettlementsByName.get(wNorm);
+    const candidates = _allSettlementsByName.get(w) || _allSettlementsByName.get(wNorm) ||
+                       _allSettlementsByNameNA.get(wA) || _allSettlementsByNameNA.get(wANorm);
     if (candidates && candidates.length > 0) {
       let chosen = candidates[0];
       if (candidates.length > 1 && (contextOblast || contextRaion)) {
@@ -731,7 +799,7 @@
   function normalizeSearchTokens(rawQuery) {
     if (!rawQuery) return { tokens: [], cleanText: '', hasPostomatKeyword: false, hasBranchKeyword: false, detectedCity: null };
 
-    let text = rawQuery.trim().replace(/^[\s=+\-*•—–~#№\\\/]+/, '');
+    let text = stripApostrophes(rawQuery.trim()).replace(/^[\s=+\-*•—–~#№\\\/]+/, '');
 
     // 0. Склеювання розірваних поштових індексів (Space-separated Postal Code: "79 049" -> "79049")
     text = text.replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2');
@@ -885,7 +953,7 @@
     }
 
     // Крок 1. Перемикання розкладки
-    let corrected = fixKeyboardLayout(rawQuery.trim().replace(/^[\s=+\-*•—–~#№\\\/]+/, ''));
+    let corrected = fixKeyboardLayout(stripApostrophes(rawQuery.trim()).replace(/^[\s=+\-*•—–~#№\\\/]+/, ''));
     const isLayoutFixed = corrected.toLowerCase() !== rawQuery.trim().toLowerCase();
 
     // Склеювання розірваних поштових індексів ("79 049" -> "79049") та маркерів поштоматів
@@ -1141,7 +1209,7 @@
   // 7. LP-CRM ІНТЕРАКТИВНИЙ АВТОКОМПЛІТ (Підказки під час введення)
   function getAutocompleteSuggestions(query, currentService, liveCityBranches = null) {
     if (!query || query.trim().length < 2) return [];
-    const qClean = fixKeyboardLayout(query.trim());
+    const qClean = fixKeyboardLayout(stripApostrophes(query.trim()));
     const qLower = qClean.toLowerCase();
     const normalizedQuery = qLower.replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
     if (!normalizedQuery || normalizedQuery.length < 2) return [];
@@ -1479,7 +1547,7 @@
   // Перевірка збігу вулиці з урахуванням кореня/морфології та нечіткого зіставлення (одруківок)
   function matchStreetOrAddress(branch, token) {
     if (!branch || !token) return false;
-    const sLower = ((branch.street || '') + ' ' + (branch.address || '')).toLowerCase();
+    const sLower = canonText((branch.street || '') + ' ' + (branch.address || ''));
     if (sLower.includes(token)) return true;
     const stem = getUkrainianStem(token);
     if (stem && stem.length >= 3 && sLower.includes(stem)) return true;
@@ -1503,6 +1571,7 @@
     if (!query) {
       return { city: null, number: null, oblast: null, raion: null, streetTokens: [], settlementOblast: null };
     }
+    query = stripApostrophes(query);
     let text = fixKeyboardLayout(query.trim().replace(/^[\s=+\-*•—–~#№\\\/]+/, ''))
       .replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2')
       .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм')
@@ -1801,16 +1870,19 @@
       return cached;
     }
 
+    // Уніфікація апострофів (' ʼ ’ ` тощо): "пʼятихатки" == "п'ятихатки" == "пятихатки"
+    rawQuery = stripApostrophes(rawQuery);
+
     // Інтелектуальна нормалізація токенів
     const norm = normalizeSearchTokens(rawQuery);
-    let tokens = norm.tokens;
+    let tokens = norm.tokens.map(canonText);
     if (tokens.length === 0) return [];
 
     const facets = extractFacets(rawQuery);
     const hasPostomatKeyword = norm.hasPostomatKeyword;
     const hasBranchKeyword = norm.hasBranchKeyword;
     const hasCargoKeyword = norm.hasCargoKeyword || isCargoKeyword(rawQuery);
-    const detectedCityName = facets.city ? facets.city.toLowerCase() : (norm.detectedCity ? norm.detectedCity.name.toLowerCase() : null);
+    const detectedCityName = facets.city ? canonText(facets.city) : (norm.detectedCity ? canonText(norm.detectedCity.name) : null);
     const targetOblast = facets.oblast ? facets.oblast.toLowerCase() : (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
 
     // Підготовка числових токенів
@@ -1847,6 +1919,18 @@
 
     const matched = [];
 
+    // Кількість відділень на (місто|область) — для дезамбігуації тезок без явної області/району
+    const ambiguousCityNoRegion = Boolean(detectedCityName) && !hasExplicitOblast && !facets.raion;
+    const cityBranchCount = new Map();
+    if (ambiguousCityNoRegion) {
+      for (let i = 0; i < branches.length; i++) {
+        const bc = canonCity(branches[i].city);
+        if (bc !== detectedCityName) continue;
+        const key = bc + '|' + (branches[i].oblast || '').toLowerCase();
+        cityBranchCount.set(key, (cityBranchCount.get(key) || 0) + 1);
+      }
+    }
+
     // МАТРИЦЯ СКОРИНГУ (Scoring Matrix Pipeline)
     for (let i = 0; i < branches.length; i++) {
       const b = branches[i];
@@ -1854,10 +1938,11 @@
 
       const isPostomat = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || (b.name && b.name.toLowerCase().includes('поштомат'));
       const bNum = (b.number || '').toString();
-      const bCity = (b.city || '').toLowerCase();
-      const bStreet = ((b.street || '') + ' ' + (b.address || '')).toLowerCase();
+      // Усі порівняння — без апострофів (' ʼ ’ ` тощо), щоб "пʼятихатки" == "п'ятихатки" == "пятихатки"
+      const bCity = canonCity(b.city);
+      const bStreet = canonText((b.street || '') + ' ' + (b.address || ''));
       const bOblast = (b.oblast || '').toLowerCase();
-      const bRaion = (b.raion || '').toLowerCase();
+      const bRaion = canonText(b.raion);
       const bPostal = (b.postalCode || '').toString();
       let streetMatched = false;
 
@@ -2037,6 +2122,13 @@
       // Обласний центр / велике місто: +10 балів
       if (REGIONAL_CENTERS.has(bCity)) {
         score += 10;
+      }
+
+      // Дезамбігуація тезок без явно вказаної області/району (напр. "п'ятихатки 1"):
+      // при рівному збігу перевага реальному місту (за типом) та населеному пункту з більшою мережею відділень.
+      if (detectedCityName && ambiguousCityNoRegion && bCity === detectedCityName) {
+        score += settlementTypeRank(b.settlementType);
+        score += Math.min(cityBranchCount.get(bCity + '|' + bOblast) || 0, 10) * 5;
       }
 
       // Прохідний поріг для кандидатів

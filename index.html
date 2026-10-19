@@ -249,7 +249,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.24.0</span>
+          <span class="version-tag">v8.24.1</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -278,8 +278,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.24.0 -->
+        <!-- Версія 8.24.1 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.24.1</span>
+            <span class="version-state">Виправлення крайових випадків нормалізації та дезамбігуації</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Єдиний апостроф:</strong> символи ' ʼ ’ ` та їх відсутність тепер рівнозначні — «пʼятихатки 1», «п'ятихатки 1» і «пятихатки 1» знаходять П'ятихатки (Дніпропетровська обл.), Відділення №1; при однойменних населених пунктах без області перевагу має реальне місто з більшою мережею відділень.</li>
+            <li><strong>Живі дані API:</strong> суфікс області в назві міста («Городок (Рівненська обл.)») більше не ламає порівняння — «городок рівненська 1» та «городок рівненська штейн» працюють і з повним реєстром.</li>
+            <li><strong>Вулиця без номера:</strong> залишковий токен після топоніма й області («штейн») фільтрує за назвою вулиці — результат: Городок №1, вул. барона Штейнгеля.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.24.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.24.0</span>
             <span class="version-state">Повний реєстр 55k+ відділень НП, рушій Delengine та подвійна система копіювання</span>
@@ -819,15 +833,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.24.0"></script>
+  <script src="data/branches.js?v=8.24.1"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.24.0"></script>
+  <script src="data/all_settlements.js?v=8.24.1"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.24.0"></script>
+  <script src="data/fuzzySearch.js?v=8.24.1"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.24.0"></script>
+  <script src="app.js?v=8.24.1"></script>
 </body>
 </html>

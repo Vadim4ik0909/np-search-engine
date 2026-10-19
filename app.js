@@ -2330,7 +2330,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.24.0') {
+          if (key !== 'np-ukr-cache-v8.24.1') {
             caches.delete(key);
           }
         });
