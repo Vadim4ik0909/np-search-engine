@@ -1328,6 +1328,17 @@ mark.hl-match,
   box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3) !important;
 }
 
+.btn-copy-detailed {
+  border-color: rgba(251, 113, 133, 0.35);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.btn-copy-detailed:hover {
+  background: #0284c7 !important;
+  border-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+
 /* Бейдж поштового індексу Укрпошти */
 .ukrposhta-index-badge {
   font-size: 12.5px;

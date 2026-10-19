@@ -249,7 +249,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.23.0</span>
+          <span class="version-tag">v8.24.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -278,8 +278,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.23.0 -->
+        <!-- Версія 8.24.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.24.0</span>
+            <span class="version-state">Повний реєстр 55k+ відділень НП, рушій Delengine та подвійна система копіювання</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Повний реєстр відділень (55 185 точок):</strong> скрипт вивантаження опрацював усі активні відділення, поштомати та вантажні пункти Нової Пошти через офіційне API.</li>
+            <li><strong>Подвійна система копіювання (2 кнопки на картці):</strong> «📋 Скопіювати» для швидкого класичного формату («місто Ужгород, Відділення №1: вул. Волонтерів, 16») та «📋 Детально» для розширеного CRM-формату з гео-прив'язкою та лімітами ваги («м. Ужгород (Ужгородський р-н, Закарпатська обл.), Вантажне відділення №1 (до 1100 кг): вул. Волонтерів, 16»).</li>
+            <li><strong>Прогресивне контекстне звуження Delengine:</strong> точне знаходження цільових точок без колізій тезок («городок 1 рівненська штейн» повертає виключно цільове вантажне відділення в с. Городок Рівненської області).</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.23.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.23.0</span>
             <span class="version-state">Прогресивне звуження пошуку (мультифасетність) та трисекційний фільтр типів</span>
@@ -805,15 +819,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.23.0"></script>
+  <script src="data/branches.js?v=8.24.0"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.23.0"></script>
+  <script src="data/all_settlements.js?v=8.24.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.23.0"></script>
+  <script src="data/fuzzySearch.js?v=8.24.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.23.0"></script>
+  <script src="app.js?v=8.24.0"></script>
 </body>
 </html>

@@ -702,13 +702,40 @@
     return street;
   }
 
+  const OBLAST_CENTER_RAIONS = {
+    'Ужгород': 'Ужгородський',
+    'Львів': 'Львівський',
+    'Рівне': 'Рівненський',
+    'Луцьк': 'Луцький',
+    'Тернопіль': 'Тернопільський',
+    'Івано-Франківськ': 'Івано-Франківський',
+    'Хмельницький': 'Хмельницький',
+    'Житомир': 'Житомирський',
+    'Чернівці': 'Чернівецький',
+    'Вінниця': 'Вінницький',
+    'Чернігів': 'Чернігівський',
+    'Суми': 'Сумський',
+    'Полтава': 'Полтавський',
+    'Харків': 'Харківський',
+    'Дніпро': 'Дніпровський',
+    'Запоріжжя': 'Запорізький',
+    'Миколаїв': 'Миколаївський',
+    'Херсон': 'Херсонський',
+    'Одеса': 'Одеський',
+    'Кропивницький': 'Кропивницький',
+    'Черкаси': 'Черкаський'
+  };
+
   // Географічна прив'язка (Район, область) для швидкої звірки з клієнтом
   function formatGeoSub(branch) {
     let oblast = branch.oblast || '';
     let raion = branch.raion || '';
     const city = branch.city || '';
 
-    if ((!oblast || !raion) && window.SmartSearchEngine) {
+    if (!raion && OBLAST_CENTER_RAIONS[city]) {
+      raion = OBLAST_CENTER_RAIONS[city];
+    }
+    if ((!oblast || !raion) && window.SmartSearchEngine && window.SmartSearchEngine.UKRAINE_SETTLEMENTS) {
       const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
       if (found) {
         if (!oblast) oblast = found.oblast;
@@ -767,28 +794,68 @@
     return { label: `Поштове (до ${weight} кг)`, cls };
   }
 
-  // Допоміжна функція: Формування рядка для копіювання в LP-CRM з дужками району та області
-  // Приклад: «с. Городок (Рівненський р-н, Рівненська обл.), Вантажне відділення №1: вул. барона Штейнгеля, 2-А»
-  function formatLpCrmCopyString(branch) {
+
+  // 1. Класичний формат копіювання (для звичайних клієнтів/накладних)
+  // Приклад: «місто Ужгород, Відділення №1: вул. Волонтерів, 16»
+  // Приклад: «село Городок, Вантажне відділення №1: вул. барона Штейнгеля, 2-А»
+  function formatClassicCopyString(branch) {
     let sType = branch.settlementType || '';
     const city = branch.city || '';
 
-    if (!sType && window.SmartSearchEngine) {
-      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
+    if (!sType && window.SmartSearchEngine && window.SmartSearchEngine.UKRAINE_SETTLEMENTS) {
+      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() || (s.cleanName && s.cleanName.toLowerCase() === city.toLowerCase()));
+      if (found) sType = found.type;
+    }
+    if (!sType) sType = 'місто';
+
+    let sTypeFull = sType.trim().toLowerCase();
+    if (sTypeFull === 'м.' || sTypeFull === 'м' || sTypeFull === 'місто') sTypeFull = 'місто';
+    else if (sTypeFull === 'с.' || sTypeFull === 'с' || sTypeFull === 'село') sTypeFull = 'село';
+    else if (sTypeFull.includes('смт')) sTypeFull = 'смт';
+    else if (sTypeFull.includes('сел')) sTypeFull = 'селище';
+
+    const isPost = isPostomatBranch(branch);
+    const isCarg = isCargoBranch(branch);
+
+    let typeTitle = 'Відділення';
+    if (isPost) {
+      typeTitle = 'Поштомат';
+    } else if (isCarg) {
+      typeTitle = 'Вантажне відділення';
+    }
+
+    const num = branch.number || branch.postalCode || '1';
+    const street = getCleanStreet(branch);
+
+    return `${sTypeFull} ${city}, ${typeTitle} №${num}: ${street}`;
+  }
+
+  // 2. Розширений детальний CRM-формат (з областю, районом у дужках та вагою)
+  // Приклад: «м. Ужгород (Ужгородський р-н, Закарпатська обл.), Вантажне відділення №1 (до 1100 кг): вул. Волонтерів, 16»
+  // Приклад: «с. Городок (Рівненський р-н, Рівненська обл.), Вантажне відділення №1 (до 1100 кг): вул. барона Штейнгеля, 2-А»
+  function formatDetailedCopyString(branch) {
+    let sType = branch.settlementType || '';
+    const city = branch.city || '';
+
+    if (!sType && window.SmartSearchEngine && window.SmartSearchEngine.UKRAINE_SETTLEMENTS) {
+      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() || (s.cleanName && s.cleanName.toLowerCase() === city.toLowerCase()));
       if (found) sType = found.type;
     }
     if (!sType) sType = 'місто';
 
     let sTypePrefix = sType.trim().toLowerCase();
-    if (sTypePrefix === 'село') sTypePrefix = 'с.';
-    else if (sTypePrefix === 'місто') sTypePrefix = 'м.';
-    else if (sTypePrefix === 'смт' || sTypePrefix === 'селище міського типу') sTypePrefix = 'смт';
-    else if (sTypePrefix === 'селище') sTypePrefix = 'сел.';
+    if (sTypePrefix === 'село' || sTypePrefix === 'с' || sTypePrefix === 'с.') sTypePrefix = 'с.';
+    else if (sTypePrefix === 'місто' || sTypePrefix === 'м' || sTypePrefix === 'м.') sTypePrefix = 'м.';
+    else if (sTypePrefix === 'смт' || sTypePrefix.includes('селище міського типу')) sTypePrefix = 'смт';
+    else if (sTypePrefix === 'селище' || sTypePrefix === 'сел' || sTypePrefix === 'сел.') sTypePrefix = 'сел.';
     else if (!sTypePrefix.endsWith('.')) sTypePrefix = sTypePrefix + '.';
 
     let oblast = branch.oblast || '';
     let raion = branch.raion || '';
-    if ((!oblast || !raion) && window.SmartSearchEngine) {
+    if (!raion && OBLAST_CENTER_RAIONS[city]) {
+      raion = OBLAST_CENTER_RAIONS[city];
+    }
+    if ((!oblast || !raion) && window.SmartSearchEngine && window.SmartSearchEngine.UKRAINE_SETTLEMENTS) {
       const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
       if (found) {
         if (!oblast) oblast = found.oblast;
@@ -800,7 +867,7 @@
     const oblClean = (oblast || '').replace(/\s*(?:область|обл\.?)$/i, '').trim();
 
     const geoParts = [];
-    if (raionClean && !raionClean.toLowerCase().includes(city.toLowerCase())) {
+    if (raionClean) {
       geoParts.push(`${raionClean} р-н`);
     }
     if (oblClean) {
@@ -821,7 +888,24 @@
     const num = branch.number || branch.postalCode || '1';
     const street = getCleanStreet(branch);
 
-    return `${sTypePrefix} ${city}${geoBracket}, ${typeTitle} №${num}: ${street}`;
+    let weightText = '';
+    if (isCarg) {
+      const weight = branch.totalMaxWeightAllowed || branch.maxWeight || 1100;
+      weightText = ` (до ${weight} кг)`;
+    } else if (isPost) {
+      const weight = branch.totalMaxWeightAllowed || branch.maxWeight || 20;
+      weightText = ` (до ${weight} кг)`;
+    } else if (branch.totalMaxWeightAllowed || branch.maxWeight) {
+      const weight = branch.totalMaxWeightAllowed || branch.maxWeight;
+      weightText = ` (до ${weight} кг)`;
+    }
+
+    return `${sTypePrefix} ${city}${geoBracket}, ${typeTitle} №${num}${weightText}: ${street}`;
+  }
+
+  // Для зворотної сумісності: formatLpCrmCopyString повертає детальний формат
+  function formatLpCrmCopyString(branch) {
+    return formatDetailedCopyString(branch);
   }
 
   // Toast сповіщення про успішне копіювання
@@ -881,7 +965,8 @@
 
     const isUkrposhta = state.currentService === 'ukrposhta' || (branch.id && branch.id.startsWith('up-'));
     const postalCode = (branch.postalCode || branch.number || '').toString().trim();
-    const lpCrmCopyText = formatLpCrmCopyString(branch);
+    const classicCopyText = formatClassicCopyString(branch);
+    const detailedCopyText = formatDetailedCopyString(branch);
     const cleanStreet = getCleanStreet(branch);
     const geoSub = formatGeoSub(branch);
     const typeInfo = getTypeBadgeInfo(branch);
@@ -951,8 +1036,11 @@
       ${renamingHtml}
 
       <div class="card-foot">
-        <button class="btn-copy-action" type="button" title="Скопіювати для LP-CRM">
+        <button class="btn-copy-action btn-copy-short" type="button" title="Скопіювати класичний формат">
           📋 Скопіювати
+        </button>
+        <button class="btn-copy-action btn-copy-detailed" type="button" title="Скопіювати розширений CRM-формат (з областю, районом та вагою)">
+          📋 Детально
         </button>
         ${copyIndexBtnHtml}
         ${ukrposhtaIndexBadgeHtml}
@@ -961,10 +1049,21 @@
       </div>
     `;
 
-    const btnCopy = card.querySelector('.btn-copy-action');
-    btnCopy.addEventListener('click', () => {
-      copyTextToClipboard(lpCrmCopyText, btnCopy, 'Скопійовано!');
-    });
+    const btnCopyShort = card.querySelector('.btn-copy-short') || card.querySelector('.btn-copy-action');
+    if (btnCopyShort) {
+      btnCopyShort.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyTextToClipboard(classicCopyText, btnCopyShort, 'Скопійовано!');
+      });
+    }
+
+    const btnCopyDetailed = card.querySelector('.btn-copy-detailed');
+    if (btnCopyDetailed) {
+      btnCopyDetailed.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyTextToClipboard(detailedCopyText, btnCopyDetailed, 'Детально скопійовано!');
+      });
+    }
 
     const btnCopyIndex = card.querySelector('.btn-copy-index-action');
     if (btnCopyIndex) {
@@ -2231,7 +2330,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.23.0') {
+          if (key !== 'np-ukr-cache-v8.24.0') {
             caches.delete(key);
           }
         });
@@ -2267,8 +2366,13 @@
 
   window.highlightMatch = highlightMatch;
   window.createFullBranchCard = createFullBranchCard;
+  window.formatClassicCopyString = formatClassicCopyString;
+  window.formatDetailedCopyString = formatDetailedCopyString;
+  window.formatLpCrmCopyString = formatDetailedCopyString;
   if (window.SmartSearchEngine) {
     window.SmartSearchEngine.highlightMatch = highlightMatch;
+    window.SmartSearchEngine.formatClassicCopyString = formatClassicCopyString;
+    window.SmartSearchEngine.formatDetailedCopyString = formatDetailedCopyString;
   }
 
 })();

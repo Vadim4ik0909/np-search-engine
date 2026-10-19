@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 29;
+  let totalTests = 30;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1669,6 +1669,62 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 29:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 30: Подвійна система копіювання Delengine (Класичний та CRM) та прогресивне звуження
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 30: Перевірка подвійної системи копіювання Delengine та прогресивного запиту "городок рівненська 1"');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Прогресивний запит: "городок рівненська 1" -> виключно с. Городок Рівненської обл.
+    const res = window.SmartSearchEngine.searchBranches("городок рівненська 1", npPool, 5);
+    if (!res || res.length === 0) {
+      throw new Error("Жодного результату для 'городок рівненська 1'");
+    }
+    const gor1 = res[0];
+    if (gor1.city !== 'Городок' || String(gor1.number) !== '1' || !gor1.oblast.includes('Рівнен')) {
+      throw new Error(`Очікувався Городок №1 Рівненської обл, отримано: ${gor1.city} №${gor1.number}, ${gor1.oblast}`);
+    }
+
+    // 2. Класичний короткий формат копіювання
+    const classicStr = window.formatClassicCopyString(gor1);
+    const expectedClassic = "село Городок, Вантажне відділення №1: вул. барона Штейнгеля, 2-А";
+    if (classicStr !== expectedClassic) {
+      throw new Error(`Класичний формат не відповідає очікуваному.\nОчікувалось: "${expectedClassic}"\nОтримано:    "${classicStr}"`);
+    }
+
+    // 3. Розширений детальний CRM-формат копіювання
+    const detailedStr = window.formatDetailedCopyString(gor1);
+    const expectedDetailed = "с. Городок (Рівненський р-н, Рівненська обл.), Вантажне відділення №1 (до 1100 кг): вул. барона Штейнгеля, 2-А";
+    if (detailedStr !== expectedDetailed) {
+      throw new Error(`Детальний формат не відповідає очікуваному.\nОчікувалось: "${expectedDetailed}"\nОтримано:    "${detailedStr}"`);
+    }
+
+    // 4. Перевірка для Ужгорода №1 (розширений CRM-формат з обласним районом та лімітом ваги)
+    const uzh1 = npPool.find(b => b.city === 'Ужгород' && String(b.number) === '1');
+    if (!uzh1) {
+      throw new Error("Відділення №1 у місті Ужгород не знайдено");
+    }
+    const detailedUzh = window.formatDetailedCopyString(uzh1);
+    const expectedUzh = "м. Ужгород (Ужгородський р-н, Закарпатська обл.), Вантажне відділення №1 (до 1100 кг): вул. Волонтерів, 16";
+    if (detailedUzh !== expectedUzh) {
+      throw new Error(`Детальний формат для Ужгорода не відповідає очікуваному.\nОчікувалось: "${expectedUzh}"\nОтримано:    "${detailedUzh}"`);
+    }
+
+    // 5. Перевірка наявності двох кнопок на картці відділення
+    const card = window.createFullBranchCard(gor1);
+    const btnShort = card.querySelector('.btn-copy-short');
+    const btnDetailed = card.querySelector('.btn-copy-detailed');
+    if (!btnShort || !btnDetailed) {
+      throw new Error("На картці відділення мають бути присутні дві окремі кнопки: .btn-copy-short та .btn-copy-detailed");
+    }
+
+    console.log('  ✓ Успіх: Запит "городок рівненська 1" та подвійний формат копіювання (Класичний та CRM) працюють ідеально!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 30:', err.message, '\n');
   }
 
   console.log('===============================================================');

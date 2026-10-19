@@ -37,6 +37,12 @@
     return /(?<!\p{L})(?:поштомат|поштомата|поштомати|почтомат|пошт|п\/м|пм)(?!\p{L})/iu.test(text);
   }
 
+  // 1.06. Перевірка маркерів вантажного відділення (вантажне, вантажний, вантаж, карго, cargo)
+  function isCargoKeyword(text) {
+    if (!text) return false;
+    return /(?<!\p{L})(?:вантажне|вантажний|вантаж|карго|cargo)(?!\p{L})/iu.test(text);
+  }
+
   // 1.1 Нормалізація українських відмінків (місцевий, давальний, родовий тощо)
   function normalizeLocativeCase(word) {
     if (!word || word.length < 3) return word;
@@ -750,10 +756,11 @@
                .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
 
     const hasPostomatKeyword = isPostomatKeyword(text);
-    const hasBranchKeyword = /(?<!\p{L})(?:відділення|відділ|вд|склад)(?!\p{L})/iu.test(text);
+    const hasCargoKeyword = isCargoKeyword(text);
+    const hasBranchKeyword = /(?<!\p{L})(?:відділення|відділ|вд|склад)(?!\p{L})/iu.test(text) && !hasCargoKeyword;
 
     const cleanLower = text.toLowerCase().replace(/[^a-zа-яіїєґ0-9\s-]/gi, ' ').replace(/\s+/g, ' ').trim();
-    if (!cleanLower) return { tokens: [], cleanText: '', hasPostomatKeyword, hasBranchKeyword, detectedCity: null };
+    if (!cleanLower) return { tokens: [], cleanText: '', hasPostomatKeyword, hasBranchKeyword, hasCargoKeyword, detectedCity: null };
 
     let rawTokens = cleanLower.split(/\s+/).filter(Boolean);
     let filteredTokens = rawTokens.filter(t => !STOP_WORDS.has(t) && !/^[-_–—]+$/.test(t));
@@ -857,6 +864,7 @@
       cleanText: mergedTokens.join(' '),
       hasPostomatKeyword,
       hasBranchKeyword,
+      hasCargoKeyword,
       detectedCity
     };
   }
@@ -1535,7 +1543,7 @@
     }
 
     // 4. Очищення службових слів
-    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|село|місто|відділення|віділення|відділ|поштомат|поштомата|поштомати|почтомат|пошт|пм|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
+    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|село|місто|відділення|віділення|відділ|вантажне|вантажний|вантаж|карго|cargo|поштомат|поштомата|поштомати|почтомат|пошт|пм|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
       .replace(/[,.-]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -1801,6 +1809,7 @@
     const facets = extractFacets(rawQuery);
     const hasPostomatKeyword = norm.hasPostomatKeyword;
     const hasBranchKeyword = norm.hasBranchKeyword;
+    const hasCargoKeyword = norm.hasCargoKeyword || isCargoKeyword(rawQuery);
     const detectedCityName = facets.city ? facets.city.toLowerCase() : (norm.detectedCity ? norm.detectedCity.name.toLowerCase() : null);
     const targetOblast = facets.oblast ? facets.oblast.toLowerCase() : (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
 
@@ -1859,16 +1868,19 @@
         streetMatched = true;
       }
 
-      // Фільтр ключових слів поштомату / відділення
-      if (hasPostomatKeyword) {
+      // Фільтр ключових слів поштомату / вантажного / звичайного відділення
+      const isCargo = b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || (b.maxWeight && b.maxWeight >= 1000) || (b.weightLimit && b.weightLimit >= 1000) || (b.typeText && /вантажн|1[01]00/i.test(b.typeText)) || (b.name && /вантажн/i.test(b.name));
+      if (hasCargoKeyword) {
+        if (isCargo) score += 800;
+        else score -= 1500;
+      } else if (hasPostomatKeyword) {
         if (isPostomat) score += 150;
+        else score -= 1000;
+      } else if (hasBranchKeyword) {
+        if (!isPostomat) score += 150;
         else score -= 1000;
       } else if (!isPostomat) {
         score += 150; // Перевага звичайного відділення над поштоматом за замовчуванням
-      }
-      if (hasBranchKeyword) {
-        if (!isPostomat) score += 150;
-        else score -= 1000;
       }
 
       // 1. ВУЛИЦЯ:
