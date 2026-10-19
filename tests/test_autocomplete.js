@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 26;
+  let totalTests = 27;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1521,10 +1521,60 @@ async function runTests() {
       throw new Error(`У .geo-val відсутній підсвічений маркер району: ${geoEl ? geoEl.innerHTML : 'не знайдено'}`);
     }
 
-    console.log("  ✓ Успіх: Ctrl-F візуальне підсвічування бездоганно маркує місто, номер, вулицю та район з урахуванням морфології та коренів слів у поп-апах та картках!\\n");
+    console.log("  ✓ Успіх: Ctrl-F візуальне підсвічування бездоганно маркує місто, номер, вулицю та район з урахуванням морфології та коренів слів у поп-апах та картках!\n");
     passedTests++;
   } catch (err) {
-    console.error('  ✗ Провал Тесту 26:', err.message, '\\n');
+    console.error('  ✗ Провал Тесту 26:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 27: Валідація складних запитів зі скріншотів (v8.21.0 - 100% Google Equivalents)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 27: Валідація 12 критичних кейсів зі скріншотів (v8.21.0 - Google Equivalents)');
+  try {
+    const np = window.BRANCHES_DATA.novaposhta;
+    const screenshotCases = [
+      { q: "ананїв соборна", expectCity: "Ананьїв", expectNum: "1" },
+      { q: "ананів соборна 1", expectCity: "Ананьїв", expectNum: "1" },
+      { q: "чернігів варва 1", expectCity: "Варва", expectNum: "1" },
+      { q: "варва 1", expectCity: "Варва", expectNum: "1" },
+      { q: "великі любині львів 1", expectCity: "Великий Любінь", expectNum: "1" },
+      { q: "великий любінь 1", expectCity: "Великий Любінь", expectNum: "1" },
+      { q: "=володимирець рівне 1", expectCity: "Володимирець", expectNum: "1" },
+      { q: "володимирець рівне 1", expectCity: "Володимирець", expectNum: "1" },
+      { q: "кременць градан1", expectCity: "Града", expectNum: "1" },
+      { q: "града 1", expectCity: "Града", expectNum: "1" },
+      { q: "львів стрись довголука 1", expectCity: "Довголука", expectNum: "1" },
+      { q: "довголука 1", expectCity: "Довголука", expectNum: "1" },
+      { q: "нова пошта --- = дмитрівка київ бучан поштомат 45076", expectCity: "Дмитрівка", expectNum: "45076" },
+      { q: "дмитрівка київ бучан поштомат", expectCity: "Дмитрівка" },
+      { q: "ківерці центральна", expectCity: "Ківерці", expectNum: "1" },
+      { q: "пОдеса софіхська 34", expectCity: "Одеса", expectNum: "12" },
+      { q: "Одеса софіхська 34", expectCity: "Одеса", expectNum: "12" },
+      { q: "староконстатинів ххмель 3", expectCity: "Старокостянтинів", expectNum: "3" },
+      { q: "староконстатинів ххмель 1", expectCity: "Старокостянтинів", expectNum: "1" },
+      { q: "полтав сеньча 1", expectCity: "Сенча", expectNum: "1" },
+      { q: "сенча 1", expectCity: "Сенча", expectNum: "1" }
+    ];
+
+    for (const tc of screenshotCases) {
+      const res = window.SmartSearchEngine.searchBranches(tc.q, np, 5);
+      const top = res && res[0];
+      if (!top) {
+        throw new Error(`Запит '${tc.q}' не повернув жодного результату!`);
+      }
+      if (tc.expectCity && top.city !== tc.expectCity) {
+        throw new Error(`Запит '${tc.q}' повернув місто '${top.city}' замість '${tc.expectCity}'`);
+      }
+      if (tc.expectNum && String(top.number) !== String(tc.expectNum)) {
+        throw new Error(`Запит '${tc.q}' повернув відділення №${top.number} замість №${tc.expectNum}`);
+      }
+    }
+
+    console.log("  ✓ Успіх: Усі складні запити зі скріншотів (шумні символи '=', одруківки 'софіхська', 'ххмель', дезамбігуація сіл та райцентрів) бездоганно знаходять 100% цільових відділень!\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 27:', err.message, '\n');
   }
 
   console.log('===============================================================');
