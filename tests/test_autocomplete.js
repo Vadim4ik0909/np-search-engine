@@ -1535,7 +1535,8 @@ async function runTests() {
     const np = window.BRANCHES_DATA.novaposhta;
     const screenshotCases = [
       { q: "ананїв соборна", expectCity: "Ананьїв", expectNum: "1" },
-      { q: "ананів соборна 1", expectCity: "Ананьїв", expectNum: "1" },
+      { q: "ананів соборна", expectCity: "Ананьїв", expectNum: "1", expectStreet: "Соборна" },
+      { q: "ананів соборна 1", expectCity: "Ананьїв", expectNum: "1", expectStreet: "Соборна" },
       { q: "чернігів варва 1", expectCity: "Варва", expectNum: "1" },
       { q: "варва 1", expectCity: "Варва", expectNum: "1" },
       { q: "великі любині львів 1", expectCity: "Великий Любінь", expectNum: "1" },
@@ -1568,6 +1569,9 @@ async function runTests() {
       }
       if (tc.expectNum && String(top.number) !== String(tc.expectNum)) {
         throw new Error(`Запит '${tc.q}' повернув відділення №${top.number} замість №${tc.expectNum}`);
+      }
+      if (tc.expectStreet && (!top.street || !top.street.includes(tc.expectStreet))) {
+        throw new Error(`Запит '${tc.q}' повернув вулицю '${top.street}' замість '${tc.expectStreet}'`);
       }
     }
 

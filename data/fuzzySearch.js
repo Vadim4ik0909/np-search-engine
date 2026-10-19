@@ -1783,6 +1783,19 @@
             score -= 1000; // жорсткий штраф за чуже місто
           }
         }
+
+        // Бонус за комбінацію "місто + вулиця" (гарантований прохід порогу без обов'язкової наявності номера)
+        const isCityMatched = (bCity === detectedCityName) ||
+          (damerauLevenshtein(bCity, detectedCityName) <= 1 && Math.abs(bCity.length - detectedCityName.length) <= 1) ||
+          (cityStem && (bCity.startsWith(cityStem) || detectedCityName.startsWith(bCity.slice(0, 4))));
+
+        if (isCityMatched) {
+          if (streetMatched) {
+            score += 900; // Базовий бал за збіг міста та вулиці для гарантованого проходу порогу score > 300
+          } else if (!hasExplicitNumber && bNum === '1') {
+            score += 350; // Підтримка єдиного/головного відділення населеного пункту
+          }
+        }
       } else {
         // Якщо місто не було явно виділене, перевіряємо збіг токенів із містом відділення
         for (let t = 0; t < tokens.length; t++) {

@@ -243,7 +243,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.21.0</span>
+          <span class="version-tag">v8.21.1</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -272,8 +272,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.21.0 -->
+        <!-- Версія 8.21.1 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.21.1</span>
+            <span class="version-state">Пошук «місто + вулиця» без обов'язкового номера відділення (кейс «ананів соборна»)</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Пошук «місто + вулиця»:</strong> впроваджено базовий бонус (+900 балів) при збігу населеного пункту та вулиці, що гарантує впевнений прохід прохідного порогу релевантності навіть без номера відділення.</li>
+            <li><strong>Підтримка запитів без номера:</strong> запити на зразок «ананів соборна» безпомилково повертають Вантажне Відділення №1 (вул. Соборна, 29/7) на 1-му місці та поштомати цієї вулиці.</li>
+            <li><strong>Єдині відділення населених пунктів:</strong> додано пріоритетне відображення єдиного або головного відділення міста/селища у видачі за замовчуванням.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.21.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.21.0</span>
             <span class="version-state">Повна синхронізація за 41 артефактом тестування (100% Google Equivalents)</span>
