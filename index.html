@@ -243,7 +243,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.21.2</span>
+          <span class="version-tag">v8.21.3</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -272,8 +272,21 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.21.2 -->
+        <!-- Версія 8.21.3 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.21.3</span>
+            <span class="version-state">Покращення контрастності та читабельності адрес вулиць у світлій темі</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Високий контраст назв вулиць:</strong> виправлено бляклий сірий колір тексту вулиці біля номера відділення у списку та картках — встановлено виразний темно-сірий/майже чорний колір (#1e293b / font-weight: 600) для світлої теми та #f8fafc для темної теми.</li>
+            <li><strong>Повна видимість адрес операторам:</strong> ліквідовано використання занадто блідих кольорів (#e2e8f0, #cbd5e1) на світлих фонах випадаючих карток та картографічних спливаючих вікон (Leaflet).</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.21.2 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.21.2</span>
             <span class="version-state">Розпізнавання ієрархічних ланцюжків «Область + Район + Село» (кейс «київ бориспіль гнідин 2»)</span>

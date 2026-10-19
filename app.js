@@ -1461,8 +1461,8 @@
           <div style="font-family: var(--font-main); min-width: 240px; padding: 4px;">
             ${isTarget ? '<div style="font-size:11px; font-weight:700; color:' + accentColor + '; text-transform:uppercase; margin-bottom:4px;">⭐ Вибране відділення</div>' : ''}
             <strong style="color: ${accentColor}; font-size: 14.5px; display: block; margin-bottom: 4px;">${escapeHtml(b.name)}</strong>
-            <p style="margin: 4px 0; font-size: 12.5px; color: #cbd5e1;">📍 <strong>${escapeHtml(b.city)}</strong>, ${escapeHtml(b.address || b.street)}</p>
-            <p style="margin: 4px 0; font-size: 11.5px; color: #94a3b8;">🕒 ${escapeHtml(b.schedule || 'Пн-Пт 08:00-19:00')}</p>
+            <p style="margin: 4px 0; font-size: 12.5px; color: var(--text-main); font-weight: 500;">📍 <strong>${escapeHtml(b.city)}</strong>, ${escapeHtml(b.address || b.street)}</p>
+            <p style="margin: 4px 0; font-size: 11.5px; color: var(--text-muted);">🕒 ${escapeHtml(b.schedule || 'Пн-Пт 08:00-19:00')}</p>
             <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <button type="button" class="btn-popup-copy" data-copy="${escapeHtml(lpCopyStr)}">
                 📋 Скопіювати

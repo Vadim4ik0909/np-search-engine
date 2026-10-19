@@ -1057,10 +1057,21 @@ mark.hl-match,
   text-overflow: ellipsis;
 }
 
-.address-match-title .street-part {
-  color: #e2e8f0;
-  font-weight: 500;
+.address-match-title .street-part,
+.street-part,
+.branch-card-street,
+.branch-street {
+  color: #1e293b;
+  font-weight: 600;
 }
+
+[data-theme="dark"] .address-match-title .street-part,
+[data-theme="dark"] .street-part,
+[data-theme="dark"] .branch-card-street,
+[data-theme="dark"] .branch-street {
+  color: #f8fafc;
+}
+
 
 .address-match-sub {
   font-size: 12px;
@@ -1181,9 +1192,13 @@ mark.hl-match,
 }
 
 .card-primary-line .street-highlight {
-  color: var(--text-main);
+  color: #1e293b;
   font-weight: 700;
   margin-left: 2px;
+}
+
+[data-theme="dark"] .card-primary-line .street-highlight {
+  color: #f8fafc;
 }
 
 /* Рівень 2: Населений пункт: місто [Місто], [Район] район, [Область] область */
