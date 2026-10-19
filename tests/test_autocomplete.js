@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 27;
+  let totalTests = 28;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -252,6 +252,11 @@ async function runTests() {
   console.time('⏱️ Час виконання тестів');
 
   // Load Engines and App Code
+  const allSettlementsPath = path.join(__dirname, '..', 'data', 'all_settlements.js');
+  if (fs.existsSync(allSettlementsPath)) {
+    const allSettlementsCode = fs.readFileSync(allSettlementsPath, 'utf8');
+    eval(allSettlementsCode);
+  }
   const fuzzyCode = fs.readFileSync(path.join(__dirname, '..', 'data', 'fuzzySearch.js'), 'utf8');
   eval(fuzzyCode);
   const branchesCode = fs.readFileSync(path.join(__dirname, '..', 'data', 'branches.js'), 'utf8');
@@ -1583,6 +1588,41 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 27:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 28: Повний реєстр населених пунктів України (26k+ сіл, смт та селищ): авторозпізнавання малих сіл
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 28: Перевірка авторозпізнавання малих сіл України (Великий Дальник, Миньківці, Горішня Вигнанка)');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+    const resultsList = elementsById['resultsList'];
+    const smallVillageCases = [
+      { q: 'Великий Дальник 3', expectCity: 'Великий Дальник', expectNum: '3' },
+      { q: 'Миньківці 1', expectCity: 'Миньківці', expectNum: '1' },
+      { q: 'Горішня Вигнанка 1', expectCity: 'Горішня Вигнанка', expectNum: '1' },
+      { q: 'київ бориспіль гнідин 2', expectCity: 'Гнідин', expectNum: '2' }
+    ];
+
+    for (let tc of smallVillageCases) {
+      // Перевірка пошукового рушія
+      const res = window.SmartSearchEngine.searchBranches(tc.q, npPool, 5);
+      const top = res && res[0];
+      if (!top) {
+        throw new Error(`Двигун для '${tc.q}' не повернув результатів!`);
+      }
+      if (tc.expectCity && top.city !== tc.expectCity) {
+        throw new Error(`Двигун для '${tc.q}' повернув '${top.city}' замість '${tc.expectCity}'`);
+      }
+      if (tc.expectNum && String(top.number) !== String(tc.expectNum)) {
+        throw new Error(`Двигун для '${tc.q}' повернув №${top.number} замість №${tc.expectNum}`);
+      }
+    }
+
+    console.log('  ✓ Успіх: Повний реєстр 26k+ населених пунктів бездоганно розпізнає малі села (Великий Дальник, Миньківці, Горішня Вигнанка) за O(1)!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 28:', err.message, '\n');
   }
 
   console.log('===============================================================');

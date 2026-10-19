@@ -172,7 +172,8 @@
       for (let obl of OBLASTS) {
         const oLower = obl.name.toLowerCase();
         if (oLower.startsWith(t) || oLower.startsWith(tClean)) {
-          const isExactCity = Array.isArray(UKRAINE_SETTLEMENTS) && UKRAINE_SETTLEMENTS.some(s => s.name.toLowerCase() === t || s.name.toLowerCase() === tClean);
+          const isExactCity = (Array.isArray(UKRAINE_SETTLEMENTS) && UKRAINE_SETTLEMENTS.some(s => s.name.toLowerCase() === t || s.name.toLowerCase() === tClean)) ||
+                              (typeof _allSettlementsByName !== 'undefined' && _allSettlementsByName && (_allSettlementsByName.has(t) || _allSettlementsByName.has(tClean)));
           if (!isExactCity) {
             return obl.name;
           }
@@ -404,6 +405,45 @@
     }
   }
 
+  // Реєстр усіх населених пунктів України (26 000+ сіл, смт, селищ, міст)
+  let _allSettlementsRaw = [];
+  if (typeof window !== 'undefined' && Array.isArray(window.ALL_SETTLEMENTS_DATA)) {
+    _allSettlementsRaw = window.ALL_SETTLEMENTS_DATA;
+  } else if (typeof require !== 'undefined') {
+    try {
+      const p = require('path').join(__dirname, 'all_settlements.json');
+      if (require('fs').existsSync(p)) {
+        _allSettlementsRaw = require(p);
+      }
+    } catch (e) {}
+  }
+
+  // O(1) швидка хеш-таблиця для миттєвого пошуку населених пунктів за чистою назвою
+  const _allSettlementsByName = new Map();
+  function initAllSettlementsMap(items) {
+    if (!Array.isArray(items)) return;
+    for (let i = 0; i < items.length; i++) {
+      const s = items[i];
+      if (!s || !s.cleanName) continue;
+      const key = s.cleanName.toLowerCase();
+      let list = _allSettlementsByName.get(key);
+      if (!list) {
+        list = [];
+        _allSettlementsByName.set(key, list);
+      }
+      list.push(s);
+    }
+  }
+  initAllSettlementsMap(_allSettlementsRaw);
+
+  function setAllSettlementsData(items) {
+    if (Array.isArray(items)) {
+      _allSettlementsRaw = items;
+      _allSettlementsByName.clear();
+      initAllSettlementsMap(items);
+    }
+  }
+
   // 4. ДАМЕРАУ-ЛЕВЕНШТЕЙН (Відстань редагування для виправлення одруків та перестановок)
   function damerauLevenshtein(a, b) {
     if (!a || !b) return (a || '').length + (b || '').length;
@@ -589,24 +629,54 @@
             .replace(/(?:ський|цький|зький)$/iu, '');
   }
 
-  // 5.1. РОЗПІЗНАВАННЯ МІСТА (Точне або нечітке Levenshtein Distance <= 2)
-  function findSettlementByNameOrFuzzy(word) {
+  // 5.1. РОЗПІЗНАВАННЯ МІСТА (Точне O(1) або нечітке Levenshtein Distance <= 2)
+  function findSettlementByNameOrFuzzy(word, contextOblast, contextRaion) {
     if (!word || word.length < 2) return null;
     const w = word.toLowerCase().trim();
     if (isOblastToken(w) && w !== 'дніпро') return null;
     const wNorm = normalizeLocativeCase(w);
 
-    // 1. Точний збіг назви або аліасу (Абсолютний пріоритет!)
-    for (let s of UKRAINE_SETTLEMENTS) {
-      if (s.name.toLowerCase() === w || s.name.toLowerCase() === wNorm) {
-        return s;
-      }
-      if (s.aliases && s.aliases.some(a => a === w || a === wNorm)) {
-        return s;
-      }
+    // 1. Точний збіг назви або аліасу у пріоритетному словнику UKRAINE_SETTLEMENTS (185 міст) - O(1)
+    const exactBase = _settlementsByName.get(w) || _settlementsByName.get(wNorm) ||
+                      _settlementsByAlias.get(w) || _settlementsByAlias.get(wNorm);
+    if (exactBase) {
+      return exactBase;
     }
 
-    // 2. Нечітке зіставлення (Levenshtein Distance <= 2):
+    // 2. Точний збіг у повному реєстрі ALL_SETTLEMENTS (26 000+ сіл, смт, селищ, міст) - O(1)
+    const candidates = _allSettlementsByName.get(w) || _allSettlementsByName.get(wNorm);
+    if (candidates && candidates.length > 0) {
+      let chosen = candidates[0];
+      if (candidates.length > 1 && (contextOblast || contextRaion)) {
+        const cObl = (contextOblast || '').toLowerCase();
+        const cRaion = (contextRaion || '').toLowerCase();
+        for (let i = 0; i < candidates.length; i++) {
+          const cand = candidates[i];
+          const candObl = (cand.oblast || '').toLowerCase();
+          const candRaion = (cand.raion || '').toLowerCase();
+          if (cObl && (candObl.includes(cObl) || cObl.includes(candObl))) {
+            chosen = cand;
+            break;
+          }
+          if (cRaion && (candRaion.includes(cRaion) || cRaion.includes(candRaion))) {
+            chosen = cand;
+            break;
+          }
+        }
+      }
+      return {
+        name: chosen.cleanName,
+        oblast: chosen.oblast,
+        raion: chosen.raion,
+        type: chosen.type || 'село',
+        allVariants: candidates
+      };
+    }
+
+    // 3. Нечітке зіставлення (Levenshtein Distance <= 2):
+    // Згідно з правилом js-memory-perf-optimizer:
+    // НЕ проганяти 26k населених пунктів через важкі цикли!
+    // Нечіткий пошук виконується ВИКЛЮЧНО по UKRAINE_SETTLEMENTS (185 міст)
     // Захист: точний збіг назви населеного пункту має абсолютний пріоритет над префіксами довших назв.
     // Заборонено замінювати точну назву "Славута" на "Славутич" тощо.
     if (w.length >= 4) {
@@ -1479,38 +1549,97 @@
     for (let i = 0; i < words.length; i++) {
       if (i + 1 < words.length) {
         const two = (words[i] + ' ' + words[i + 1]).toLowerCase();
-        const s2 = findSettlementByNameOrFuzzy(two);
+        const s2 = findSettlementByNameOrFuzzy(two, oblast, raion);
         if (s2) {
           foundSettlementsInOrder.push({ s: s2, raw: words[i] + ' ' + words[i + 1], startIndex: i });
           i++;
           continue;
         }
       }
-      const s1 = findSettlementByNameOrFuzzy(words[i]);
+      const s1 = findSettlementByNameOrFuzzy(words[i], oblast, raion);
       if (s1) {
         foundSettlementsInOrder.push({ s: s1, raw: words[i], startIndex: i });
       }
     }
 
-    if (foundSettlementsInOrder.length === 1) {
-      const match = foundSettlementsInOrder[0];
+    // 1. Захист від колізій сіл-тезок столичних вулиць (наприклад, "Хрещатик 15" -> це вулиця Хрещатик у Києві, а не село)
+    let effectiveSettlements = foundSettlementsInOrder.filter(item => {
+      if (UKRAINE_SETTLEMENTS.some(s => s.name.toLowerCase() === item.s.name.toLowerCase())) return true;
+      if (number && parseInt(number, 10) > 1 && !oblast && !raion) {
+        const isMajorStreet = UKRAINE_SETTLEMENTS.some(cityObj => {
+          const sts = cityObj.streets || [];
+          const nameLow = item.s.name.toLowerCase();
+          return sts.some(st => st.toLowerCase().includes(nameLow));
+        });
+        if (isMajorStreet) return false;
+      }
+      return true;
+    });
+
+    // 2. Primary Settlement Anchor & Cross-Street Filter:
+    // Якщо кандидат А містить кандидата Б у своєму списку вулиць (наприклад, Гриців містить 'вул. Київська', або Львів містить 'просп. Червоної Калини'):
+    // тоді кандидат Б є вулицею міста А, а не конкуруючим населеним пунктом!
+    effectiveSettlements = effectiveSettlements.filter(itemB => {
+      const isStreetOfOther = effectiveSettlements.some(itemA => {
+        if (itemA === itemB) return false;
+        const streets = itemA.s.streets || [];
+        const bName = itemB.s.name.toLowerCase();
+        return streets.some(st => {
+          const stLow = st.toLowerCase();
+          return stLow.includes(bName) || bName.includes(stLow.replace(/^(?:вул\.?|просп\.?|пров\.?)\s*/i, ''));
+        });
+      });
+      return !isStreetOfOther;
+    });
+
+    if (effectiveSettlements.length === 1) {
+      const match = effectiveSettlements[0];
       city = match.s.name;
       settlementOblast = match.s.oblast;
       text = text.replace(new RegExp('(?<!\\p{L})' + match.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ').trim();
-    } else if (foundSettlementsInOrder.length >= 2) {
+    } else if (effectiveSettlements.length >= 2) {
       // 1. Пошук села / смт / селища серед кандидатів
-      // Якщо в запиті є село/смт, воно завжди має пріоритет над містом/райцентром/обласним центром
-      const villageCandidates = foundSettlementsInOrder.filter(item => item.s.type === 'село' || item.s.type === 'смт' || item.s.type === 'селище');
+      // Якщо в запиті є село/смт, воно має пріоритет над містом/райцентром, якщо належить до вказаного регіону/району
+      const villageCandidates = effectiveSettlements.filter(item =>
+        item.s.type === 'село' || item.s.type === 'смт' || item.s.type === 'селище' || item.s.type === 'селище міського типу'
+      );
+      const cityCandidates = effectiveSettlements.filter(item =>
+        item.s.type === 'місто' || REGIONAL_CENTERS.has(item.s.name.toLowerCase())
+      );
+
+      // Валідуємо сільські кандидати: якщо в запиті є велике місто, село повинно мати територіальний зв'язок із ним
+      const validVillageCandidates = villageCandidates.filter(v => {
+        if (cityCandidates.length === 0) return true;
+        const vObl = (v.s.oblast || '').toLowerCase();
+        const vRaion = (v.s.raion || '').toLowerCase();
+
+        // Чи належить село до області або району міста-кандидата (або явно вказаної області)
+        const matchesAnyCityRegion = cityCandidates.some(c => {
+          const cObl = (c.s.oblast || '').toLowerCase();
+          const cNameStem = c.s.name.toLowerCase().slice(0, 4);
+          return (vObl && cObl && (vObl.includes(cObl) || cObl.includes(vObl))) ||
+                 (vRaion && vRaion.includes(cNameStem));
+        });
+        if (matchesAnyCityRegion) return true;
+
+        // Якщо вказана область у запиті збігається з областю села
+        if (oblast && vObl && (vObl.includes(oblast.toLowerCase()) || oblast.toLowerCase().includes(vObl))) {
+          return true;
+        }
+
+        return false;
+      });
+
       let selectedMatch = null;
 
-      if (villageCandidates.length === 1) {
-        selectedMatch = villageCandidates[0];
-      } else if (villageCandidates.length > 1) {
-        // Якщо сіл кілька, обираємо те, чий район або область збігається з іншими словами
-        for (let v of villageCandidates) {
+      if (validVillageCandidates.length === 1) {
+        selectedMatch = validVillageCandidates[0];
+      } else if (validVillageCandidates.length > 1) {
+        // Якщо валідних сіл кілька, обираємо те, чий район або область збігається з іншими словами
+        for (let v of validVillageCandidates) {
           const vObl = (v.s.oblast || '').toLowerCase();
           const vRaion = (v.s.raion || '').toLowerCase();
-          const matchesContext = foundSettlementsInOrder.some(other => {
+          const matchesContext = effectiveSettlements.some(other => {
             if (other === v) return false;
             const oName = other.s.name.toLowerCase().slice(0, 4);
             return vObl.includes(oName) || vRaion.includes(oName);
@@ -1520,25 +1649,40 @@
             break;
           }
         }
-        if (!selectedMatch) selectedMatch = villageCandidates[0];
+        if (!selectedMatch) selectedMatch = validVillageCandidates[0];
       } else {
-        // Усі кандидати — міста: виключаємо обласні центри (REGIONAL_CENTERS), щоб знайти цільове місто
-        const nonRegional = foundSettlementsInOrder.filter(item => !REGIONAL_CENTERS.has(item.s.name.toLowerCase()));
-        if (nonRegional.length > 0) {
-          selectedMatch = nonRegional[0];
+        // Обираємо серед міст: виключаємо обласні центри (REGIONAL_CENTERS), якщо є конкретніше місто
+        const nonRegionalCities = cityCandidates.filter(item => !REGIONAL_CENTERS.has(item.s.name.toLowerCase()));
+        if (nonRegionalCities.length > 0) {
+          selectedMatch = nonRegionalCities[0];
+        } else if (cityCandidates.length > 0) {
+          selectedMatch = cityCandidates[0];
         } else {
-          selectedMatch = foundSettlementsInOrder[0];
+          selectedMatch = effectiveSettlements[0];
         }
       }
 
       // Визначаємо область та район з інших кандидатів
-      for (let m of foundSettlementsInOrder) {
+      for (let m of effectiveSettlements) {
         if (m !== selectedMatch) {
           // 1. Чи є однойменний населений пункт для selectedMatch в області кандидата m? (наприклад, Олександрія Рівне)
-          const sameNameInOtherOblast = UKRAINE_SETTLEMENTS.find(s =>
+          let sameNameInOtherOblast = UKRAINE_SETTLEMENTS.find(s =>
             s.name.toLowerCase() === selectedMatch.s.name.toLowerCase() &&
             s.oblast.toLowerCase() === (m.s.oblast || '').toLowerCase()
           );
+          if (!sameNameInOtherOblast && Array.isArray(selectedMatch.s.allVariants)) {
+            const vMatch = selectedMatch.s.allVariants.find(v =>
+              (v.oblast || '').toLowerCase() === (m.s.oblast || '').toLowerCase()
+            );
+            if (vMatch) {
+              sameNameInOtherOblast = {
+                name: vMatch.cleanName,
+                oblast: vMatch.oblast,
+                raion: vMatch.raion,
+                type: vMatch.type || 'село'
+              };
+            }
+          }
           if (sameNameInOtherOblast) {
             selectedMatch = { ...selectedMatch, s: sameNameInOtherOblast };
             oblast = sameNameInOtherOblast.oblast;
@@ -1560,7 +1704,7 @@
       settlementOblast = selectedMatch.s.oblast;
       if (!oblast) oblast = selectedMatch.s.oblast;
 
-      for (let m of foundSettlementsInOrder) {
+      for (let m of effectiveSettlements) {
         // Видаляємо з тексту тільки selectedMatch та споріднені регіони (не видаляємо незв'язані слова типу 'київ' у Грицеві, бо це вулиця!)
         if (m === selectedMatch || (m.s.oblast === selectedMatch.s.oblast)) {
           text = text.replace(new RegExp('(?<!\\p{L})' + m.raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\p{L})', 'iu'), ' ');
@@ -1584,7 +1728,19 @@
           const oMatch = Boolean(oKey && sO.includes(oKey));
           return oMatch || rMatch;
         };
-        const sFound = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() && matchesTargetRegion(s));
+        let sFound = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() && matchesTargetRegion(s));
+        if (!sFound && _allSettlementsByName.has(city.toLowerCase())) {
+          const list = _allSettlementsByName.get(city.toLowerCase());
+          const vFound = list.find(s => matchesTargetRegion(s));
+          if (vFound) {
+            sFound = {
+              name: vFound.cleanName,
+              oblast: vFound.oblast,
+              raion: vFound.raion,
+              type: vFound.type || 'село'
+            };
+          }
+        }
         if (sFound) {
           settlementOblast = sFound.oblast;
           if (sFound.raion) raion = sFound.raion;
@@ -1604,7 +1760,8 @@
       } else {
         // Якщо користувач не вказав ні район, ні область, а місто існує в кількох областях:
         const sameCityVariants = UKRAINE_SETTLEMENTS.filter(s => s.name.toLowerCase() === city.toLowerCase());
-        if (sameCityVariants.length > 1) {
+        const hasMultipleInAll = _allSettlementsByName.has(city.toLowerCase()) && _allSettlementsByName.get(city.toLowerCase()).length > 1;
+        if (sameCityVariants.length > 1 || hasMultipleInAll) {
           settlementOblast = null; // Не обмежуємо примусово першою знайденою областю
         }
       }
@@ -1934,7 +2091,9 @@
     UKRAINE_SETTLEMENTS,
     RENAMED_REGISTRY,
     getRaionStem,
-    CONSOLIDATED_RAION_MAP
+    CONSOLIDATED_RAION_MAP,
+    setAllSettlementsData,
+    getAllSettlementsCount: () => _allSettlementsByName.size
   };
 
 })();

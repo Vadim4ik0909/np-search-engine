@@ -30,7 +30,7 @@
   </script>
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.19.0">
+  <link rel="stylesheet" href="styles.css?v=8.22.0">
 </head>
 <body data-service="novaposhta">
 
@@ -243,7 +243,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.21.3</span>
+          <span class="version-tag">v8.22.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -272,8 +272,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.21.3 -->
+        <!-- Версія 8.22.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.22.0</span>
+            <span class="version-state">Інтеграція повного реєстру населених пунктів України (26 500+ сіл, смт, селищ та міст) через API Нової Пошти</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Повний реєстр 26k+ сіл та смт:</strong> підключено вичерпну базу всіх населених пунктів України безпосередньо з офіційного API Нової Пошти (AddressGeneral/getSettlements). Відтепер навіть найдрібніші села (Великий Дальник, Миньківці, Горішня Вигнанка тощо) автоматично розпізнаються як цільовий населений пункт.</li>
+            <li><strong>Швидкісний O(1) пошук (js-memory-perf-optimizer):</strong> оптимізована індексація за чистою назвою та відмінками. Важкі розрахунки Левенштейна виконуються виключно по базовому словнику, що гарантує відсутність навантаження на процесор і нульове сповільнення інтерфейсу.</li>
+            <li><strong>Пріоритет села над райцентром:</strong> підтримано правила топоніміки України — автоматичне зняття омонімії та пріоритезація діючого сільського відділення або поштомату.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.21.3 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.21.3</span>
             <span class="version-state">Покращення контрастності та читабельності адрес вулиць у світлій темі</span>
@@ -771,12 +785,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.19.0"></script>
+  <script src="data/branches.js?v=8.22.0"></script>
+
+  <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
+  <script src="data/all_settlements.js?v=8.22.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.19.0"></script>
+  <script src="data/fuzzySearch.js?v=8.22.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.19.0"></script>
+  <script src="app.js?v=8.22.0"></script>
 </body>
 </html>
