@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 32;
+  let totalTests = 33;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -657,18 +657,19 @@ async function runTests() {
   }
 
   // --------------------------------------------------------------------------
-  // ТЕСТ 13: City Autocomplete Guard & Пріоритет номера відділення ("Київ 111")
+  // ТЕСТ 13: Перехід City Mode -> Branch Mode & Пріоритет номера відділення ("Київ 111")
   // --------------------------------------------------------------------------
-  console.log('▶ ТЕСТ 13: City Autocomplete Guard при введенні "Київ 111" (автозакриття поп-апу та активна картка результату)');
+  console.log('▶ ТЕСТ 13: Перехід City Mode -> Branch Mode при введенні "Київ 111" (відсутність підказок міст та активна картка результату)');
   try {
     // 1. Вводимо "Київ 111" в рядок пошуку
     searchInput.value = 'Київ 111';
     searchInput.dispatchEvent({ type: 'input' });
     await sleep(500);
 
-    // 2. Перевіряємо, що випадаючий поп-ап автоматично закритий/прихований (не накладається на картку)
-    if (!dropdown.classList.contains('hidden')) {
-      throw new Error('Поп-ап підказок міст повинен бути негайно закритий (hidden) при введенні цифри у запиті "Київ 111"');
+    // 2. Перевіряємо, що в дропдауні немає підказок міст (City Mode вимкнено, активний Branch Mode)
+    const cityModeItems = dropdown.querySelectorAll('.autocomplete-item-city');
+    if (cityModeItems.length > 0) {
+      throw new Error('Підказки міст (City Mode) не повинні відображатися при введенні цифри у запиті "Київ 111"');
     }
 
     // 3. Перевіряємо, що секція результатів видима
@@ -688,7 +689,7 @@ async function runTests() {
       throw new Error(`Очікувався Київ відділення №111, отримано: ${topBranch.city} №${topBranch.number}`);
     }
 
-    console.log(`  ✓ Успіх: При "Київ 111" поп-ап повністю прихований (classList.contains('hidden')), активна картка відділення №${topBranch.number} (${topBranch.street}).\n`);
+    console.log(`  ✓ Успіх: При "Київ 111" підказки міст замінено на Branch Mode, активна картка відділення №${topBranch.number} (${topBranch.street}).\n`);
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 13:', err.message, '\n');
@@ -1853,6 +1854,120 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 32:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 33: v8.25.0 — LP-CRM UX випадаючого списку: перемикання між режимом міст (City Mode) та режимом відділень (Branch Mode)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 33: LP-CRM UX автокомпліту (City Mode -> Branch Mode, "Городок", "Олександрівка", "Київ 1", "Київ 100", "Львів наукова", клавіатура Enter)');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+    const S = window.SmartSearchEngine;
+    const resultsList = elementsById['resultsList'];
+
+    // 1. City Suggestion Mode: "Городок" та "Олександрівка" у форматі LP-CRM:
+    // Назва пункту (жирний), (Район р-н, Область обл.) праворуч у дужках, бейдж типу (місто / смт / село)
+    searchInput.value = 'Городок';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+
+    if (dropdown.classList.contains('hidden')) {
+      throw new Error('Дропдаун повинен бути відкритим для "Городок"');
+    }
+    if (dropdown.getAttribute('data-mode') !== 'city') {
+      throw new Error(`Очікувався data-mode="city" для "Городок", отримано: ${dropdown.getAttribute('data-mode')}`);
+    }
+    const cityItems = dropdown.querySelectorAll('.autocomplete-item');
+    if (cityItems.length < 3) {
+      throw new Error(`Очікувалось щонайменше 3 варіанти "Городок" з різних областей, отримано: ${cityItems.length}`);
+    }
+    const firstCityHtml = cityItems[0].innerHTML;
+    if (!firstCityHtml.includes('<strong class="autocomplete-title">') || !firstCityHtml.includes('р-н') || !firstCityHtml.includes('обл.)')) {
+      throw new Error(`Формат City Mode LP-CRM для "Городок" некоректний: ${firstCityHtml}`);
+    }
+
+    // Перевірка "Олександрівка" (кілька областей + смт/село бейджі)
+    const oleksSuggestions = S.getAutocompleteSuggestions('Олександрівка', 'novaposhta', null, npPool);
+    if (!oleksSuggestions || oleksSuggestions.length < 3) {
+      throw new Error('Очікувалось декілька варіантів для "Олександрівка"');
+    }
+    for (const s of oleksSuggestions) {
+      if (s.mode !== 'city' || !s.subtitle.startsWith('(') || !s.subtitle.endsWith(')') || !['місто', 'смт', 'село'].includes(s.badge)) {
+        throw new Error(`Некоректний елемент City Mode для Олександрівки: ${JSON.stringify(s)}`);
+      }
+    }
+
+    // Клік на підказку фіксує місто в інпуті з пробілом
+    cityItems[0].dispatchEvent({ type: 'mousedown', preventDefault() {}, stopPropagation() {} });
+    await sleep(50);
+    if (searchInput.value !== 'Городок ') {
+      throw new Error(`Клік на підказку міста має фіксувати "Городок " з пробілом, отримано: "${searchInput.value}"`);
+    }
+
+    // 2. Динамічний перехід у режим відділень (Branch Suggestion Mode): "Київ 1", "Київ 100", "Львів наукова"
+    searchInput.value = 'Київ 1';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+
+    if (dropdown.classList.contains('hidden')) {
+      throw new Error('Дропдаун повинен бути відкритим у Branch Mode для "Київ 1"');
+    }
+    if (dropdown.getAttribute('data-mode') !== 'branch') {
+      throw new Error(`Очікувався data-mode="branch" для "Київ 1", отримано: ${dropdown.getAttribute('data-mode')}`);
+    }
+    const kyiv1Items = dropdown.querySelectorAll('.autocomplete-item');
+    if (kyiv1Items.length === 0) {
+      throw new Error('Очікувались підказки відділень для "Київ 1"');
+    }
+    const kyiv1Html = kyiv1Items[0].innerHTML;
+    if (!kyiv1Html.includes('№<mark class="hl-match">1</mark>') || !kyiv1Html.includes('кг)') || !kyiv1Html.includes('Пирогівський шлях')) {
+      throw new Error(`Формат Branch Mode для "Київ 1" некоректний: ${kyiv1Html}`);
+    }
+
+    // Перевірка "Київ 100"
+    const kyiv100Sug = S.getAutocompleteSuggestions('Київ 100', 'novaposhta', null, npPool);
+    if (!kyiv100Sug.length || kyiv100Sug[0].mode !== 'branch' || kyiv100Sug[0].branchObj.number !== '100') {
+      throw new Error('Очікувалось Відділення №100 першим у Branch Mode для "Київ 100"');
+    }
+
+    // Перевірка "Львів наукова" (вулиця переводить дропдаун у режим відділень з підсвічуванням)
+    searchInput.value = 'Львів наукова';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+
+    if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'branch') {
+      throw new Error('Для "Львів наукова" дропдаун має перейти в Branch Mode (data-mode="branch")');
+    }
+    const lvivNaukItems = dropdown.querySelectorAll('.autocomplete-item');
+    if (lvivNaukItems.length === 0 || !lvivNaukItems[0].innerHTML.includes('<mark class="hl-match">Наукова</mark>')) {
+      throw new Error(`Очікувалось підсвічування вулиці Наукова у Branch Mode: ${lvivNaukItems[0] ? lvivNaukItems[0].innerHTML : 'empty'}`);
+    }
+
+    // 3. Навігація з клавіатури (ArrowDown + Enter) на вибраному пункті відділення миттєво відкриває повну картку з кнопками копіювання
+    searchInput.dispatchEvent({ type: 'keydown', key: 'ArrowDown', preventDefault() {} });
+    if (!lvivNaukItems[0].classList.contains('focused')) {
+      throw new Error('ArrowDown має виділити перший пункт відділення класом .focused');
+    }
+    searchInput.dispatchEvent({ type: 'keydown', key: 'Enter', preventDefault() {} });
+    await sleep(50);
+
+    if (!dropdown.classList.contains('hidden')) {
+      throw new Error('Після натискання Enter на відділенні дропдаун повинен закритися');
+    }
+    const renderedCard = resultsList.querySelector('.branch-card');
+    if (!renderedCard) {
+      throw new Error('Після вибору відділення клавішею Enter має відобразитися повна картка відділення (.branch-card)');
+    }
+    const btnShort = renderedCard.querySelector('.btn-copy-short');
+    const btnDetailed = renderedCard.querySelector('.btn-copy-detailed');
+    if (!btnShort || !btnDetailed) {
+      throw new Error('На відкритій картці відділення повинні бути обидві кнопки копіювання (.btn-copy-short та .btn-copy-detailed)');
+    }
+
+    console.log('  ✓ Успіх: LP-CRM перемикання City Mode <-> Branch Mode, підсвічування та вибір клавішею Enter працюють бездоганно!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 33:', err.message, '\n');
   }
 
   console.log('===============================================================');

@@ -644,7 +644,7 @@
     } else {
       state.selectedBranch = null;
     }
-    if (isExplicitSubmit || /\d/.test(rawQuery) || state.selectedBranch) {
+    if (isExplicitSubmit || results.length === 0) {
       closeAutocomplete();
     }
     renderSearchResults(results, rawQuery, didYouMeanText, missingTargetBranch);
@@ -1829,7 +1829,7 @@
           patterns.add('(?<!\\p{L})' + escapeRegex(stem) + '[\\p{L}]*');
         }
       } else if (t.length >= 2) {
-        patterns.add('(?<!\\p{L})' + escapeRegex(t) + '(?![\\p{L}])');
+        patterns.add('(?<!\\p{L})' + escapeRegex(t));
       }
     }
 
@@ -1843,17 +1843,26 @@
   function renderAutocomplete(suggestions, query) {
     if (!dom.autocompleteDropdown) return;
 
-    if (!query || query.trim().length < 2 || /\d/.test(query)) {
+    if (!query || query.trim().length < 2) {
       closeAutocomplete();
       return;
     }
 
+    const hasDigits = /\d/.test(query);
+
     dom.autocompleteDropdown.innerHTML = '';
     activeAutocompleteIndex = -1;
 
-    // Якщо нічого не знайдено — показуємо охайне повідомлення «Нічого не знайдено», не закриваючи поп-ап
+    // Якщо нічого не знайдено:
+    // При наявності цифр (напр. "київ 99999" або "33159") закриваємо дропдаун, щоб показати картку помилки результатів.
+    // При пошуку міста показуємо охайне повідомлення «Нічого не знайдено».
     if (!suggestions || suggestions.length === 0) {
+      if (hasDigits) {
+        closeAutocomplete();
+        return;
+      }
       autocompleteItems = [];
+      dom.autocompleteDropdown.removeAttribute('data-mode');
       const emptyEl = document.createElement('div');
       emptyEl.className = 'autocomplete-empty';
       emptyEl.innerHTML = `
@@ -1867,38 +1876,66 @@
     }
 
     autocompleteItems = suggestions;
+    const isBranchMode = suggestions.some(s => s.mode === 'branch' || s.type === 'branch' || s.type === 'postomat');
+    dom.autocompleteDropdown.setAttribute('data-mode', isBranchMode ? 'branch' : 'city');
 
     suggestions.forEach((item, idx) => {
       const el = document.createElement('div');
-      el.className = 'autocomplete-item';
+      const itemIsBranch = item.mode === 'branch' || item.type === 'branch' || item.type === 'postomat';
+      el.className = 'autocomplete-item ' + (itemIsBranch ? 'autocomplete-item-branch' : 'autocomplete-item-city');
       el.setAttribute('role', 'option');
       el.setAttribute('data-index', idx);
+      el.setAttribute('data-mode', itemIsBranch ? 'branch' : 'city');
 
-      let iconHtml = '📍';
+      let iconHtml = item.icon || '📍';
       let badgeClass = 'badge-city';
       if (item.type === 'postomat') {
         iconHtml = '📦';
         badgeClass = 'badge-postomat';
       } else if (item.type === 'branch') {
         iconHtml = '🏢';
-        badgeClass = 'badge-branch';
-      } else if (item.type === 'село' || item.type === 'смт' || item.type === 'селище') {
+        badgeClass = item.isCargo ? 'badge-cargo' : 'badge-branch';
+      } else if (item.type === 'смт' || item.type === 'селище') {
+        badgeClass = 'badge-smt';
+      } else if (item.type === 'село') {
         badgeClass = 'badge-village';
       }
 
       const highlightedTitle = highlightMatch(item.title, query);
       const highlightedSub = highlightMatch(item.subtitle, query);
 
-      el.innerHTML = `
-        <div class="autocomplete-item-main">
-          <div class="autocomplete-icon">${iconHtml}</div>
-          <div class="autocomplete-content">
-            <span class="autocomplete-title">${highlightedTitle}</span>
-            <span class="autocomplete-sub">${highlightedSub}</span>
+      if (itemIsBranch) {
+        const weightHtml = item.weightLabel
+          ? ` <span class="autocomplete-weight">${escapeHtml(item.weightLabel)}</span>`
+          : '';
+        const streetHtml = item.street
+          ? ` <span class="autocomplete-sep">—</span> <span class="autocomplete-street">${highlightMatch(item.street, query)}</span>`
+          : '';
+
+        el.innerHTML = `
+          <div class="autocomplete-item-main">
+            <div class="autocomplete-icon">${iconHtml}</div>
+            <div class="autocomplete-content autocomplete-content-branch">
+              <span class="autocomplete-title">${highlightedTitle}${weightHtml}${streetHtml}</span>
+              <span class="autocomplete-sub">${highlightedSub}</span>
+            </div>
           </div>
-        </div>
-        <span class="autocomplete-badge ${badgeClass}">${escapeHtml(item.badge || item.type)}</span>
-      `;
+          <span class="autocomplete-badge ${badgeClass}">${escapeHtml(item.badge || item.type)}</span>
+        `;
+      } else {
+        // Режим топонімів у дропдауні (City Suggestion Mode — формат LP-CRM):
+        // Жирний текст: назва пункту; вторинний сірий текст у дужках праворуч: (Район р-н, Область обл.); бейдж типу праворуч (місто / смт / село)
+        el.innerHTML = `
+          <div class="autocomplete-item-main">
+            <div class="autocomplete-icon">${iconHtml}</div>
+            <div class="autocomplete-content autocomplete-content-city">
+              <strong class="autocomplete-title">${highlightedTitle}</strong>
+              <span class="autocomplete-sub">${highlightedSub}</span>
+            </div>
+          </div>
+          <span class="autocomplete-badge ${badgeClass}">${escapeHtml(item.badge || item.type)}</span>
+        `;
+      }
 
       // Запобігаємо втраті фокусу інпутом при виборі підказки
       const handleSelect = (e) => {
@@ -1920,16 +1957,31 @@
   function selectAutocompleteItem(item) {
     if (!item) return;
     let fill = item.textToFill || item.title;
-    const isSettlement = item.type === 'місто' || item.type === 'смт' || item.type === 'село' || item.type === 'селище';
+    const isSettlement = item.mode === 'city' || item.type === 'місто' || item.type === 'смт' || item.type === 'село' || item.type === 'селище';
     if (isSettlement && !fill.endsWith(' ')) {
       fill += ' ';
     }
     dom.searchInput.value = fill;
     dom.btnClearSearch.classList.remove('hidden');
     closeAutocomplete();
+
     if (item.branchObj) {
-      state.selectedBranch = item.branchObj;
+      const b = item.branchObj;
+      state.searchQuery = fill.trim();
+      state.selectedBranch = b;
+      state.currentResults = [b];
+      renderSearchResults([b], fill.trim(), null, null);
+      recordFrequentQuery(b.city || fill.trim());
+      recordSearchHistory(fill.trim(), 1);
+      if (state.isMapVisible && state.leafletMap) {
+        updateMapMarkers([b], b);
+        if (b.lat && b.lng) {
+          state.leafletMap.flyTo([b.lat, b.lng], 14, { duration: 1.2 });
+        }
+      }
+      return;
     }
+
     executeSearch(fill.trim(), true, true);
     if (isSettlement) {
       focusSearchInputAtEnd(true);
@@ -1986,7 +2038,7 @@
     });
 
     function triggerAutocomplete(val) {
-      if (!val || val.length < 2 || /\d/.test(val)) {
+      if (!val || val.length < 2) {
         closeAutocomplete();
         return;
       }
@@ -2001,30 +2053,23 @@
       }
     }
 
-    // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом (лише якщо немає цифр)
+    // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом
     const handleInputActivation = () => {
       const val = dom.searchInput.value.trim();
-      if (val.length >= 2 && !/\d/.test(val) && !isAutocompleteOpen) {
+      if (val.length >= 2 && !isAutocompleteOpen) {
         triggerAutocomplete(val);
       }
     };
     dom.searchInput.addEventListener('focus', handleInputActivation);
     dom.searchInput.addEventListener('click', handleInputActivation);
 
-    // Автодоповнення та миттєвий живий пошук при введенні (City Autocomplete Guard + дебаунс + AbortController)
+    // Автодоповнення та миттєвий живий пошук при введенні (LP-CRM City Mode <-> Branch Mode + дебаунс + AbortController)
     dom.searchInput.addEventListener('input', () => {
       const val = dom.searchInput.value.trim();
       if (val.length > 0) {
         dom.btnClearSearch.classList.remove('hidden');
       } else {
         dom.btnClearSearch.classList.add('hidden');
-        closeAutocomplete();
-      }
-
-      // City Autocomplete Guard:
-      // Якщо в інпуті з'являється хоча б одна цифра (наприклад, "Київ 1", "Київ 111", "33159") —
-      // поп-ап підказок міст ПОВИНЕН НЕГАЙНО ЗАКРИВАТИСЯ, щоб не перекривати картки знайдених відділень.
-      if (/\d/.test(val)) {
         closeAutocomplete();
       }
 
@@ -2039,37 +2084,21 @@
       clearTimeout(liveSearchDebounceTimer);
 
       if (val.length >= 2) {
-        // ПРАВИЛО 2: Розділення станів "Введення міста" та "Видача результатів"
-        // Поки користувач вводить лише назву міста (без цифр):
-        // Працює ВИКЛЮЧНО випадаючий поп-ап міст. На фоні під поп-апом приховано рендер випадкових відділень!
         if (!/\d/.test(val)) {
           dom.searchResultsSection.classList.add('hidden');
 
-          // Дебаунс 300мс для підказок міст (стабільний плавний відгук без race conditions)
+          // Дебаунс 300мс для підказок міст або відділень по вулиці (напр. "Львів наукова")
           autocompleteDebounceTimer = setTimeout(() => {
             if (currentSignal.aborted) return;
-            if (/\d/.test(dom.searchInput.value)) {
-              closeAutocomplete();
-              return;
-            }
-
-            let cityPool = null;
-            const candidate = val.split(/[, ]+/)[0].toLowerCase();
-            if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
-              cityPool = liveWarehousesCache.novaposhta.get(candidate);
-            }
-
-            if (window.SmartSearchEngine) {
-              const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool, getAllCurrentServiceBranches());
-              if (!currentSignal.aborted && !/\d/.test(dom.searchInput.value)) {
-                renderAutocomplete(suggestions, val);
-              }
-            }
+            triggerAutocomplete(val);
           }, 300);
         } else {
-          // Якщо в запиті з'явилася хоча б одна цифра (номер відділення чи поштомату),
-          // негайно закриваємо підказки міст та запускаємо пошук конкретного відділення/поштомату
-          closeAutocomplete();
+          // Коли в інпуті є розпізнане місто та цифра (напр. "Київ 1", "Київ 100"):
+          // Дропдаун перебудовується в режим відділень (Branch Suggestion Mode), а результати оновлюються паралельно
+          autocompleteDebounceTimer = setTimeout(() => {
+            if (currentSignal.aborted) return;
+            triggerAutocomplete(val);
+          }, 300);
           liveSearchDebounceTimer = setTimeout(() => {
             if (!currentSignal.aborted) {
               executeSearch(val, false, false); // isExplicitSubmit = false
@@ -2286,12 +2315,12 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.23.0)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.25.0)
   // ==========================================================================
   function initServiceWorker() {
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.23.0', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.25.0', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2330,7 +2359,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.24.2') {
+          if (key !== 'np-ukr-cache-v8.25.0') {
             caches.delete(key);
           }
         });
