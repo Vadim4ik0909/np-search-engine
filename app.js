@@ -829,7 +829,7 @@
   }
 
   // Створення повнорозмірної картки відділення (з'являється тільки при виборі конкретної адреси)
-  function createFullBranchCard(branch) {
+  function createFullBranchCard(branch, query = state.searchQuery) {
     const card = document.createElement('div');
     card.className = 'branch-card';
 
@@ -878,6 +878,11 @@
 
     const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || postalCode}: ${cleanStreet}`;
 
+    const hlCity = highlightMatch(branch.city || '', query);
+    const hlNumber = highlightMatch(branch.number || postalCode, query);
+    const hlStreet = highlightMatch(cleanStreet, query);
+    const hlGeoSub = geoSub ? highlightMatch(geoSub, query) : '';
+
     let ukrposhtaIndexBadgeHtml = '';
     let copyIndexBtnHtml = '';
     if (isUkrposhta && postalCode) {
@@ -892,16 +897,16 @@
     card.innerHTML = `
       <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
       <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
-        <span class="city-highlight">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}</span>
+        <span class="city-highlight">${escapeHtml(sType)} ${hlCity}</span>
         <span class="line-sep">-</span>
-        <span class="branch-highlight">${escapeHtml(typeDisplay)} №${escapeHtml(branch.number || postalCode)}:</span>
-        <span class="street-highlight">${escapeHtml(cleanStreet)}</span>
+        <span class="branch-highlight">${escapeHtml(typeDisplay)} №${hlNumber}:</span>
+        <span class="street-highlight">${hlStreet}</span>
       </div>
 
       <!-- Рядок 2: Населений пункт (район, область) -->
       <div class="card-geo-line" title="Населений пункт: ${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}">
         <span class="geo-label">Населений пункт:</span>
-        <span class="geo-val">${escapeHtml(sType)} ${escapeHtml(branch.city || '')}${geoSub ? ', ' + escapeHtml(geoSub) : ''}</span>
+        <span class="geo-val">${escapeHtml(sType)} ${hlCity}${hlGeoSub ? ', ' + hlGeoSub : ''}</span>
       </div>
 
       ${renamingHtml}
@@ -1029,7 +1034,7 @@
 
       container.innerHTML = backBtnHtml;
 
-      const card = createFullBranchCard(branch);
+      const card = createFullBranchCard(branch, query || state.searchQuery);
       container.appendChild(card);
       dom.resultsList.appendChild(container);
 
@@ -1103,15 +1108,20 @@
       if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
       if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
 
-      const branchTitle = `${typeDisplay} №${branch.number || postalCode}: <span class="street-part">${escapeHtml(cleanStreet)}</span>`;
-      const locationSub = `${sType} ${branch.city || ''}${geoSub ? ', ' + geoSub : ''}`;
+      const hlNumber = highlightMatch(branch.number || postalCode, query || state.searchQuery);
+      const hlStreet = highlightMatch(cleanStreet, query || state.searchQuery);
+      const hlCity = highlightMatch(branch.city || '', query || state.searchQuery);
+      const hlGeoSub = geoSub ? highlightMatch(geoSub, query || state.searchQuery) : '';
+
+      const branchTitle = `${typeDisplay} №${hlNumber}: <span class="street-part">${hlStreet}</span>`;
+      const locationSub = `${escapeHtml(sType)} ${hlCity}${hlGeoSub ? ', ' + hlGeoSub : ''}`;
 
       row.innerHTML = `
         <div class="address-match-left">
           <div class="address-match-icon">${isPostomat ? '📦' : '🏢'}</div>
           <div class="address-match-content">
             <div class="address-match-title">${branchTitle}</div>
-            <div class="address-match-sub">${escapeHtml(locationSub)}</div>
+            <div class="address-match-sub">${locationSub}</div>
           </div>
         </div>
         <div class="address-match-right">
@@ -1650,12 +1660,44 @@
   }
 
   function highlightMatch(text, query) {
-    if (!text || !query) return escapeHtml(text || '');
-    const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2 || /^\d+$/.test(t));
-    if (tokens.length === 0) return escapeHtml(text);
-    const pattern = tokens.map(t => escapeRegex(t)).join('|');
-    const regex = new RegExp(`(${pattern})`, 'giu');
-    return escapeHtml(text).replace(regex, '<span class="hl-match">$1</span>');
+    if (!text) return '';
+    if (!query) return escapeHtml(text);
+
+    let cleanQuery = query;
+    if (window.SmartSearchEngine && window.SmartSearchEngine.fixKeyboardLayout) {
+      cleanQuery = window.SmartSearchEngine.fixKeyboardLayout(query);
+    }
+
+    const STOP = new Set(['вул', 'вулиця', 'обл', 'область', 'район', 'р-н', 'селище', 'село', 'місто', 'відділення', 'поштомат', 'нова', 'пошта', 'вд', 'пм', 'номер']);
+    const rawTokens = cleanQuery.toLowerCase().split(/[^\p{L}0-9]+/u).filter(Boolean);
+    const patterns = new Set();
+
+    for (const t of rawTokens) {
+      if (STOP.has(t)) continue;
+      if (/^\d+$/.test(t)) {
+        patterns.add('(?<!\\d)' + escapeRegex(t) + '(?!\\d)');
+      } else if (t.length >= 3) {
+        patterns.add('(?<!\\p{L})' + escapeRegex(t) + '(?!\\p{L})');
+        let stem = '';
+        if (window.SmartSearchEngine && window.SmartSearchEngine.getRaionStem) {
+          stem = window.SmartSearchEngine.getRaionStem(t);
+        } else {
+          stem = t.replace(/(?:енськ|инськ|івськ|овськ|ськ|цьк|зьк)(?:ий|ого|ому|им|е|а)?$/iu, '')
+                  .replace(/(?:ний|ного|ному|не|на|тий|того)$/iu, '');
+        }
+        if (stem && stem.length >= 3) {
+          patterns.add('(?<!\\p{L})' + escapeRegex(stem) + '[\\p{L}]*');
+        }
+      } else if (t.length >= 2) {
+        patterns.add('(?<!\\p{L})' + escapeRegex(t) + '(?![\\p{L}])');
+      }
+    }
+
+    if (patterns.size === 0) return escapeHtml(text);
+
+    const combinedRegex = new RegExp('(' + Array.from(patterns).join('|') + ')', 'giu');
+    const safeText = escapeHtml(text);
+    return safeText.replace(combinedRegex, '<mark class="hl-match">$1</mark>');
   }
 
   function renderAutocomplete(suggestions, query) {
@@ -2126,6 +2168,12 @@
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
+  }
+
+  window.highlightMatch = highlightMatch;
+  window.createFullBranchCard = createFullBranchCard;
+  if (window.SmartSearchEngine) {
+    window.SmartSearchEngine.highlightMatch = highlightMatch;
   }
 
 })();

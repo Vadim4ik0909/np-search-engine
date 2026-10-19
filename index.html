@@ -243,7 +243,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.19.0</span>
+          <span class="version-tag">v8.20.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -272,8 +272,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.19.0 -->
+        <!-- Версія 8.20.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.20.0</span>
+            <span class="version-state">Топонімічна дезамбігуація районів та Ctrl-F візуальне підсвічування збігів</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Районна консолідація 2020:</strong> розпізнавання сучасних укрупнених районів (Сарненський, Білоцерківський, Тернопільський тощо) та історичних назв (Рокитнівський, Підгаєцький). Стем-толерантність до одруків («сарнинський» == «сарненський»).</li>
+            <li><strong>Топонімічна точність (смт Рокитне):</strong> додано повну підтримку смт Рокитне Рівненської області (Сарненський р-н) у базі та автокомпліті. Запити типу «сарнинський 2 рокитне» миттєво знаходять Відділення №2 (вул. Патріотична, 44) на 1-му місці.</li>
+            <li><strong>Ctrl-F візуальне підсвічування:</strong> інтегровано напівпрозорий жовтий прямокутний маркер з контуром для ключових слів (місто, район, область, вулиця, номер) у випадаючому поп-апі та картках видачі для миттєвого розрізнення однакових назв.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.19.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.19.0</span>
             <span class="version-state">Перемикач теми оформлення (Світла та Темна) із збереженням у LocalStorage</span>

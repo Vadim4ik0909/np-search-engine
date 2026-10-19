@@ -751,11 +751,26 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   text-overflow: ellipsis;
 }
 
-.autocomplete-title .hl-match {
-  color: #38bdf8;
+/* Ctrl-F style yellow marker highlight */
+mark.hl-match,
+.hl-match {
+  background-color: rgba(254, 240, 138, 0.7);
+  border: 1px solid #eab308;
+  color: #713f12;
+  border-radius: 3px;
+  padding: 0 3px;
+  margin: 0 1px;
   font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+[data-theme="dark"] mark.hl-match,
+[data-theme="dark"] .hl-match {
+  background-color: rgba(234, 179, 8, 0.3);
+  border: 1px solid rgba(250, 204, 21, 0.75);
+  color: #fef08a;
 }
 
 .autocomplete-sub {

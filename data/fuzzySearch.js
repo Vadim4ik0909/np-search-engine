@@ -333,6 +333,7 @@
     { name: 'Радивилів', oblast: 'Рівненська', raion: 'Дубенський', type: 'місто', lat: 50.1292, lng: 25.2583, postalCodes: ['35500'], aliases: ['радивилів', 'радивилов'], streets: ['вул. Почаївська'] },
     { name: 'Клевань', oblast: 'Рівненська', raion: 'Рівненський', type: 'смт', lat: 50.7500, lng: 25.9667, postalCodes: ['35312'], aliases: ['клевань'], streets: ['вул. Центральна'] },
     { name: 'Квасилів', oblast: 'Рівненська', raion: 'Рівненський', type: 'смт', lat: 50.5611, lng: 26.2694, postalCodes: ['35335'], aliases: ['квасилів'], streets: ['вул. Богдана Хмельницького'] },
+    { name: 'Рокитне', oblast: 'Рівненська', raion: 'Сарненський', type: 'смт', lat: 51.2806, lng: 27.2128, postalCodes: ['34200'], aliases: ['рокитне', 'ракитное'], streets: ['вул. Патріотична', 'вул. Адама Міцкевича', 'вул. Набережна', 'вул. Спортивна', 'вул. Незалежності', 'вул. Соборна', 'вул. Шевченка'] },
 
     // Популярні мікро-пункти з LP-CRM (Скріншоти 2-3)
     { name: 'Київець', oblast: 'Львівська', raion: 'Стрийський', type: 'село', lat: 49.4667, lng: 23.9833, postalCodes: ['81646'], aliases: ['київець', 'киевец'], streets: ['вул. Центральна', 'вул. Шевченка'] },
@@ -478,6 +479,65 @@
       return r.charAt(0).toUpperCase() + r.slice(1);
     }
     return null;
+  }
+
+  const CONSOLIDATED_RAION_MAP = {
+    'рокитнівський': 'сарненський',
+    'рокитновський': 'сарненський',
+    'дубровицький': 'сарненський',
+    'зарічненський': 'вараський',
+    'володимирецький': 'вараський',
+    'костопільський': 'рівненський',
+    'березнівський': 'рівненський',
+    'гощанський': 'рівненський',
+    'корецький': 'рівненський',
+    'острозький': 'рівненський',
+    'здолбунівський': 'рівненський',
+    'радивилівський': 'дубенський',
+    'демидівський': 'дубенський',
+    'млинівський': 'дубенський',
+    'києво-святошинський': 'бучанський',
+    'бородянський': 'бучанський',
+    'макарівський': 'бучанський',
+    'іванківський': 'вишгородський',
+    'поліський': 'вишгородський',
+    'васильківський': 'обухівський',
+    'кагарлицький': 'обухівський',
+    'богуславський': 'обухівський',
+    'миронівський': 'обухівський',
+    'баришівський': 'броварський',
+    'яготинський': 'бориспільський',
+    'жидачівський': 'стрийський',
+    'сколівський': 'стрийський',
+    'миколаївський': 'стрийський',
+    'підгаєцький': 'тернопільський',
+    'збаразький': 'тернопільський',
+    'теребовлянський': 'тернопільський',
+    'козівський': 'тернопільський',
+    'бережанський': 'тернопільський',
+    'борщівський': 'чортківський',
+    'заліщицький': 'чортківський',
+    'бучацький': 'чортківський',
+    'шумський': 'кременецький',
+    'рокитнянський': 'білоцерківський',
+    'сквирський': 'білоцерківський',
+    'таращанський': 'білоцерківський',
+    'тетіївський': 'білоцерківський',
+    'горохівський': 'луцький',
+    'рожищенський': 'луцький',
+    'ківерцівський': 'луцький'
+  };
+
+  function getRaionStem(raion) {
+    if (!raion) return '';
+    let r = raion.toLowerCase().trim()
+      .replace(/(?:район|району|р-н)/gi, '')
+      .trim();
+    if (CONSOLIDATED_RAION_MAP[r]) {
+      r = CONSOLIDATED_RAION_MAP[r];
+    }
+    return r.replace(/(?:енськ|инськ|івськ|овськ|ськ|цьк|зьк)(?:ий|ого|ому|им|е|а)?$/iu, '')
+            .replace(/(?:ський|цький|зький)$/iu, '');
   }
 
   // 5.1. РОЗПІЗНАВАННЯ МІСТА (Точне або нечітке Levenshtein Distance <= 2)
@@ -1021,8 +1081,22 @@
     const firstToken = tokens[0];
     for (let s of UKRAINE_SETTLEMENTS) {
       const sLower = s.name.toLowerCase();
-      const matchPrefix = sLower.startsWith(firstToken) || sLower.startsWith(normalizedQuery) ||
-                          (s.aliases && s.aliases.some(a => a.startsWith(firstToken) || a.startsWith(normalizedQuery)));
+      let matchPrefix = false;
+      if (tokens.length === 1) {
+        matchPrefix = sLower.startsWith(firstToken) || sLower.startsWith(normalizedQuery) ||
+                            (s.aliases && s.aliases.some(a => a.startsWith(firstToken) || a.startsWith(normalizedQuery)));
+      } else {
+        const sR = (s.raion || '').toLowerCase();
+        const sO = (s.oblast || '').toLowerCase();
+        const sRStem = getRaionStem(s.raion);
+        matchPrefix = tokens.every(tok => {
+          const rStem = getRaionStem(tok);
+          return sLower.startsWith(tok) || sLower.includes(tok) ||
+                 (s.aliases && s.aliases.some(a => a.includes(tok))) ||
+                 (rStem && (sRStem === rStem || sR.includes(rStem))) ||
+                 sO.includes(tok);
+        });
+      }
 
       if (matchPrefix) {
         const sKey = `${s.name.toLowerCase()}-${(s.raion || '').toLowerCase()}-${(s.oblast || '').toLowerCase()}`;
@@ -1382,28 +1456,39 @@
     // Якщо місто знайдено і є кілька однойменних міст у різних областях,
     // звіряємо з вказаним районом або областю для точної ідентифікації
     let isDisambiguatedStreet = false;
-    if (city && (raion || oblast)) {
-      const rKey = (raion || '').replace(/(?:ський|цький|зький)$/i, '').toLowerCase();
-      const oKey = (oblast || '').replace(/(?:ська|цька|зька)$/i, '').toLowerCase();
-      const matchesTargetRegion = (s) => {
-        const sO = (s.oblast || '').toLowerCase();
-        const sR = (s.raion || '').toLowerCase();
-        return (oKey && sO.includes(oKey)) || (rKey && (sR.includes(rKey) || sO.includes(rKey)));
-      };
-      const sFound = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() && matchesTargetRegion(s));
-      if (sFound) {
-        settlementOblast = sFound.oblast;
-      } else if (oblast && detectedO && detectedO.rawMatched && !/(?:область|обл)/i.test(query)) {
-        // Якщо для цього міста немає жодного збігу у знайденій області,
-        // перевіряємо, чи є токен назвою вулиці в цьому місті (наприклад, "гриців 1 київська" -> вул. Київська у Грицеві)
-        const currentSettlement = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
-        const rawLow = detectedO.rawMatched.toLowerCase();
-        const isStreetOfCity = currentSettlement && Array.isArray(currentSettlement.streets) &&
-          currentSettlement.streets.some(st => st.toLowerCase().includes(rawLow) || rawLow.includes(st.toLowerCase().replace(/^(?:вул\.?|просп\.?|пров\.?)\s*/i, '')));
-        if (isStreetOfCity) {
-          oblast = null;
-          isDisambiguatedStreet = true;
-          text = text + ' ' + detectedO.rawMatched;
+    if (city) {
+      if (raion || oblast) {
+        const rStem = getRaionStem(raion);
+        const oKey = (oblast || '').replace(/(?:ська|цька|зька)$/i, '').toLowerCase();
+        const matchesTargetRegion = (s) => {
+          const sO = (s.oblast || '').toLowerCase();
+          const sR = (s.raion || '').toLowerCase();
+          const sRStem = getRaionStem(s.raion);
+          const rMatch = Boolean(rStem && (sRStem === rStem || sR.includes(rStem) || (CONSOLIDATED_RAION_MAP[sR] && getRaionStem(CONSOLIDATED_RAION_MAP[sR]) === rStem)));
+          const oMatch = Boolean(oKey && sO.includes(oKey));
+          return oMatch || rMatch;
+        };
+        const sFound = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase() && matchesTargetRegion(s));
+        if (sFound) {
+          settlementOblast = sFound.oblast;
+        } else if (oblast && detectedO && detectedO.rawMatched && !/(?:область|обл)/i.test(query)) {
+          // Якщо для цього міста немає жодного збігу у знайденій області,
+          // перевіряємо, чи є токен назвою вулиці в цьому місті (наприклад, "гриців 1 київська" -> вул. Київська у Грицеві)
+          const currentSettlement = UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
+          const rawLow = detectedO.rawMatched.toLowerCase();
+          const isStreetOfCity = currentSettlement && Array.isArray(currentSettlement.streets) &&
+            currentSettlement.streets.some(st => st.toLowerCase().includes(rawLow) || rawLow.includes(st.toLowerCase().replace(/^(?:вул\.?|просп\.?|пров\.?)\s*/i, '')));
+          if (isStreetOfCity) {
+            oblast = null;
+            isDisambiguatedStreet = true;
+            text = text + ' ' + detectedO.rawMatched;
+          }
+        }
+      } else {
+        // Якщо користувач не вказав ні район, ні область, а місто існує в кількох областях:
+        const sameCityVariants = UKRAINE_SETTLEMENTS.filter(s => s.name.toLowerCase() === city.toLowerCase());
+        if (sameCityVariants.length > 1) {
+          settlementOblast = null; // Не обмежуємо примусово першою знайденою областю
         }
       }
     }
@@ -1457,6 +1542,7 @@
     const hasExplicitOblast = Boolean(explicitOblast);
     let queryOblastName = explicitOblast || (facets.settlementOblast ? facets.settlementOblast.toLowerCase() : null);
     const queryOblastClean = queryOblastName ? queryOblastName.replace(/(?:ська|цька|зька| область| обл\.?)$/gi, '').slice(0, 4) : null;
+    const queryRaionStem = facets.raion ? getRaionStem(facets.raion) : null;
     const queryRaionClean = facets.raion ? facets.raion.toLowerCase().replace(/(?:ський|цький|зький| район| р-н)$/gi, '').slice(0, 4) : null;
 
     // Підготовка кандидатів у назву вулиці (без цифр, без міста, без області)
@@ -1618,7 +1704,16 @@
         }
       }
 
-      if (queryRaionClean) {
+      if (queryRaionStem) {
+        const bRaionStem = getRaionStem(b.raion);
+        const isRaionMatch = Boolean(bRaionStem && (bRaionStem === queryRaionStem || bRaion.includes(queryRaionStem) ||
+          (CONSOLIDATED_RAION_MAP[bRaion] && getRaionStem(CONSOLIDATED_RAION_MAP[bRaion]) === queryRaionStem)));
+        if (isRaionMatch) {
+          score += 600; // Вагомий бонус за точний збіг вказаного району
+        } else if (b.raion) {
+          score -= 1200; // Штраф за чужий район, коли користувач чітко вказав свій район
+        }
+      } else if (queryRaionClean) {
         if (bRaion.includes(queryRaionClean)) {
           score += 250;
         }
@@ -1698,7 +1793,9 @@
     OBLAST_SHORT_ALIASES,
     OBLASTS,
     UKRAINE_SETTLEMENTS,
-    RENAMED_REGISTRY
+    RENAMED_REGISTRY,
+    getRaionStem,
+    CONSOLIDATED_RAION_MAP
   };
 
 })();

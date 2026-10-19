@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 24;
+  let totalTests = 26;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1408,6 +1408,123 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 24:', err.message, '\\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 25: Топонімічна дезамбігуація та районна консолідація ("сарнинський 2 рокитне" -> смт Рокитне, Сарненський р-н, Рівненська обл. №2)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 25: Топонімічна дезамбігуація та районна консолідація ("сарнинський 2 рокитне")');
+  try {
+    const branches = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Пошук за запитом з одруківкою в районі: "сарнинський 2 рокитне"
+    const r1 = window.SmartSearchEngine.searchBranches('сарнинський 2 рокитне', branches, 5);
+    if (r1.length === 0) {
+      throw new Error("За запитом 'сарнинський 2 рокитне' нічого не знайдено!");
+    }
+    const top1 = r1[0];
+    if (top1.city !== 'Рокитне' || top1.number !== '2' || top1.oblast !== 'Рівненська') {
+      throw new Error(`Очікувалось смт Рокитне №2 (Рівненська обл.), отримано: ${top1.city} №${top1.number} (${top1.raion} р-н, ${top1.oblast} обл.)`);
+    }
+    if (!top1.street.includes('Патріотична')) {
+      throw new Error(`Очікувалась вул. Патріотична, отримано: '${top1.street}'`);
+    }
+
+    // 2. Пошук за колишньою назвою району до адмінреформи 2020: "рокитнівський 2 рокитне"
+    const r2 = window.SmartSearchEngine.searchBranches('рокитнівський 2 рокитне', branches, 5);
+    if (r2.length === 0 || r2[0].city !== 'Рокитне' || r2[0].number !== '2' || r2[0].oblast !== 'Рівненська') {
+      throw new Error("Очікувалось смт Рокитне №2 (Рівненська обл.) для 'рокитнівський 2 рокитне'");
+    }
+
+    // 3. Прямий порядок: "рокитне сарненський 2"
+    const r3 = window.SmartSearchEngine.searchBranches('рокитне сарненський 2', branches, 5);
+    if (r3.length === 0 || r3[0].city !== 'Рокитне' || r3[0].number !== '2' || r3[0].oblast !== 'Рівненська') {
+      throw new Error("Очікувалось смт Рокитне №2 (Рівненська обл.) для 'рокитне сарненський 2'");
+    }
+
+    // 4. Автокомпліт без цифр для однойменних населених пунктів: "рокитне" повертає обидва варіанти
+    const acAll = window.SmartSearchEngine.getAutocompleteSuggestions('рокитне', 'novaposhta');
+    const hasKyiv = acAll.some(s => s.subtitle.includes('Київська') || s.subtitle.includes('Білоцерківський'));
+    const hasRivne = acAll.some(s => s.subtitle.includes('Рівненська') || s.subtitle.includes('Сарненський'));
+    if (!hasKyiv || !hasRivne) {
+      throw new Error(`Автокомпліт для 'рокитне' має повертати обидва регіони (Київська та Рівненська), знайдено: ${acAll.map(s => s.subtitle).join('; ')}`);
+    }
+
+    // 5. Автокомпліт з уточненням району: "рокитне сарн"
+    const acSarn = window.SmartSearchEngine.getAutocompleteSuggestions('рокитне сарн', 'novaposhta');
+    if (acSarn.length === 0 || !acSarn[0].subtitle.includes('Рівненська') || !acSarn[0].subtitle.includes('Сарненський')) {
+      throw new Error("Автокомпліт для 'рокитне сарн' має повертати Рівненську область (Сарненський р-н)");
+    }
+
+    console.log("  ✓ Успіх: Запит 'сарнинський 2 рокитне' (також 'рокитнівський 2 рокитне') миттєво знаходить смт Рокитне №2 (вул. Патріотична, 44, Сарненський р-н, Рівненська обл.), а автокомпліт коректно відображає обидва варіанти!\\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 25:', err.message, '\\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 26: Ctrl-F візуальне підсвічування ключових слів (Жовтий маркер <mark class="hl-match">)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 26: Ctrl-F візуальне підсвічування ключових слів (Жовтий маркер <mark class="hl-match">)');
+  try {
+    // 1. Перевірка морфологічного підсвічування: одруківка в районі підсвічує правильну назву
+    const query = 'сарнинський 2 рокитне';
+    const subText = 'селище Рокитне, Сарненський район, Рівненська область';
+    const hlSub = window.highlightMatch(subText, query);
+
+    if (!hlSub.includes('<mark class="hl-match">Рокитне</mark>')) {
+      throw new Error(`Очікувалось підсвічування <mark class="hl-match">Рокитне</mark>, отримано: '${hlSub}'`);
+    }
+    if (!hlSub.includes('<mark class="hl-match">Сарненський</mark>')) {
+      throw new Error(`Очікувалось підсвічування <mark class="hl-match">Сарненський</mark> для запиту '${query}', отримано: '${hlSub}'`);
+    }
+
+    // 2. Підсвічування номера відділення
+    const titleText = 'Відділення №2: вул. Патріотична, 44';
+    const hlTitle = window.highlightMatch(titleText, query);
+    if (!hlTitle.includes('№<mark class="hl-match">2</mark>')) {
+      throw new Error(`Очікувалось підсвічування номера №<mark class="hl-match">2</mark>, отримано: '${hlTitle}'`);
+    }
+
+    // 3. Підсвічування вулиці
+    const streetQuery = 'патріотична 44';
+    const hlStreet = window.highlightMatch('вул. Патріотична, 44', streetQuery);
+    if (!hlStreet.includes('<mark class="hl-match">Патріотична</mark>')) {
+      throw new Error(`Очікувалось підсвічування вулиці, отримано: '${hlStreet}'`);
+    }
+    if (!hlStreet.includes('<mark class="hl-match">44</mark>')) {
+      throw new Error(`Очікувалось підсвічування номера будинку 44, отримано: '${hlStreet}'`);
+    }
+
+    // 4. Перевірка створення повнорозмірної картки: спани містять підсвічені елементи
+    const targetBranch = window.BRANCHES_DATA.novaposhta.find(b => b.city === 'Рокитне' && b.number === '2' && b.oblast === 'Рівненська');
+    if (!targetBranch) {
+      throw new Error("Цільове відділення Рокитне №2 (Рівненська обл.) не знайдено в базі!");
+    }
+
+    const card = window.createFullBranchCard(targetBranch, query);
+    const cardHtml = card.innerHTML;
+
+    if (!cardHtml.includes('<mark class="hl-match">')) {
+      throw new Error("У згенерованій картці відділення відсутні теги <mark class=\"hl-match\">!");
+    }
+    const cityEl = card.querySelector('.city-highlight');
+    if (!cityEl || !cityEl.innerHTML.includes('<mark class="hl-match">Рокитне</mark>')) {
+      throw new Error(`У .city-highlight відсутній підсвічений маркер міста: ${cityEl ? cityEl.innerHTML : 'не знайдено'}`);
+    }
+    const branchEl = card.querySelector('.branch-highlight');
+    if (!branchEl || !branchEl.innerHTML.includes('<mark class="hl-match">2</mark>')) {
+      throw new Error(`У .branch-highlight відсутній підсвічений маркер номера: ${branchEl ? branchEl.innerHTML : 'не знайдено'}`);
+    }
+    const geoEl = card.querySelector('.geo-val');
+    if (!geoEl || !geoEl.innerHTML.includes('<mark class="hl-match">Сарненський')) {
+      throw new Error(`У .geo-val відсутній підсвічений маркер району: ${geoEl ? geoEl.innerHTML : 'не знайдено'}`);
+    }
+
+    console.log("  ✓ Успіх: Ctrl-F візуальне підсвічування бездоганно маркує місто, номер, вулицю та район з урахуванням морфології та коренів слів у поп-апах та картках!\\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 26:', err.message, '\\n');
   }
 
   console.log('===============================================================');
