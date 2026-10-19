@@ -461,6 +461,8 @@
     return branches;
   }
 
+  let suppressNextFocusActivation = false;
+
   // Утиліта фокусування поля пошуку з встановленням курсору в самий кінець (після назви міста/слова)
   function focusSearchInputAtEnd(appendSpace = true) {
     if (!dom.searchInput) return;
@@ -468,7 +470,9 @@
       dom.searchInput.value += ' ';
     }
     dom.btnClearSearch.classList.remove('hidden');
+    suppressNextFocusActivation = true;
     dom.searchInput.focus();
+    suppressNextFocusActivation = false;
     const len = dom.searchInput.value.length;
     dom.searchInput.setSelectionRange(len, len);
   }
@@ -550,20 +554,18 @@
         if (exactMatches.length > 0) {
           results = exactMatches;
           didYouMeanText = null;
-        } else if (parsed.isPostomat) {
-          const prefixMatches = staticMatches.filter(b => (b.typeClass === 'poshtomat' || b.type === 'poshtomat') && b.number && b.number.toString().startsWith(parsed.targetBranchNumber.toString()));
+        } else {
+          const targetNumStr = parsed.targetBranchNumber.toString();
+          const prefixMatches = staticMatches.filter(b => b.number && b.number.toString().startsWith(targetNumStr));
           if (prefixMatches.length > 0) {
             results = prefixMatches;
             didYouMeanText = null;
           } else if (hasStreetInQuery && staticMatches.length > 0) {
+            // Якщо точного номера немає серед результатів, але вказано слово-вулицю (випадок "145 драгоманов київ"),
+            // відображаємо результат скорингового рушія за цією вулицею
             results = staticMatches;
             didYouMeanText = null;
           }
-        } else if (hasStreetInQuery && staticMatches.length > 0) {
-          // Якщо точного номера немає серед результатів, але вказано слово-вулицю (випадок "145 драгоманов київ"),
-          // відображаємо результат скорингового рушія за цією вулицею
-          results = staticMatches;
-          didYouMeanText = null;
         }
       } else {
         // Пошук за вулицею, містом або аліасом без фіксованого номера
@@ -572,7 +574,7 @@
     }
 
     // 2. ДИНАМІЧНИЙ ОНЛАЙН API FALLBACK ДЛЯ НОВОЇ ПОШТИ
-    // Запускається, якщо відділення відсутнє у статичному CI/CD файлі (наприклад, окремі СМТ або села)
+    // Запускається лише якщо місто взагалі відсутнє у статичному реєстрі (55k+ відділень вже у статичній базі)
     if (isNP && results.length === 0) {
       let searchCity = parsed.matchedSettlement ? parsed.matchedSettlement.name : '';
       if (!searchCity && parsed.cleanQuery) {
@@ -582,7 +584,10 @@
         }
       }
 
-      if (searchCity) {
+      const cityLower = searchCity ? searchCity.toLowerCase() : '';
+      const hasCityInStatic = cityLower && allStaticBranches.some(b => b.city && b.city.toLowerCase() === cityLower);
+
+      if (searchCity && !hasCityInStatic) {
         const liveData = await fetchLiveNovaPoshta(searchCity, currentSignal);
         if (liveData && liveData.length > 0) {
           allCityBranches = liveData;
@@ -693,10 +698,12 @@
         street = branch.address || '';
       }
     }
+    street = street.replace(/\\n|\r?\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
     const city = branch.city || '';
     const escapedCity = city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     street = street.replace(new RegExp(`^${escapedCity}[,\\s]*`, 'i'), '').trim();
-    if (!/^(вул|просп|проспект|пл|площа|бульв|бульвар|урочище|набережна|пров|провулок)/i.test(street)) {
+    street = street.replace(/^(?:вул\.?\s+)+(?=(?:вул|вулиця|просп|проспект|пр-т|пл|площа|бульв|бульвар|б-р|пров|провулок|шосе|наб|набережна|узвіз|майдан|тупик|алея|квартал|мікрорайон|мкрн|урочище|ст\.|станція)(?:\.|[\s-]|$))/i, '');
+    if (street && !/^(?:вул|вулиця|просп|проспект|пр-т|пл|площа|бульв|бульвар|б-р|пров|провулок|шосе|наб|набережна|узвіз|майдан|тупик|алея|квартал|мікрорайон|мкрн|урочище|ст\.|станція)(?:\.|[\s-]|$)/i.test(street)) {
       street = 'вул. ' + street;
     }
     return street;
@@ -1773,7 +1780,9 @@
   // ==========================================================================
   function escapeHtml(str) {
     if (!str) return '';
-    return str
+    return String(str)
+      .replace(/\\n|\r?\n/g, ' ')
+      .replace(/\s{2,}/g, ' ')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -1789,6 +1798,8 @@
   let autocompleteItems = [];
   let isAutocompleteOpen = false;
   let activeAutocompleteAbortController = null;
+  let autocompleteDebounceTimer = null;
+  let liveSearchDebounceTimer = null;
 
   function closeAutocomplete() {
     if (!dom.autocompleteDropdown) return;
@@ -1799,6 +1810,16 @@
     isAutocompleteOpen = false;
   }
 
+  const HIGHLIGHT_STOP_WORDS = new Set([
+    'вул', 'вулиця', 'просп', 'проспект', 'пр-т', 'прт', 'буд', 'будинок',
+    'пров', 'провулок', 'бульв', 'бульвар', 'б-р', 'пл', 'площа', 'шосе',
+    'наб', 'набережна', 'узвіз', 'майдан', 'тупик', 'алея', 'квартал', 'мкрн',
+    'обл', 'область', 'район', 'р-н', 'рн', 'селище', 'село', 'місто', 'смт',
+    'відділення', 'віділення', 'відділ', 'вантажне', 'вантажний', 'пункт',
+    'поштомат', 'почтомат', 'нова', 'пошта', 'укрпошта', 'вд', 'пм', 'номер',
+    'вага', 'до', 'кг'
+  ]);
+
   function highlightMatch(text, query) {
     if (!text) return '';
     if (!query) return escapeHtml(text);
@@ -1808,14 +1829,14 @@
       cleanQuery = window.SmartSearchEngine.fixKeyboardLayout(query);
     }
 
-    const STOP = new Set(['вул', 'вулиця', 'обл', 'область', 'район', 'р-н', 'селище', 'село', 'місто', 'відділення', 'поштомат', 'нова', 'пошта', 'вд', 'пм', 'номер']);
     const rawTokens = cleanQuery.toLowerCase().split(/[^\p{L}0-9]+/u).filter(Boolean);
     const patterns = new Set();
 
     for (const t of rawTokens) {
-      if (STOP.has(t)) continue;
+      if (HIGHLIGHT_STOP_WORDS.has(t)) continue;
       if (/^\d+$/.test(t)) {
         patterns.add('(?<!\\d)' + escapeRegex(t) + '(?!\\d)');
+        patterns.add('(?<=№)' + escapeRegex(t));
       } else if (t.length >= 3) {
         patterns.add('(?<!\\p{L})' + escapeRegex(t) + '(?!\\p{L})');
         let stem = '';
@@ -1825,7 +1846,7 @@
           stem = t.replace(/(?:енськ|инськ|івськ|овськ|ськ|цьк|зьк)(?:ий|ого|ому|им|е|а)?$/iu, '')
                   .replace(/(?:ний|ного|ному|не|на|тий|того)$/iu, '');
         }
-        if (stem && stem.length >= 3) {
+        if (stem && stem.length >= 3 && !HIGHLIGHT_STOP_WORDS.has(stem)) {
           patterns.add('(?<!\\p{L})' + escapeRegex(stem) + '[\\p{L}]*');
         }
       } else if (t.length >= 2) {
@@ -1837,7 +1858,77 @@
 
     const combinedRegex = new RegExp('(' + Array.from(patterns).join('|') + ')', 'giu');
     const safeText = escapeHtml(text);
-    return safeText.replace(combinedRegex, '<mark class="hl-match">$1</mark>');
+    return safeText.replace(combinedRegex, (match, _p1, offset, fullStr) => {
+      // Перевіряємо повне слово навколо збігу, щоб ніколи не підсвічувати службові слова
+      let start = offset;
+      let end = offset + match.length;
+      while (start > 0 && /[\p{L}-]/u.test(fullStr[start - 1])) start--;
+      while (end < fullStr.length && /[\p{L}-]/u.test(fullStr[end])) end++;
+      const wholeWord = fullStr.slice(start, end).toLowerCase();
+      const wholeWordNoHyphen = wholeWord.replace(/^-+|-+$/g, '');
+      if (HIGHLIGHT_STOP_WORDS.has(wholeWord) || HIGHLIGHT_STOP_WORDS.has(wholeWordNoHyphen)) {
+        return match;
+      }
+      return '<mark class="hl-match">' + match + '</mark>';
+    });
+  }
+
+  function getCitySubtitleHighlightQuery(query, cityTitle) {
+    if (!query) return '';
+    let q = query;
+    if (window.SmartSearchEngine && window.SmartSearchEngine.fixKeyboardLayout) {
+      q = window.SmartSearchEngine.fixKeyboardLayout(query);
+    }
+    const cityWords = String(cityTitle || '').toLowerCase().split(/[^\p{L}0-9]+/u).filter(Boolean);
+    const tokens = q.toLowerCase().split(/[^\p{L}0-9]+/u).filter(Boolean);
+    const remaining = tokens.filter(tok => {
+      if (HIGHLIGHT_STOP_WORDS.has(tok)) return false;
+      for (const cw of cityWords) {
+        if (cw === tok || cw.startsWith(tok) || tok.startsWith(cw)) return false;
+      }
+      return true;
+    });
+    return remaining.join(' ');
+  }
+
+  function getBranchStreetHighlightQuery(query, item) {
+    if (!query) return '';
+    let q = query;
+    if (window.SmartSearchEngine && window.SmartSearchEngine.fixKeyboardLayout) {
+      q = window.SmartSearchEngine.fixKeyboardLayout(query);
+    }
+    const cityWords = String(item.value || (item.branchObj && item.branchObj.city) || '')
+      .toLowerCase()
+      .split(/[^\p{L}0-9]+/u)
+      .filter(Boolean);
+    const tokens = q.toLowerCase().split(/[^\p{L}0-9]+/u).filter(Boolean);
+    const wordTokens = [];
+    const numTokens = [];
+    for (const tok of tokens) {
+      if (HIGHLIGHT_STOP_WORDS.has(tok)) continue;
+      if (/^\d+$/.test(tok)) {
+        numTokens.push(tok);
+        continue;
+      }
+      let isCityWord = false;
+      for (const cw of cityWords) {
+        if (cw === tok || (tok.length >= 3 && cw.startsWith(tok))) {
+          isCityWord = true;
+          break;
+        }
+      }
+      if (!isCityWord) {
+        wordTokens.push(tok);
+      }
+    }
+    if (wordTokens.length > 0) {
+      return wordTokens.concat(numTokens).join(' ');
+    }
+    // Якщо введено лише місто + номер (напр. "київ 222"), не підсвічуємо цифри номерів будинків у рядку вулиці,
+    // якщо номер вже збігається з номером відділення/поштомату
+    const branchNum = item.branchObj && item.branchObj.number ? String(item.branchObj.number) : '';
+    const unmatchedNums = numTokens.filter(n => !branchNum.startsWith(n));
+    return unmatchedNums.join(' ');
   }
 
   function renderAutocomplete(suggestions, query) {
@@ -1901,30 +1992,34 @@
         badgeClass = 'badge-village';
       }
 
-      const highlightedTitle = highlightMatch(item.title, query);
-      const highlightedSub = highlightMatch(item.subtitle, query);
-
       if (itemIsBranch) {
+        // Компактна дворядкова структура відділення без дублюючих бейджів праворуч:
+        // Рядок 1 (жирний): [Іконка] Відділення/Поштомат №X • (вага: до 30 кг / до 1100 кг)
+        // Рядок 2 (вторинний сірий): вул. [Назва вулиці], [номер будинку] (Орієнтир/магазин, якщо є)
+        const numOnlyQuery = (query.match(/\d+/g) || []).join(' ');
+        const highlightedBranchTitle = highlightMatch(item.title, numOnlyQuery);
         const weightHtml = item.weightLabel
-          ? ` <span class="autocomplete-weight">${escapeHtml(item.weightLabel)}</span>`
+          ? ` <span class="autocomplete-sep">•</span> <span class="autocomplete-weight">${escapeHtml(item.weightLabel)}</span>`
           : '';
-        const streetHtml = item.street
-          ? ` <span class="autocomplete-sep">—</span> <span class="autocomplete-street">${highlightMatch(item.street, query)}</span>`
-          : '';
+        const streetText = item.street || item.subtitle || '';
+        const streetQuery = getBranchStreetHighlightQuery(query, item);
+        const highlightedStreet = highlightMatch(streetText, streetQuery);
 
         el.innerHTML = `
           <div class="autocomplete-item-main">
-            <div class="autocomplete-icon">${iconHtml}</div>
             <div class="autocomplete-content autocomplete-content-branch">
-              <span class="autocomplete-title">${highlightedTitle}${weightHtml}${streetHtml}</span>
-              <span class="autocomplete-sub">${highlightedSub}</span>
+              <div class="autocomplete-title"><span class="autocomplete-inline-icon">${iconHtml}</span><strong class="autocomplete-branch-name">${highlightedBranchTitle}</strong>${weightHtml}</div>
+              <div class="autocomplete-sub autocomplete-street">${highlightedStreet}</div>
             </div>
           </div>
-          <span class="autocomplete-badge ${badgeClass}">${escapeHtml(item.badge || item.type)}</span>
         `;
       } else {
         // Режим топонімів у дропдауні (City Suggestion Mode — формат LP-CRM):
         // Жирний текст: назва пункту; вторинний сірий текст у дужках праворуч: (Район р-н, Область обл.); бейдж типу праворуч (місто / смт / село)
+        const highlightedTitle = highlightMatch(item.title, query);
+        const subQuery = getCitySubtitleHighlightQuery(query, item.title);
+        const highlightedSub = highlightMatch(item.subtitle, subQuery);
+
         el.innerHTML = `
           <div class="autocomplete-item-main">
             <div class="autocomplete-icon">${iconHtml}</div>
@@ -1956,6 +2051,13 @@
 
   function selectAutocompleteItem(item) {
     if (!item) return;
+    clearTimeout(autocompleteDebounceTimer);
+    clearTimeout(liveSearchDebounceTimer);
+    if (activeAutocompleteAbortController) {
+      activeAutocompleteAbortController.abort();
+      activeAutocompleteAbortController = null;
+    }
+
     let fill = item.textToFill || item.title;
     const isSettlement = item.mode === 'city' || item.type === 'місто' || item.type === 'смт' || item.type === 'село' || item.type === 'селище';
     if (isSettlement && !fill.endsWith(' ')) {
@@ -2023,9 +2125,6 @@
     dom.btnNovaPoshta.addEventListener('click', () => switchService('novaposhta'));
     dom.btnUkrposhta.addEventListener('click', () => switchService('ukrposhta'));
 
-    let autocompleteDebounceTimer = null;
-    let liveSearchDebounceTimer = null;
-
     dom.searchForm.addEventListener('submit', e => {
       e.preventDefault();
       clearTimeout(autocompleteDebounceTimer);
@@ -2055,8 +2154,13 @@
 
     // Відкриття поп-апу при кліку або фокусі на інпуті з вже введеним текстом
     const handleInputActivation = () => {
+      if (suppressNextFocusActivation) return;
       const val = dom.searchInput.value.trim();
       if (val.length >= 2 && !isAutocompleteOpen) {
+        // Якщо вже вибрано конкретне відділення і текст інпуту відповідає вибраному запиту, не перекриваємо картку при кліку
+        if (state.selectedBranch && state.currentResults.length === 1 && val === state.searchQuery) {
+          return;
+        }
         triggerAutocomplete(val);
       }
     };
@@ -2315,12 +2419,18 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.25.0)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.25.1)
   // ==========================================================================
   function initServiceWorker() {
+    try {
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.clear) {
+        sessionStorage.clear();
+      }
+    } catch (e) {}
+
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.25.0', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.25.1', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2359,7 +2469,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.25.0') {
+          if (key !== 'np-ukr-cache-v8.25.1') {
             caches.delete(key);
           }
         });

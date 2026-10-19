@@ -1303,12 +1303,12 @@
     const hasCargoKeyword = isCargoKeyword(normalizedQuery);
 
     let pool = null;
-    if (Array.isArray(liveCityBranches) && liveCityBranches.length > 0) {
-      pool = liveCityBranches;
-    } else if (Array.isArray(staticBranches) && staticBranches.length > 0) {
+    if (Array.isArray(staticBranches) && staticBranches.length > 0) {
       pool = staticBranches;
-    } else if (typeof window !== 'undefined' && window.BRANCHES_DATA && Array.isArray(window.BRANCHES_DATA[currentService])) {
+    } else if (typeof window !== 'undefined' && window.BRANCHES_DATA && Array.isArray(window.BRANCHES_DATA[currentService]) && window.BRANCHES_DATA[currentService].length > 0) {
       pool = window.BRANCHES_DATA[currentService];
+    } else if (Array.isArray(liveCityBranches) && liveCityBranches.length > 0) {
+      pool = liveCityBranches;
     }
 
     // Допоміжний метод: опис населеного пункту у форматі LP-CRM:
@@ -1316,13 +1316,20 @@
     function formatSettlementSubtitle(s) {
       const parts = [];
       if (s.raion) {
-        const rClean = s.raion.replace(/\s*(?:район|р-н)$/i, '').trim();
+        let rClean = String(s.raion).replace(/\\n|\r?\n/g, ' ').replace(/\s*(?:район|р-н|міськрада|громада)$/i, '').trim();
+        if (/ська$/i.test(rClean)) {
+          rClean = rClean.replace(/ська$/i, 'ський');
+        } else if (/цька$/i.test(rClean)) {
+          rClean = rClean.replace(/цька$/i, 'цький');
+        } else if (/зька$/i.test(rClean)) {
+          rClean = rClean.replace(/зька$/i, 'зький');
+        }
         if (rClean) {
           parts.push(`${rClean} р-н`);
         }
       }
       if (s.oblast) {
-        const oClean = s.oblast.replace(/\s*(?:область|обл\.?)$/i, '').trim();
+        const oClean = String(s.oblast).replace(/\\n|\r?\n/g, ' ').replace(/\s*(?:область|обл\.?)$/i, '').trim();
         if (oClean) {
           parts.push(`${oClean} обл.`);
         }
@@ -1332,7 +1339,7 @@
 
     // Допоміжний метод: додавання підказки населеного пункту (City Suggestion Mode)
     function pushSettlementSuggestion(s, customTextToFill) {
-      const cleanName = s.cleanName || (s.name || '').replace(/^(?:місто|селище міського типу|смт|селище|село)\s+/i, '').trim();
+      const cleanName = (s.cleanName || (s.name || '').replace(/^(?:місто|селище міського типу|смт|селище|село)\s+/i, '')).replace(/\\n|\r?\n/g, ' ').trim();
       if (!cleanName) return false;
       const badgeType = normalizeSettlementBadge(s.type);
       const sKey = `${canonText(cleanName)}-${canonText(s.raion || '')}-${canonText(s.oblast || '')}`;
@@ -1353,38 +1360,41 @@
       return true;
     }
 
-    // Допоміжний метод: побудова підказки відділення/поштомату у форматі LP-CRM (Branch Suggestion Mode):
-    // [Іконка/Бейдж типу] Відділення/Поштомат №[X] (ліміт ваги) — вул. [Назва вулиці] (орієнтир/магазин, якщо є)
+    // Допоміжний метод: побудова підказки відділення/поштомату у дворядковому форматі LP-CRM (Branch Suggestion Mode):
+    // Рядок 1 (жирний): [Іконка] Відділення/Поштомат №X • (вага: до 30 кг / до 1100 кг)
+    // Рядок 2 (вторинний сірий): вул. [Назва вулиці], [номер будинку] (Орієнтир/магазин, якщо є)
     function buildBranchSuggestion(b) {
-      const cleanCity = (b.city || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+      const cleanCity = (b.city || '').replace(/\\n|\r?\n/g, ' ').replace(/\s*\([^)]*\)\s*$/, '').trim();
       const isPost = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || /поштомат/i.test(b.name || '') || /поштомат/i.test(b.typeName || '');
       const isCargo = !isPost && (b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || (b.maxWeight && b.maxWeight >= 1000) || (b.totalMaxWeightAllowed && b.totalMaxWeightAllowed >= 1000) || /вантажн/i.test(b.name || '') || /вантажн/i.test(b.typeText || ''));
       const kind = isPost ? 'Поштомат' : (isCargo ? 'Вантажне відділення' : 'Відділення');
 
       const weight = b.totalMaxWeightAllowed || b.maxWeight || (isPost ? 20 : (isCargo ? 1100 : 30));
-      const weightLabel = `(до ${weight} кг)`;
+      const weightLabel = `(вага: до ${weight} кг)`;
 
-      let rawStreet = (b.street || '').trim();
+      let rawStreet = (b.street || '').replace(/\\n|\r?\n/g, ' ').trim();
       if (!rawStreet && b.name && b.name.includes(':')) {
-        rawStreet = b.name.split(':').slice(1).join(':').trim();
+        rawStreet = b.name.split(':').slice(1).join(':').replace(/\\n|\r?\n/g, ' ').trim();
       }
       if (!rawStreet) {
-        rawStreet = (b.address || '').trim();
+        rawStreet = (b.address || '').replace(/\\n|\r?\n/g, ' ').trim();
       }
       if (cleanCity) {
         const escCity = cleanCity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         rawStreet = rawStreet.replace(new RegExp(`^(?:м\\.|с\\.|смт|село|місто|селище)?\\s*${escCity}[,\\s]*`, 'i'), '').trim();
       }
-      if (rawStreet && !/^(?:вул|просп|проспект|пл|площа|бульв|бульвар|урочище|набережна|наб|пров|провулок|шосе|майдан|узвіз|тупик|кв-л|квартал|мкрн|мікрорайон)\b/i.test(rawStreet)) {
+      // Очищаємо подвійні префікси типу "вул. вул." або "вул. просп." / "вул. Пр-т."
+      rawStreet = rawStreet.replace(/^(?:вул\.?\s+)+(?=(?:вул|вулиця|просп|пр-т|проспект|пл|площа|бульв|бул|бульвар|урочище|набережна|наб|пров|провулок|шосе|майдан|узвіз|тупик|алея|кв-л|квартал|мкрн|мікрорайон)(?:\.|[\s-]|$))/iu, '').trim();
+      if (rawStreet && !/^(?:вул|вулиця|просп|пр-т|проспект|пл|площа|бульв|бул|бульвар|урочище|набережна|наб|пров|провулок|шосе|майдан|узвіз|тупик|алея|кв-л|квартал|мкрн|мікрорайон)(?:\.|[\s-]|$)/iu.test(rawStreet)) {
         rawStreet = 'вул. ' + rawStreet;
       }
 
       const geo = [
-        b.raion ? `${b.raion.replace(/\s*(?:район|р-н)$/i, '')} р-н` : '',
-        b.oblast ? `${b.oblast.replace(/\s*(?:область|обл\.?)$/i, '')} обл.` : ''
+        b.raion ? `${String(b.raion).replace(/\s*(?:район|р-н)$/i, '')} р-н` : '',
+        b.oblast ? `${String(b.oblast).replace(/\s*(?:область|обл\.?)$/i, '')} обл.` : ''
       ].filter(Boolean).join(', ');
 
-      const displayLine = `${kind} №${b.number} ${weightLabel}${rawStreet ? ' — ' + rawStreet : ''}`;
+      const displayLine = `${kind} №${b.number} • ${weightLabel}`;
       const isMajorCity = REGIONAL_CENTERS.has(canonText(cleanCity));
       const fillText = isMajorCity
         ? `${cleanCity} ${b.number}`.replace(/\s+/g, ' ').trim()
@@ -1398,10 +1408,10 @@
         weightLabel: weightLabel,
         street: rawStreet,
         displayLine: displayLine,
-        subtitle: [`${b.settlementType || 'місто'} ${cleanCity}`, `${weightLabel} — ${rawStreet}`, geo].filter(Boolean).join(' — '),
+        subtitle: [rawStreet, geo ? `(${geo})` : ''].filter(Boolean).join(' '),
         value: cleanCity,
         textToFill: fillText,
-        badge: isPost ? 'поштомат' : 'відділення',
+        badge: '',
         icon: isPost ? '📦' : '🏢',
         branchObj: b
       };
@@ -1411,7 +1421,10 @@
     function collectCityBranchSuggestions(facets) {
       if (!pool || pool.length === 0 || !facets || !facets.city) return [];
       const cityKey = canonText(facets.city);
-      const cityBranches = getCityBranchesFromPool(pool, cityKey);
+      let cityBranches = getCityBranchesFromPool(pool, cityKey);
+      if (cityBranches.length === 0 && Array.isArray(liveCityBranches) && liveCityBranches.length > 0 && pool !== liveCityBranches) {
+        cityBranches = getCityBranchesFromPool(liveCityBranches, cityKey);
+      }
       if (cityBranches.length === 0) return [];
 
       const targetOblastKey = facets.oblast
@@ -1419,18 +1432,19 @@
         : (facets.settlementOblast ? facets.settlementOblast.replace(/(?:ська|цька|зька| область| обл\.?)$/gi, '').toLowerCase().slice(0, 4) : null);
       const targetRaionStem = facets.raion ? getRaionStem(facets.raion) : null;
 
-      let found = searchBranches(normalizedQuery, cityBranches, 10).filter(b => (b._canonCity || canonCity(b.city)) === cityKey);
+      const found = [];
+      const seenBranchKeys = new Set();
 
-      // Якщо введено номер (напр. "Київ 1" або "Київ 100"), доповнюємо префіксними збігами номерів цього ж міста (№10, №11..., Поштомати №100...)
-      if (facets.number && found.length < 10) {
+      // Якщо введено номер (напр. "Київ 1", "Київ 111", "київ 222"), спочатку збираємо точні та префіксні збіги за номером відділення/поштомату
+      if (facets.number) {
         const numPrefix = String(facets.number);
-        const seenBranchKeys = new Set(found.map(b => b.id || `${b._canonCity || canonCity(b.city)}|${b.number}|${b.street}`));
         const prefixCandidates = [];
 
         for (let i = 0; i < cityBranches.length; i++) {
           const b = cityBranches[i];
           const bNum = String(b.number || '');
-          if (!bNum.startsWith(numPrefix)) continue;
+          const bPostal = String(b.postalCode || '');
+          if (!bNum.startsWith(numPrefix) && bPostal !== numPrefix) continue;
 
           if (targetOblastKey && b.oblast && !b.oblast.toLowerCase().includes(targetOblastKey)) continue;
           if (targetRaionStem && b.raion) {
@@ -1442,16 +1456,12 @@
           if (hasPostomatKeyword && !isPost) continue;
           if (hasBranchKeyword && isPost) continue;
 
-          const bKey = b.id || `${b._canonCity || canonCity(b.city)}|${b.number}|${b.street}`;
-          if (!seenBranchKeys.has(bKey)) {
-            seenBranchKeys.add(bKey);
-            prefixCandidates.push(b);
-          }
+          prefixCandidates.push(b);
         }
 
         prefixCandidates.sort((a, b) => {
-          const aExact = String(a.number) === numPrefix ? 0 : 1;
-          const bExact = String(b.number) === numPrefix ? 0 : 1;
+          const aExact = (String(a.number) === numPrefix || String(a.postalCode) === numPrefix) ? 0 : 1;
+          const bExact = (String(b.number) === numPrefix || String(b.postalCode) === numPrefix) ? 0 : 1;
           if (aExact !== bExact) return aExact - bExact;
 
           const aPost = (a.typeClass === 'poshtomat' || a.type === 'poshtomat') ? 1 : 0;
@@ -1462,7 +1472,24 @@
         });
 
         for (let i = 0; i < prefixCandidates.length && found.length < 10; i++) {
-          found.push(prefixCandidates[i]);
+          const b = prefixCandidates[i];
+          const bKey = b.id || `${b._canonCity || canonCity(b.city)}|${b.number}|${b.street}`;
+          if (!seenBranchKeys.has(bKey)) {
+            seenBranchKeys.add(bKey);
+            found.push(b);
+          }
+        }
+      }
+
+      if (found.length < 10) {
+        const scored = searchBranches(normalizedQuery, cityBranches, 10).filter(b => (b._canonCity || canonCity(b.city)) === cityKey);
+        for (let i = 0; i < scored.length && found.length < 10; i++) {
+          const b = scored[i];
+          const bKey = b.id || `${b._canonCity || canonCity(b.city)}|${b.number}|${b.street}`;
+          if (!seenBranchKeys.has(bKey)) {
+            seenBranchKeys.add(bKey);
+            found.push(b);
+          }
         }
       }
 
@@ -2277,6 +2304,7 @@
 
       // 2. ТОЧНИЙ НОМЕР ВІДДІЛЕННЯ / ПОШТОМАТУ ТА ІНДЕКС УКРПОШТИ:
       let numMatched = false;
+      let houseNumMatched = false;
       if (hasExplicitNumber) {
         for (let t = 0; t < numTokens.length; t++) {
           const numTok = numTokens[t];
@@ -2293,14 +2321,13 @@
             } else {
               score += 1000;
             }
-          } else if (isPostomat && bNum.startsWith(numTok)) {
+          } else if (bNum.startsWith(numTok)) {
             numMatched = true;
-            score += 200;
-          } else if (bNum.startsWith(numTok) && bNum.length <= numTok.length + 1) {
-            numMatched = true;
-            score += 200;
+            const lenDiff = Math.min(Math.max(0, bNum.length - numTok.length), 4);
+            score += 350 - lenDiff * 30 + (!isPostomat ? 40 : 0);
           } else if (bStreet.includes(numTok) && new RegExp('(?:^|[^0-9])' + numTok + '(?![0-9])').test(bStreet)) {
             // Номер будинку у вулиці/адресі додає бал, але не замінює номер відділення
+            houseNumMatched = true;
             score += streetMatched ? 700 : 400;
           }
         }
@@ -2311,10 +2338,10 @@
           if (!isUkrMicro) {
             if (isPostomat && !hasPostomatKeyword) {
               score -= 1200;
-            } else if (streetMatched) {
+            } else if (streetMatched || houseNumMatched) {
               score -= 100;
             } else {
-              score -= 600;
+              score -= 1000;
             }
           }
         }

@@ -1857,39 +1857,39 @@ async function runTests() {
   }
 
   // --------------------------------------------------------------------------
-  // ТЕСТ 33: v8.25.0 — LP-CRM UX випадаючого списку: перемикання між режимом міст (City Mode) та режимом відділень (Branch Mode)
+  // ТЕСТ 33: v8.25.1 — LP-CRM UX автокомпліту, ліквідація over-highlighting, чистий 2-рядковий стиль відділення та закриття поп-апу
   // --------------------------------------------------------------------------
-  console.log('▶ ТЕСТ 33: LP-CRM UX автокомпліту (City Mode -> Branch Mode, "Городок", "Олександрівка", "Київ 1", "Київ 100", "Львів наукова", клавіатура Enter)');
+  console.log('▶ ТЕСТ 33: LP-CRM UX v8.25.1 ("київ 222", "львів наукова", "ізяслав", "олександрівка", дворядковий стиль без дублюючих бейджів та без over-highlighting)');
   try {
     const npPool = window.BRANCHES_DATA.novaposhta;
     const S = window.SmartSearchEngine;
     const resultsList = elementsById['resultsList'];
 
-    // 1. City Suggestion Mode: "Городок" та "Олександрівка" у форматі LP-CRM:
-    // Назва пункту (жирний), (Район р-н, Область обл.) праворуч у дужках, бейдж типу (місто / смт / село)
-    searchInput.value = 'Городок';
+    // 1. City Suggestion Mode: "ізяслав", "олександрівка", "Городок"
+    searchInput.value = 'ізяслав';
     searchInput.dispatchEvent({ type: 'input' });
     await sleep(360);
 
-    if (dropdown.classList.contains('hidden')) {
-      throw new Error('Дропдаун повинен бути відкритим для "Городок"');
+    if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'city') {
+      throw new Error('Дропдаун повинен бути відкритим у City Mode для "ізяслав"');
     }
-    if (dropdown.getAttribute('data-mode') !== 'city') {
-      throw new Error(`Очікувався data-mode="city" для "Городок", отримано: ${dropdown.getAttribute('data-mode')}`);
+    const izItems = dropdown.querySelectorAll('.autocomplete-item');
+    if (izItems.length === 0) {
+      throw new Error('Очікувались підказки міст для "ізяслав"');
     }
-    const cityItems = dropdown.querySelectorAll('.autocomplete-item');
-    if (cityItems.length < 3) {
-      throw new Error(`Очікувалось щонайменше 3 варіанти "Городок" з різних областей, отримано: ${cityItems.length}`);
+    const izHtml = izItems[0].innerHTML;
+    if (!izHtml.includes('<mark class="hl-match">Ізяслав</mark>') || !izHtml.includes('р-н') || !izHtml.includes('обл.)')) {
+      throw new Error(`Некоректний City Mode для "ізяслав": ${izHtml}`);
     }
-    const firstCityHtml = cityItems[0].innerHTML;
-    if (!firstCityHtml.includes('<strong class="autocomplete-title">') || !firstCityHtml.includes('р-н') || !firstCityHtml.includes('обл.)')) {
-      throw new Error(`Формат City Mode LP-CRM для "Городок" некоректний: ${firstCityHtml}`);
+    // Перевіряємо відсутність паразитної підсвітки службових слів ("р-н", "обл.")
+    if (izHtml.includes('<mark class="hl-match">р-н</mark>') || izHtml.includes('<mark class="hl-match">обл</mark>')) {
+      throw new Error(`Виявлено паразитну підсвітку службових слів для "ізяслав": ${izHtml}`);
     }
 
-    // Перевірка "Олександрівка" (кілька областей + смт/село бейджі)
-    const oleksSuggestions = S.getAutocompleteSuggestions('Олександрівка', 'novaposhta', null, npPool);
+    // Перевірка "олександрівка" (кілька областей + смт/село бейджі)
+    const oleksSuggestions = S.getAutocompleteSuggestions('олександрівка', 'novaposhta', null, npPool);
     if (!oleksSuggestions || oleksSuggestions.length < 3) {
-      throw new Error('Очікувалось декілька варіантів для "Олександрівка"');
+      throw new Error('Очікувалось декілька варіантів для "олександрівка"');
     }
     for (const s of oleksSuggestions) {
       if (s.mode !== 'city' || !s.subtitle.startsWith('(') || !s.subtitle.endsWith(')') || !['місто', 'смт', 'село'].includes(s.badge)) {
@@ -1897,62 +1897,72 @@ async function runTests() {
       }
     }
 
-    // Клік на підказку фіксує місто в інпуті з пробілом
-    cityItems[0].dispatchEvent({ type: 'mousedown', preventDefault() {}, stopPropagation() {} });
-    await sleep(50);
-    if (searchInput.value !== 'Городок ') {
-      throw new Error(`Клік на підказку міста має фіксувати "Городок " з пробілом, отримано: "${searchInput.value}"`);
-    }
-
-    // 2. Динамічний перехід у режим відділень (Branch Suggestion Mode): "Київ 1", "Київ 100", "Львів наукова"
-    searchInput.value = 'Київ 1';
-    searchInput.dispatchEvent({ type: 'input' });
-    await sleep(360);
-
-    if (dropdown.classList.contains('hidden')) {
-      throw new Error('Дропдаун повинен бути відкритим у Branch Mode для "Київ 1"');
-    }
-    if (dropdown.getAttribute('data-mode') !== 'branch') {
-      throw new Error(`Очікувався data-mode="branch" для "Київ 1", отримано: ${dropdown.getAttribute('data-mode')}`);
-    }
-    const kyiv1Items = dropdown.querySelectorAll('.autocomplete-item');
-    if (kyiv1Items.length === 0) {
-      throw new Error('Очікувались підказки відділень для "Київ 1"');
-    }
-    const kyiv1Html = kyiv1Items[0].innerHTML;
-    if (!kyiv1Html.includes('№<mark class="hl-match">1</mark>') || !kyiv1Html.includes('кг)') || !kyiv1Html.includes('Пирогівський шлях')) {
-      throw new Error(`Формат Branch Mode для "Київ 1" некоректний: ${kyiv1Html}`);
-    }
-
-    // Перевірка "Київ 100"
-    const kyiv100Sug = S.getAutocompleteSuggestions('Київ 100', 'novaposhta', null, npPool);
-    if (!kyiv100Sug.length || kyiv100Sug[0].mode !== 'branch' || kyiv100Sug[0].branchObj.number !== '100') {
-      throw new Error('Очікувалось Відділення №100 першим у Branch Mode для "Київ 100"');
-    }
-
-    // Перевірка "Львів наукова" (вулиця переводить дропдаун у режим відділень з підсвічуванням)
-    searchInput.value = 'Львів наукова';
+    // 2. Branch Suggestion Mode: "київ 222" (2-рядковий формат, без дублюючого бейджа праворуч, без \n)
+    searchInput.value = 'київ 222';
     searchInput.dispatchEvent({ type: 'input' });
     await sleep(360);
 
     if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'branch') {
-      throw new Error('Для "Львів наукова" дропдаун має перейти в Branch Mode (data-mode="branch")');
+      throw new Error('Дропдаун повинен бути відкритим у Branch Mode для "київ 222"');
     }
-    const lvivNaukItems = dropdown.querySelectorAll('.autocomplete-item');
-    if (lvivNaukItems.length === 0 || !lvivNaukItems[0].innerHTML.includes('<mark class="hl-match">Наукова</mark>')) {
-      throw new Error(`Очікувалось підсвічування вулиці Наукова у Branch Mode: ${lvivNaukItems[0] ? lvivNaukItems[0].innerHTML : 'empty'}`);
+    const kyiv222Items = dropdown.querySelectorAll('.autocomplete-item');
+    if (kyiv222Items.length === 0) {
+      throw new Error('Очікувались підказки відділень для "київ 222"');
+    }
+    const kyiv222Html = kyiv222Items[0].innerHTML;
+    if (!kyiv222Html.includes('№<mark class="hl-match">222</mark>') ||
+        !kyiv222Html.includes('•') ||
+        !kyiv222Html.includes('(вага: до 30 кг)') ||
+        !kyiv222Html.includes('просп. Академіка Глушкова, 31А')) {
+      throw new Error(`Формат Branch Mode для "київ 222" некоректний: ${kyiv222Html}`);
+    }
+    if (kyiv222Html.includes('autocomplete-badge') || kyiv222Html.includes('\\n') || kyiv222Html.includes('вул. вул.')) {
+      throw new Error(`У рядку відділення "київ 222" виявлено дублюючий бейдж, символ \\n або "вул. вул.": ${kyiv222Html}`);
+    }
+    if (/hl-match">(?:Відділення|Поштомат|вул|просп|буд)/i.test(kyiv222Html)) {
+      throw new Error(`Виявлено паразитне підсвічування службових слів у "київ 222": ${kyiv222Html}`);
     }
 
-    // 3. Навігація з клавіатури (ArrowDown + Enter) на вибраному пункті відділення миттєво відкриває повну картку з кнопками копіювання
+    // 3. Префіксний пошук номера без існуючого точного відділення ("Київ 505" -> поштомати №5050, №5051... без помилки "не знайдено")
+    searchInput.value = 'Київ 505';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(450);
+
+    const kyiv505Sug = S.getAutocompleteSuggestions('Київ 505', 'novaposhta', null, npPool);
+    if (!kyiv505Sug.length || !String(kyiv505Sug[0].branchObj.number).startsWith('505')) {
+      throw new Error('Для "Київ 505" першими у списку мають виводитися поштомати/відділення з префіксом 505');
+    }
+    if (resultsList.innerHTML.includes('не знайдено')) {
+      throw new Error(`Для "Київ 505" при наявності поштоматів 505x не повинно з'являтися повідомлення про помилку "не знайдено"`);
+    }
+
+    // 4. Перевірка "львів наукова" (вулиця переводить дропдаун у режим відділень, підсвічується лише "Наукова", без "вул. вул.")
+    searchInput.value = 'львів наукова';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+
+    if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'branch') {
+      throw new Error('Для "львів наукова" дропдаун має перейти в Branch Mode (data-mode="branch")');
+    }
+    const lvivNaukItems = dropdown.querySelectorAll('.autocomplete-item');
+    const lvivNaukHtml = lvivNaukItems[0] ? lvivNaukItems[0].innerHTML : '';
+    if (!lvivNaukHtml.includes('<mark class="hl-match">Наукова</mark>')) {
+      throw new Error(`Очікувалось підсвічування вулиці Наукова у Branch Mode: ${lvivNaukHtml}`);
+    }
+    if (lvivNaukHtml.includes('вул. вул.') || lvivNaukHtml.includes('вул. просп.') || /hl-match">(?:вул|просп|Відділення|Поштомат)/i.test(lvivNaukHtml)) {
+      throw new Error(`У "львів наукова" виявлено дублювання "вул." або підсвітку службових слів: ${lvivNaukHtml}`);
+    }
+
+    // 5. Вибір конкретного відділення (кліком або Enter) МИТТЄВО закриває дропдаун і залишає його закритим
     searchInput.dispatchEvent({ type: 'keydown', key: 'ArrowDown', preventDefault() {} });
     if (!lvivNaukItems[0].classList.contains('focused')) {
       throw new Error('ArrowDown має виділити перший пункт відділення класом .focused');
     }
     searchInput.dispatchEvent({ type: 'keydown', key: 'Enter', preventDefault() {} });
-    await sleep(50);
+    await sleep(350);
 
     if (!dropdown.classList.contains('hidden')) {
-      throw new Error('Після натискання Enter на відділенні дропдаун повинен закритися');
+      throw new Error('Після вибору відділення клавішею Enter дропдаун повинен залишатися закритим (hidden)');
     }
     const renderedCard = resultsList.querySelector('.branch-card');
     if (!renderedCard) {
@@ -1964,7 +1974,7 @@ async function runTests() {
       throw new Error('На відкритій картці відділення повинні бути обидві кнопки копіювання (.btn-copy-short та .btn-copy-detailed)');
     }
 
-    console.log('  ✓ Успіх: LP-CRM перемикання City Mode <-> Branch Mode, підсвічування та вибір клавішею Enter працюють бездоганно!\n');
+    console.log('  ✓ Успіх: "київ 222", "львів наукова", "ізяслав", "олександрівка" та префіксні номери працюють ідеально без over-highlighting!\n');
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 33:', err.message, '\n');

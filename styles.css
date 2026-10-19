@@ -760,15 +760,39 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   font-weight: 400;
 }
 
+.autocomplete-content-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+}
+
 .autocomplete-content-branch .autocomplete-title {
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
   line-height: 1.35;
 }
 
+.autocomplete-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.autocomplete-branch-name {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
 .autocomplete-weight {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .autocomplete-sep {
@@ -777,9 +801,14 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   margin: 0 2px;
 }
 
-.autocomplete-street {
-  font-weight: 500;
-  color: var(--text-main);
+.autocomplete-content-branch .autocomplete-street {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  padding-left: 23px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .autocomplete-title {
