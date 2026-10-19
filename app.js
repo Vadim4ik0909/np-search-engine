@@ -1996,7 +1996,7 @@
         cityPool = liveWarehousesCache.novaposhta.get(candidate);
       }
       if (window.SmartSearchEngine) {
-        const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
+        const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool, getAllCurrentServiceBranches());
         renderAutocomplete(suggestions, val);
       }
     }
@@ -2060,7 +2060,7 @@
             }
 
             if (window.SmartSearchEngine) {
-              const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool);
+              const suggestions = window.SmartSearchEngine.getAutocompleteSuggestions(val, state.currentService, cityPool, getAllCurrentServiceBranches());
               if (!currentSignal.aborted && !/\d/.test(dom.searchInput.value)) {
                 renderAutocomplete(suggestions, val);
               }
@@ -2330,7 +2330,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.24.1') {
+          if (key !== 'np-ukr-cache-v8.24.2') {
             caches.delete(key);
           }
         });

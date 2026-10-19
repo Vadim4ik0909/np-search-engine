@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 31;
+  let totalTests = 32;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -1782,6 +1782,77 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 31:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 32: v8.24.2 — вулиця без номера: UI-автокомпліт не має казати "не знайдено"
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 32: "городок рівненська штейн" -> Вантажне відділення №1 (автокомпліт, парсер, пошук) + регресії');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+    const S = window.SmartSearchEngine;
+
+    // 1. Парсер: топонім + область виділені, залишок "штейн" — це streetQuery, а не частина міста
+    const p = S.parseQuery('городок рівненська штейн');
+    if (!p.matchedSettlement || p.matchedSettlement.name !== 'Городок' || !String(p.detectedOblast).includes('Рівнен')) {
+      throw new Error(`parseQuery: очікувалось Городок/Рівненська, отримано ${p.matchedSettlement && p.matchedSettlement.name}/${p.detectedOblast}`);
+    }
+    if (p.streetQuery !== 'штейн' || p.targetBranchNumber) {
+      throw new Error(`parseQuery: streetQuery='${p.streetQuery}', targetBranchNumber='${p.targetBranchNumber}'`);
+    }
+
+    // 2. Автокомпліт (саме він показував "міст чи відділень не знайдено"): перший пункт — Вантажне відділення №1
+    const ac = S.getAutocompleteSuggestions('городок рівненська штейн', 'novaposhta', null, npPool);
+    if (!ac || ac.length === 0) throw new Error('Автокомпліт порожній для "городок рівненська штейн"');
+    const first = ac[0];
+    if (first.type !== 'branch' || first.title !== 'Вантажне відділення №1' ||
+        !first.branchObj || first.branchObj.city !== 'Городок' || !first.subtitle.includes('Штейнгеля') ||
+        !first.subtitle.includes('Рівненський р-н') || !first.subtitle.includes('Рівненська обл.')) {
+      throw new Error(`Перший пункт автокомпліту некоректний: ${first.type} | ${first.title} | ${first.subtitle}`);
+    }
+    if (ac.some(x => !x.subtitle.includes('Штейнгеля') || !x.subtitle.includes('Рівненська обл.'))) {
+      throw new Error('В автокомпліті є пункти не з вул. Штейнгеля / не з Рівненської області');
+    }
+    // Вибір пункту має відтворювати саме Городок №1 (Рівненська)
+    const sel = S.searchBranches(first.textToFill, npPool, 5);
+    if (sel.length !== 1 || sel[0].city !== 'Городок' || String(sel[0].number) !== '1') {
+      throw new Error(`textToFill '${first.textToFill}' -> ${sel.length} результатів`);
+    }
+    // Без пулу відділень (порожній пул) — показуємо населений пункт, а не "не знайдено"
+    const acNoPool = S.getAutocompleteSuggestions('городок рівненська штейн', 'ukrposhta', null, []);
+    if (!acNoPool || acNoPool.length === 0 || acNoPool[0].title !== 'Городок') {
+      throw new Error('Без пулу відділень очікувалась підказка населеного пункту Городок');
+    }
+
+    // 3. Пошук: Городок №1 першим
+    const res = S.searchBranches('городок рівненська штейн', npPool, 5);
+    if (!res.length || res[0].city !== 'Городок' || String(res[0].number) !== '1' || !res[0].street.includes('Штейнгеля')) {
+      throw new Error('searchBranches: першим має бути Городок №1 (вул. барона Штейнгеля, 2-А)');
+    }
+
+    // 4. Регресії
+    const r1 = S.searchBranches('городок 1 рівненська', npPool, 5);
+    if (r1.length !== 1 || r1[0].city !== 'Городок' || !String(r1[0].oblast).includes('Рівнен') || String(r1[0].number) !== '1') {
+      throw new Error(`регресія "городок 1 рівненська": ${r1.length} результатів`);
+    }
+    const r2 = S.searchBranches('великий дальник 3', npPool, 5);
+    if (!r2.length || r2[0].city !== 'Великий Дальник' || String(r2[0].number) !== '3') {
+      throw new Error('регресія "великий дальник 3"');
+    }
+    const r3 = S.searchBranches("п'ятихатки 1", npPool, 5);
+    if (!r3.length || canon(r3[0].city) !== 'пятихатки' || String(r3[0].number) !== '1' || !String(r3[0].oblast).includes('Дніпропетровськ')) {
+      throw new Error("регресія \"п'ятихатки 1\"");
+    }
+    // Старі підказки міст не зламані
+    const acOld = S.getAutocompleteSuggestions('київ бориспіль', 'novaposhta', null, npPool);
+    if (!acOld.length || acOld[0].type === 'branch') {
+      throw new Error('регресія автокомпліту "київ бориспіль"');
+    }
+
+    console.log('  ✓ Успіх: "городок рівненська штейн" -> Вантажне відділення №1 (вул. барона Штейнгеля, 2-А); регресії в нормі!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 32:', err.message, '\n');
   }
 
   console.log('===============================================================');

@@ -249,7 +249,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.24.1</span>
+          <span class="version-tag">v8.24.2</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -278,8 +278,21 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.24.1 -->
+        <!-- Версія 8.24.2 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.24.2</span>
+            <span class="version-state">Пошук за вулицею без номера відділення</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Вулиця без номера:</strong> запит «городок рівненська штейн» більше не закінчується повідомленням «міст чи відділень не знайдено» — підказки показують відділення знайденого населеного пункту за фрагментом вулиці (Вантажне відділення №1, вул. барона Штейнгеля, 2-А, Рівненський р-н).</li>
+            <li><strong>Топонім + область:</strong> «городок рівненська» тепер показує населений пункт замість порожніх підказок; парсер запиту повертає залишок як streetQuery.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.24.1 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.24.1</span>
             <span class="version-state">Виправлення крайових випадків нормалізації та дезамбігуації</span>
@@ -833,15 +846,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.24.1"></script>
+  <script src="data/branches.js?v=8.24.2"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.24.1"></script>
+  <script src="data/all_settlements.js?v=8.24.2"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.24.1"></script>
+  <script src="data/fuzzySearch.js?v=8.24.2"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.24.1"></script>
+  <script src="app.js?v=8.24.2"></script>
 </body>
 </html>

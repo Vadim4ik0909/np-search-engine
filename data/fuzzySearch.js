@@ -1202,12 +1202,14 @@
       matchedSettlement,
       confidence: highestScore,
       didYouMeanText,
-      facets: extractFacets(rawQuery)
+      facets: extractFacets(rawQuery),
+      // Залишок запиту після топоніма/області/району/номера — фільтр за вулицею (street / ShortAddress)
+      get streetQuery() { return ((this.facets && this.facets.streetTokens) || []).join(' '); }
     };
   }
 
   // 7. LP-CRM ІНТЕРАКТИВНИЙ АВТОКОМПЛІТ (Підказки під час введення)
-  function getAutocompleteSuggestions(query, currentService, liveCityBranches = null) {
+  function getAutocompleteSuggestions(query, currentService, liveCityBranches = null, staticBranches = null) {
     if (!query || query.trim().length < 2) return [];
     const qClean = fixKeyboardLayout(stripApostrophes(query.trim()));
     const qLower = qClean.toLowerCase();
@@ -1328,6 +1330,73 @@
         }
       }
       if (suggestions.length >= 7) break;
+    }
+
+    // КРОК 1б: Топонім + область/район + залишковий текстовий токен без номера ("городок рівненська штейн").
+    // Залишок — не частина назви населеного пункту, а фрагмент вулиці: виділяємо місто й область
+    // та звужуємо відділення цього населеного пункту за вулицею (street / ShortAddress).
+    if (suggestions.length === 0 && tokens.length > 1) {
+      const facets = extractFacets(normalizedQuery);
+      const streetPart = (facets.streetTokens || []).filter(t => !/^\d+$/.test(t));
+      if (facets.city && (streetPart.length > 0 || facets.oblast || facets.raion)) {
+        let pool = null;
+        if (streetPart.length === 0) {
+          pool = null; // лише топонім + область/район: показуємо населений пункт
+        } else if (Array.isArray(liveCityBranches) && liveCityBranches.length > 0) {
+          pool = liveCityBranches;
+        } else if (Array.isArray(staticBranches) && staticBranches.length > 0) {
+          pool = staticBranches;
+        } else if (typeof window !== 'undefined' && window.BRANCHES_DATA && Array.isArray(window.BRANCHES_DATA[currentService])) {
+          pool = window.BRANCHES_DATA[currentService];
+        }
+
+        const cityKey = canonText(facets.city);
+        let found = pool ? searchBranches(normalizedQuery, pool, 7) : [];
+        found = found.filter(b => canonCity(b.city) === cityKey);
+
+        for (let b of found) {
+          const cleanCity = (b.city || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+          const isPost = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || /поштомат/i.test(b.name || '');
+          const isCargo = b.typeClass === 'cargo' || (b.maxWeight && b.maxWeight >= 1000) || /вантажн/i.test(b.name || '');
+          const kind = isPost ? 'Поштомат' : (isCargo ? 'Вантажне відділення' : 'Відділення');
+          const street = (b.street || b.address || '').trim();
+          const geo = [
+            b.raion ? `${b.raion.replace(/\s*(?:район|р-н)$/i, '')} р-н` : '',
+            b.oblast ? `${b.oblast.replace(/\s*(?:область|обл\.?)$/i, '')} обл.` : ''
+          ].filter(Boolean).join(', ');
+          suggestions.push({
+            type: isPost ? 'postomat' : 'branch',
+            title: `${kind} №${b.number}`,
+            subtitle: [`${b.settlementType || 'місто'} ${cleanCity}`, street, geo].filter(Boolean).join(' — '),
+            value: cleanCity,
+            textToFill: `${cleanCity} ${b.oblast || ''} ${b.number}`.replace(/\s+/g, ' ').trim(),
+            badge: isPost ? 'поштомат' : 'відділення',
+            icon: isPost ? '📦' : '🏢',
+            branchObj: b
+          });
+        }
+
+        // Немає відділень у пулі — показуємо знайдений населений пункт (запит збережено для подальшого пошуку)
+        if (suggestions.length === 0) {
+          const s = findSettlementByNameOrFuzzy(facets.city, facets.oblast, facets.raion);
+          if (s) {
+            const sOblast = facets.settlementOblast || facets.oblast || s.oblast;
+            const oKey = (sOblast || '').toLowerCase().slice(0, 5);
+            const sameOblastVariants = Array.isArray(s.allVariants)
+              ? s.allVariants.filter(v => (v.oblast || '').toLowerCase().startsWith(oKey)).length : 1;
+            suggestions.push({
+              type: s.type || 'місто',
+              title: s.name,
+              subtitle: formatSettlementSubtitle({ ...s, oblast: sOblast, raion: sameOblastVariants > 1 ? '' : s.raion }),
+              value: s.name,
+              textToFill: normalizedQuery + ' ',
+              badge: s.type || 'місто',
+              icon: '📍',
+              settlementObj: s
+            });
+          }
+        }
+      }
     }
 
     return suggestions;
