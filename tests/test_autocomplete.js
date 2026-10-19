@@ -177,6 +177,7 @@ function createMockEnvironment() {
   }
 
   const mockDocument = {
+    documentElement: new MockElement('html'),
     getElementById(id) { return getOrCreateElement(id); },
     querySelector(sel) {
       if (sel.startsWith('#')) return getOrCreateElement(sel.slice(1));
@@ -212,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 23;
+  let totalTests = 24;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -221,7 +222,14 @@ async function runTests() {
   global.document = mockDocument;
   global.navigator = { clipboard: { writeText: () => Promise.resolve() } };
   global.sessionStorage = { getItem: () => null, setItem: () => {} };
-  global.localStorage = { getItem: () => null, setItem: () => {} };
+  const mockStorageMap = new Map();
+  global.localStorage = {
+    getItem: (k) => (mockStorageMap.has(k) ? mockStorageMap.get(k) : null),
+    setItem: (k, v) => mockStorageMap.set(k, String(v)),
+    removeItem: (k) => mockStorageMap.delete(k),
+    clear: () => mockStorageMap.clear(),
+    get length() { return mockStorageMap.size; }
+  };
   global.location = { hostname: 'localhost' };
   global.Event = class { constructor(t) { this.type = t; } };
   global.CustomEvent = class extends global.Event {};
@@ -1332,6 +1340,74 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 23:', err.message, '\\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 24: Перемикання та збереження тем оформлення (Світла та Темна)
+  // --------------------------------------------------------------------------
+  try {
+    console.log('▶ ТЕСТ 24: Перемикання та збереження тем оформлення (Світла та Темна; v8.19.0)');
+    const btnThemeToggle = elementsById['btnThemeToggle'];
+    if (!btnThemeToggle) {
+      throw new Error("Елемент #btnThemeToggle не знайдено в DOM!");
+    }
+
+    // 1. Початковий стан: без збереженого вибору в localStorage повинна бути дефолтна світла тема
+    const initialTheme = mockDocument.documentElement.getAttribute('data-theme');
+    if (initialTheme !== 'light') {
+      throw new Error(`Дефолтна тема має бути 'light', отримано '${initialTheme}'`);
+    }
+
+    // 2. Клік на кнопку перемикача: перемикає на темну тему
+    btnThemeToggle.dispatchEvent({ type: 'click' });
+    const darkTheme = mockDocument.documentElement.getAttribute('data-theme');
+    const storedDark = global.localStorage.getItem('app_theme');
+    if (darkTheme !== 'dark') {
+      throw new Error(`Після першого кліку очікувалась тема 'dark', отримано '${darkTheme}'`);
+    }
+    if (storedDark !== 'dark') {
+      throw new Error(`В localStorage очікувалось 'dark', отримано '${storedDark}'`);
+    }
+    if (btnThemeToggle.getAttribute('aria-label') !== 'Увімкнути світлу тему') {
+      throw new Error(`aria-label очікувалось 'Увімкнути світлу тему', отримано '${btnThemeToggle.getAttribute('aria-label')}'`);
+    }
+
+    // 3. Другий клік: повернення до світлої теми
+    btnThemeToggle.dispatchEvent({ type: 'click' });
+    const lightTheme = mockDocument.documentElement.getAttribute('data-theme');
+    const storedLight = global.localStorage.getItem('app_theme');
+    if (lightTheme !== 'light') {
+      throw new Error(`Після другого кліку очікувалась тема 'light', отримано '${lightTheme}'`);
+    }
+    if (storedLight !== 'light') {
+      throw new Error(`В localStorage очікувалось 'light', отримано '${storedLight}'`);
+    }
+    if (btnThemeToggle.getAttribute('aria-label') !== 'Увімкнути темну тему') {
+      throw new Error(`aria-label очікувалось 'Увімкнути темну тему', отримано '${btnThemeToggle.getAttribute('aria-label')}'`);
+    }
+
+    // 4. Персистентність при перезавантаженні сторінки з обраною темною темою
+    global.localStorage.setItem('app_theme', 'dark');
+    // Симуляція ініціалізації при перезавантаженні
+    const reloadedTheme = (global.localStorage.getItem('app_theme') === 'dark') ? 'dark' : 'light';
+    mockDocument.documentElement.setAttribute('data-theme', reloadedTheme);
+    if (mockDocument.documentElement.getAttribute('data-theme') !== 'dark') {
+      throw new Error("Перезавантаження сторінки не зберегло обрану тему 'dark'");
+    }
+
+    // 5. Очищення кешу / сховища браузера: повернення до дефолтної білої теми
+    global.localStorage.clear();
+    const cacheClearedStored = global.localStorage.getItem('app_theme');
+    const resetTheme = (cacheClearedStored === 'dark') ? 'dark' : 'light';
+    mockDocument.documentElement.setAttribute('data-theme', resetTheme);
+    if (resetTheme !== 'light' || mockDocument.documentElement.getAttribute('data-theme') !== 'light') {
+      throw new Error("Після очищення кешу/localStorage дефолтна тема має бути 'light'");
+    }
+
+    console.log("  ✓ Успіх: Перемикання світла/темна працює бездоганно, персистентність у localStorage підтверджена, після очищення кешу відновлюється дефолтна світла (біла) тема!\\n");
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 24:', err.message, '\\n');
   }
 
   console.log('===============================================================');

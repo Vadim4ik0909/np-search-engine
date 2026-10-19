@@ -11,6 +11,7 @@
   // СТАН ДОДАТКУ (STATE)
   // ==========================================================================
   const state = {
+    theme: 'light', // 'light' | 'dark' (Default: Light / біла)
     currentService: 'novaposhta', // 'novaposhta' | 'ukrposhta'
     searchQuery: '',
     currentResults: [],
@@ -45,6 +46,8 @@
   // ==========================================================================
   const dom = {
     body: document.body,
+    html: document.documentElement,
+    btnThemeToggle: document.getElementById('btnThemeToggle'),
     btnNovaPoshta: document.getElementById('btnNovaPoshta'),
     btnUkrposhta: document.getElementById('btnUkrposhta'),
     activeServiceTag: document.getElementById('activeServiceTag'),
@@ -96,6 +99,46 @@
     npApiKeyInput: document.getElementById('npApiKeyInput'),
     apiTestStatus: document.getElementById('apiTestStatus')
   };
+
+  // ==========================================================================
+  // 0. ТЕМА ОФОРМЛЕННЯ (СВІТЛА / ТЕМНА, LOCALSTORAGE, ДЕФОЛТ: СВІТЛА)
+  // ==========================================================================
+  const THEME_STORAGE_KEY = 'app_theme';
+
+  function getStoredTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      return stored === 'dark' ? 'dark' : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  }
+
+  function applyTheme(newTheme, saveToStorage = true) {
+    const theme = newTheme === 'dark' ? 'dark' : 'light';
+    state.theme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+
+    if (dom.btnThemeToggle) {
+      const isDark = theme === 'dark';
+      const label = isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему';
+      dom.btnThemeToggle.setAttribute('aria-label', label);
+      dom.btnThemeToggle.setAttribute('title', label);
+    }
+
+    if (saveToStorage) {
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+      } catch (e) {
+        console.error('Помилка запису теми в localStorage', e);
+      }
+    }
+  }
+
+  function toggleTheme() {
+    const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme, true);
+  }
 
   // ==========================================================================
   // 1. ПЕРЕМИКАННЯ СЛУЖБИ (НОВА ПОШТА ЧЕРВОНА / УКРПОШТА ЖОВТА)
@@ -1740,6 +1783,9 @@
   // 9. EVENT LISTENERS
   // ==========================================================================
   function initEventListeners() {
+    if (dom.btnThemeToggle) {
+      dom.btnThemeToggle.addEventListener('click', toggleTheme);
+    }
     dom.btnNovaPoshta.addEventListener('click', () => switchService('novaposhta'));
     dom.btnUkrposhta.addEventListener('click', () => switchService('ukrposhta'));
 
@@ -2061,6 +2107,7 @@
   // ІНІЦІАЛІЗАЦІЯ ДОДАТКУ
   // ==========================================================================
   function init() {
+    applyTheme(getStoredTheme(), false);
     initEventListeners();
     checkServerApiStatus();
     renderFrequentChips();

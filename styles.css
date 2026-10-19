@@ -7,14 +7,67 @@
   --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Спокійна глибока графітова палітра (Neutral Obsidian) */
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  /* ========================================================================
+     ДЕФОЛТНА СВІТЛА ТЕМА (Чистий білий / світло-сірий стиль "Calm White")
+     За замовчуванням при першому запуску або після скидання кешу
+     ======================================================================== */
+  --bg-app: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-subtle: #f8fafc;
+  --bg-card-hover: #e2e8f0;
+  --bg-chip: #f1f5f9;
+  --bg-chip-hover: #e2e8f0;
+
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+  --border-light: rgba(15, 23, 42, 0.08);
+  --border-subtle: rgba(15, 23, 42, 0.16);
+  --border-focus: #0284c7;
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+
+  /* Нова пошта у світлій темі */
+  --brand-color: #d92534;
+  --brand-hover: #b91c1c;
+  --brand-contrast-text: #ffffff;
+  --brand-bg-subtle: rgba(217, 37, 52, 0.06);
+  --brand-border: rgba(217, 37, 52, 0.22);
+  --brand-text: #dc2626;
+  --brand-glow: transparent;
+}
+
+/* Автентична тема Укрпошти у світлій темі */
+body[data-service="ukrposhta"] {
+  --brand-color: #f59e0b;
+  --brand-hover: #d97706;
+  --brand-contrast-text: #0f172a;
+  --brand-bg-subtle: rgba(245, 158, 11, 0.08);
+  --brand-border: rgba(245, 158, 11, 0.35);
+  --brand-text: #b45309;
+  --brand-glow: transparent;
+}
+
+/* ========================================================================
+   ТЕМНА ТЕМА (Neutral Obsidian Dark)
+   Активується при виборі користувача та зберігається в localStorage
+   ======================================================================== */
+[data-theme="dark"] {
   --bg-app: #0a0d14;
   --bg-card: #111622;
   --bg-card-subtle: #151b29;
   --bg-card-hover: #1b2234;
   --bg-chip: #141a28;
   --bg-chip-hover: #1c2438;
-  
+
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-subtle: #64748b;
@@ -27,12 +80,6 @@
   --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.55);
   --shadow-xl: 0 20px 35px -5px rgba(0, 0, 0, 0.65);
 
-  --radius-sm: 7px;
-  --radius-md: 11px;
-  --radius-lg: 14px;
-  --radius-full: 9999px;
-
-  /* Тема: Нова пошта (Стриманий корпоративний кармін, без неонового світіння) */
   --brand-color: #d92534;
   --brand-hover: #b91c1c;
   --brand-contrast-text: #ffffff;
@@ -42,8 +89,8 @@
   --brand-glow: transparent;
 }
 
-/* Автентична спокійна тема Укрпошти (Теплий медовий бурштин замість їдкого неону) */
-body[data-service="ukrposhta"] {
+[data-theme="dark"] body[data-service="ukrposhta"],
+body[data-service="ukrposhta"][data-theme="dark"] {
   --brand-color: #f59e0b;
   --brand-hover: #d97706;
   --brand-contrast-text: #090d16;
@@ -146,28 +193,55 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   justify-content: center;
 }
 
-.icon-tool-btn {
+.icon-tool-btn,
+.theme-toggle-btn {
   position: absolute;
   right: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   color: var(--text-muted);
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-full);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-sm);
+  z-index: 10;
 }
 
-.icon-tool-btn:hover {
+.icon-tool-btn:hover,
+.theme-toggle-btn:hover {
   color: var(--text-main);
   border-color: var(--border-subtle);
   background: var(--bg-card-subtle);
-  transform: rotate(20deg);
+  transform: scale(1.08);
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Іконки теми: за замовчуванням (у світлій темі) показуємо Місяць */
+.theme-toggle-btn .theme-icon-light {
+  display: none;
+}
+.theme-toggle-btn .theme-icon-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* У темній темі показуємо Сонце */
+[data-theme="dark"] .theme-toggle-btn .theme-icon-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-theme="dark"] .theme-toggle-btn .theme-icon-dark {
+  display: none;
 }
 
 /* ==========================================================================
@@ -366,15 +440,24 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   height: 380px;
   width: 100%;
   z-index: 1;
-  background: #0b0f19;
+  background: var(--bg-card);
 }
 
-/* OpenStreetMap темний фільтр для темної теми */
+/* OpenStreetMap плитки за замовчуванням у світлій темі — чисті, природні */
 .leaflet-tile {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%);
+  filter: none;
 }
 
 .leaflet-container {
+  background: var(--bg-card) !important;
+}
+
+/* OpenStreetMap фільтр інверсії лише для темної теми */
+[data-theme="dark"] .leaflet-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%);
+}
+
+[data-theme="dark"] .leaflet-container {
   background: #0b0f19 !important;
 }
 
@@ -383,57 +466,57 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .leaflet-control-attribution {
-  background: rgba(15, 23, 42, 0.85) !important;
-  color: #64748b !important;
+  background: var(--bg-card-subtle) !important;
+  color: var(--text-subtle) !important;
   font-size: 10px !important;
 }
 
 .leaflet-control-attribution a {
-  color: #94a3b8 !important;
+  color: var(--text-muted) !important;
   text-decoration: none;
 }
 
 .leaflet-bar a {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-  color: #f1f5f9 !important;
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-main) !important;
 }
 
 .leaflet-bar a:hover {
-  background-color: #334155 !important;
-  color: #ffffff !important;
+  background-color: var(--bg-card-hover) !important;
+  color: var(--text-main) !important;
 }
 
-/* Стилізація балунів Leaflet для темної теми */
+/* Стилізація балунів Leaflet для світлої та темної тем */
 .leaflet-popup-content-wrapper {
-  background: #172030 !important;
-  color: #f1f5f9 !important;
-  border: 1px solid #2d3b55 !important;
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-subtle) !important;
   border-radius: 12px !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7) !important;
+  box-shadow: var(--shadow-xl) !important;
 }
 
 .leaflet-popup-tip {
-  background: #172030 !important;
-  border: 1px solid #2d3b55 !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-subtle) !important;
 }
 
 .leaflet-container a.leaflet-popup-close-button {
-  color: #94a3b8 !important;
+  color: var(--text-muted) !important;
   padding: 8px !important;
   font-size: 16px !important;
   transition: color 0.15s ease, transform 0.15s ease !important;
 }
 
 .leaflet-container a.leaflet-popup-close-button:hover {
-  color: #ffffff !important;
+  color: var(--text-main) !important;
   transform: scale(1.1);
 }
 
 .btn-popup-copy {
-  background: #1e293b;
-  color: #f8fafc;
-  border: 1px solid #334155;
+  background: var(--bg-card-subtle);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
@@ -443,6 +526,12 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   align-items: center;
   gap: 5px;
   transition: all 0.2s ease;
+}
+
+.btn-popup-copy:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-main);
 }
 
 .btn-popup-copy:hover {
@@ -578,10 +667,10 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: #111827;
-  border: 1px solid #283548;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-xl);
   max-height: 280px;
   overflow-y: auto;
   scroll-behavior: smooth;
@@ -595,17 +684,17 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .autocomplete-dropdown::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-card-subtle);
   border-radius: 3px;
 }
 
 .autocomplete-dropdown::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--text-subtle);
 }
 
 .autocomplete-item {
@@ -622,7 +711,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .autocomplete-item:hover,
 .autocomplete-item.focused {
-  background: #1e293b;
+  background: var(--bg-card-hover);
 }
 
 .autocomplete-item-main {
@@ -638,8 +727,8 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -656,7 +745,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 .autocomplete-title {
   font-size: 14px;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -808,7 +897,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .results-type-pills {
   display: inline-flex;
-  background: #111827;
+  background: var(--bg-card-subtle);
   border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 2px;
@@ -833,9 +922,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .type-pill-btn.active {
-  background: #1e293b;
-  color: #f8fafc;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
 }
 
 .results-controls-group {
@@ -858,7 +947,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .limit-btn {
-  background: #111827;
+  background: var(--bg-card-subtle);
   border: 1px solid var(--border-light);
   border-radius: 6px;
   color: var(--text-muted);
@@ -876,10 +965,10 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .limit-btn.active {
-  background: #2563eb;
-  border-color: #3b82f6;
-  color: #ffffff;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
+  background: var(--brand-color);
+  border-color: var(--brand-border);
+  color: var(--brand-contrast-text);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-text-dim {
@@ -1053,7 +1142,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 .card-primary-line {
   font-size: 1.25rem; /* 20px */
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-main);
   letter-spacing: -0.2px;
   line-height: 1.35;
   display: block;
@@ -1061,23 +1150,23 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .card-primary-line .city-highlight {
-  color: #ffffff;
+  color: var(--text-main);
   font-weight: 700;
 }
 
 .card-primary-line .line-sep {
-  color: #64748b;
+  color: var(--text-subtle);
   margin: 0 6px;
   font-weight: 400;
 }
 
 .card-primary-line .branch-highlight {
-  color: #ffffff;
+  color: var(--text-main);
   font-weight: 700;
 }
 
 .card-primary-line .street-highlight {
-  color: #f8fafc;
+  color: var(--text-main);
   font-weight: 700;
   margin-left: 2px;
 }
@@ -1085,21 +1174,21 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 /* Рівень 2: Населений пункт: місто [Місто], [Район] район, [Область] область */
 .card-geo-line {
   font-size: 0.95rem; /* ~15px */
-  color: #e2e8f0;
+  color: var(--text-muted);
   line-height: 1.45;
   display: block;
   margin-top: 4px;
 }
 
 .card-geo-line .geo-label {
-  color: #94a3b8;
+  color: var(--text-subtle);
   font-weight: 600;
   font-size: 0.95rem;
   margin-right: 5px;
 }
 
 .card-geo-line .geo-val {
-  color: #f1f5f9;
+  color: var(--text-main);
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -1128,7 +1217,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   flex-wrap: wrap;
   margin-top: 8px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-light);
 }
 
 .card-foot-meta {
@@ -1144,9 +1233,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   padding: 4px 9px;
   border-radius: var(--radius-sm);
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.04);
-  color: #94a3b8;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
 }
 
 .weight-pill.cargo {
@@ -1156,9 +1245,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .weight-pill.post {
-  background: rgba(255, 255, 255, 0.04);
-  color: #cbd5e1;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
 }
 
 .weight-pill.pickup {
@@ -1177,9 +1266,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 .btn-copy-action {
   padding: 8px 18px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
   font-family: var(--font-main);
   font-size: 13px;
   font-weight: 700;
@@ -1189,6 +1278,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   gap: 6px;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-copy-action:hover {
@@ -1242,9 +1332,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 .btn-copy-index-action {
   padding: 8px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  background: rgba(245, 158, 11, 0.12);
-  color: #fef08a;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--brand-text);
   font-family: var(--font-main);
   font-size: 13px;
   font-weight: 700;
@@ -1279,10 +1369,10 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: #0f172a;
+  background: var(--bg-card);
   border: 1px solid #22c55e;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(34, 197, 94, 0.3);
-  color: #f8fafc;
+  box-shadow: var(--shadow-xl);
+  color: var(--text-main);
   padding: 12px 18px;
   border-radius: var(--radius-md);
   font-size: 13px;
@@ -1545,7 +1635,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: rgba(17, 22, 34, 0.85);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-light);
@@ -1581,7 +1671,7 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: rgba(17, 22, 34, 0.85);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-light);
@@ -1655,9 +1745,9 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .modal-card {
-  background: #131926;
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
-  border: 1px solid #232d42;
+  border: 1px solid var(--border-subtle);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1665,11 +1755,11 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .modal-header {
   padding: 20px 24px;
-  border-bottom: 1px solid #232d42;
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #172030;
+  background: var(--bg-card-subtle);
 }
 
 .modal-title-group {
@@ -1726,16 +1816,16 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .modal-body::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-card-subtle);
 }
 
 .modal-body::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .modal-body::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--text-subtle);
 }
 
 .changelog-item {
@@ -1800,8 +1890,8 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 .modal-footer {
   padding: 18px 24px;
-  background: #172030;
-  border-top: 1px solid #232d42;
+  background: var(--bg-card-subtle);
+  border-top: 1px solid var(--border-light);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
@@ -1827,8 +1917,8 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
 /* Покрокова інструкція по API в модалці */
 .api-guide-box {
-  background: #172030;
-  border: 1px solid #232d42;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 18px;
@@ -1880,8 +1970,8 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .setting-input {
-  background: #0b0f19;
-  border: 1px solid #232d42;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   font-size: 13.5px;
@@ -1907,8 +1997,8 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   gap: 12px;
   padding: 14px;
   border-radius: var(--radius-sm);
-  background: #172030;
-  border: 1px solid #232d42;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-light);
   font-size: 13px;
 }
 
@@ -1959,6 +2049,10 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 
   .chips-grid-10 {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .top-nav {
+    padding-right: 48px;
   }
 
   .switcher-btn {

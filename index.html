@@ -16,15 +16,28 @@
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
+  <!-- Theme initialization (Default: Light; persists in localStorage; resets to Light on cache clear) -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('app_theme');
+        var theme = savedTheme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.18.2">
+  <link rel="stylesheet" href="styles.css?v=8.19.0">
 </head>
 <body data-service="novaposhta">
 
   <!-- Головний контейнер (за розмірами та структурою вайрфрейму Figma) -->
   <div class="app-layout">
     
-    <!-- 1. ВЕРХНІ КНОПКИ ПЕРЕМИКАННЯ (Вгорі по центру) -->
+    <!-- 1. ВЕРХНІ КНОПКИ ПЕРЕМИКАННЯ (Вгорі по центру) ТА ТЕМА (СПРАВА) -->
     <header class="top-nav">
       <div class="service-switcher" role="tablist" aria-label="Вибір поштової служби">
         <button id="btnNovaPoshta" class="switcher-btn active" role="tab" aria-selected="true" data-target="novaposhta">
@@ -45,6 +58,28 @@
           <span class="switcher-label">Укрпошта</span>
         </button>
       </div>
+
+      <!-- Кнопка перемикання теми (Світла / Темна) -->
+      <button id="btnThemeToggle" class="theme-toggle-btn icon-tool-btn" type="button" aria-label="Увімкнути темну тему" title="Увімкнути темну тему">
+        <span class="theme-icon-light" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </span>
+        <span class="theme-icon-dark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </span>
+      </button>
     </header>
 
     <!-- ОСНОВНА ЧАСТИНА (ЦЕНТР) -->
@@ -208,7 +243,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.18.2</span>
+          <span class="version-tag">v8.19.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -237,8 +272,23 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.18.2 -->
+        <!-- Версія 8.19.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.19.0</span>
+            <span class="version-state">Перемикач теми оформлення (Світла та Темна) із збереженням у LocalStorage</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Світла та темна теми:</strong> повноцінна підтримка контрастної світлої теми "Calm White" та глибокої темної теми "Neutral Obsidian".</li>
+            <li><strong>Збереження вибору:</strong> обрана тема зберігається у <code>localStorage</code> та не збивається при оновленні чи перезапуску браузера.</li>
+            <li><strong>Дефолтна біла тема:</strong> при очищенні кешу / сховища браузера застосовується дефолтна світла тема без жодних артефактів миготіння (FOUC).</li>
+            <li><strong>Адаптивна карта та елементи:</strong> автоматичне перемикання стилів тайлів OpenStreetMap, балунів підказок, автокомпліту та модальних вікон.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.18.2 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.18.2</span>
             <span class="version-state">Виправлення 5 критичних крайових випадків за результатами стрес-тестування</span>
@@ -648,12 +698,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.18.2"></script>
+  <script src="data/branches.js?v=8.19.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.18.2"></script>
+  <script src="data/fuzzySearch.js?v=8.19.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.18.2"></script>
+  <script src="app.js?v=8.19.0"></script>
 </body>
 </html>
