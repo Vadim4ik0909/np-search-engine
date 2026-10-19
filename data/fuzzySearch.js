@@ -212,6 +212,7 @@
     { name: 'Баришівка', oblast: 'Київська', raion: 'Броварський', type: 'смт', lat: 50.3611, lng: 31.3194, postalCodes: ['07500'], aliases: ['баришівка', 'барышевка'], streets: ['вул. Центральна', 'вул. Богдана Хмельницького'] },
     { name: 'Березань', oblast: 'Київська', raion: 'Броварський', type: 'місто', lat: 50.3167, lng: 31.4833, postalCodes: ['07540'], aliases: ['березань', 'berezan'], streets: ['вул. Маяковського', 'вул. Шевченка'] },
     { name: 'Бориспіль', oblast: 'Київська', raion: 'Бориспільський', type: 'місто', lat: 50.3421, lng: 30.9542, postalCodes: ['08300'], aliases: ['бориспіль', 'борисполь', 'boryspil'], streets: ['вул. Київський Шлях', 'вул. Привокзальна', 'вул. Головатого'] },
+    { name: 'Гнідин', oblast: 'Київська', raion: 'Бориспільський', type: 'село', lat: 50.3304, lng: 30.7255, postalCodes: ['08340'], aliases: ['гнідин', 'гнедин', 'село гнідин', 'hnidyn'], streets: ['вул. Заводська', 'пров. Заводський'] },
     { name: 'Переяслав', oblast: 'Київська', raion: 'Бориспільський', type: 'місто', lat: 50.0650, lng: 31.4450, postalCodes: ['08400'], aliases: ['переяслав', 'переяслав-хмельницький'], streets: ['вул. Богдана Хмельницького', 'вул. Покровська'] },
     { name: 'Яготин', oblast: 'Київська', raion: 'Бориспільський', type: 'місто', lat: 50.2583, lng: 31.7806, postalCodes: ['07700'], aliases: ['яготин', 'yahotyn'], streets: ['вул. Незалежності', 'вул. Шевченка'] },
     { name: 'Вишгород', oblast: 'Київська', raion: 'Вишгородський', type: 'місто', lat: 50.5847, lng: 30.4889, postalCodes: ['07300'], aliases: ['вишгород', 'вышгород', 'vyshhorod'], streets: ['вул. Шолуденка', 'просп. Шевченка', 'вул. Набережна'] },
@@ -734,6 +735,23 @@
             detectedCity = foundSingle;
             mergedTokens.push(foundSingle.name.toLowerCase());
           } else {
+            // Малий населений пункт (село/смт) має безумовний пріоритет як цільове місто над містом/райцентром
+            const isVillage = foundSingle.type === 'село' || foundSingle.type === 'смт' || foundSingle.type === 'селище';
+            const prevIsCity = !detectedCity.type || detectedCity.type === 'місто';
+
+            if (isVillage && prevIsCity) {
+              const singleObl = (foundSingle.oblast || '').toLowerCase();
+              const oblStem = detectedCity.name.toLowerCase().slice(0, 4);
+              const singleRaion = (foundSingle.raion || '').toLowerCase();
+              const isCompatible = singleObl.includes(oblStem) || singleRaion.includes(oblStem) ||
+                                   (detectedCity.oblast && foundSingle.oblast && detectedCity.oblast === foundSingle.oblast);
+              if (isCompatible) {
+                detectedCity = foundSingle;
+                mergedTokens.push(foundSingle.name.toLowerCase());
+                continue;
+              }
+            }
+
             // Region disambiguation: check if foundSingle is in detectedCity's oblast
             const oblStem = detectedCity.name.toLowerCase().slice(0, 5);
             const singleObl = (foundSingle.oblast || '').toLowerCase();

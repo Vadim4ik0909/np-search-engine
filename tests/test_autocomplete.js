@@ -1555,7 +1555,8 @@ async function runTests() {
       { q: "староконстатинів ххмель 3", expectCity: "Старокостянтинів", expectNum: "3" },
       { q: "староконстатинів ххмель 1", expectCity: "Старокостянтинів", expectNum: "1" },
       { q: "полтав сеньча 1", expectCity: "Сенча", expectNum: "1" },
-      { q: "сенча 1", expectCity: "Сенча", expectNum: "1" }
+      { q: "сенча 1", expectCity: "Сенча", expectNum: "1" },
+      { q: "київ бориспіль гнідин 2", expectCity: "Гнідин", expectNum: "2", expectStreet: "Заводська", expectRaion: "Бориспільський" }
     ];
 
     for (const tc of screenshotCases) {
@@ -1572,6 +1573,9 @@ async function runTests() {
       }
       if (tc.expectStreet && (!top.street || !top.street.includes(tc.expectStreet))) {
         throw new Error(`Запит '${tc.q}' повернув вулицю '${top.street}' замість '${tc.expectStreet}'`);
+      }
+      if (tc.expectRaion && (!top.raion || !top.raion.includes(tc.expectRaion))) {
+        throw new Error(`Запит '${tc.q}' повернув район '${top.raion}' замість '${tc.expectRaion}'`);
       }
     }
 
