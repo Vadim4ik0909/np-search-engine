@@ -1743,7 +1743,7 @@
         }
         if (sFound) {
           settlementOblast = sFound.oblast;
-          if (sFound.raion) raion = sFound.raion;
+          if (sFound.raion && (raion || detectedR)) raion = sFound.raion;
         } else if (oblast && detectedO && detectedO.rawMatched && !/(?:область|обл)/i.test(query)) {
           // Якщо для цього міста немає жодного збігу у знайденій області,
           // перевіряємо, чи є токен назвою вулиці в цьому місті (наприклад, "гриців 1 київська" -> вул. Київська у Грицеві)
@@ -1922,7 +1922,7 @@
             numMatched = true;
             score += 200;
           } else if (new RegExp('(?:^|[^0-9])' + numTok + '(?![0-9])').test(bStreet)) {
-            numMatched = true;
+            // Номер будинку у вулиці/адресі додає бал, але не замінює номер відділення
             score += streetMatched ? 700 : 400;
           }
         }
@@ -1932,7 +1932,9 @@
           // Виняток для Укрпошти у селах: номер 1 не штрафує відділення села, якщо індекс 5-значний
           const isUkrMicro = isUkrposhta && numTokens.some(t => t.length <= 2) && detectedCityName && bCity === detectedCityName;
           if (!isUkrMicro) {
-            if (streetMatched) {
+            if (isPostomat && !hasPostomatKeyword) {
+              score -= 1200; // штраф для поштомата з чужим номером, коли шукають відділення
+            } else if (streetMatched) {
               score -= 100; // пом'якшений штраф, якщо вулиця точна
             } else {
               score -= 600;
@@ -1942,18 +1944,23 @@
       }
 
       // 3. НАСЕЛЕНИЙ ПУНКТ (Місто / Село / СМТ):
-      // - Точний збіг назви міста (b.city === token): +800 балів.
+      // - Точний збіг назви міста (b.city === token): +1000 балів.
       // - Нечіткий збіг або корінь міста (Levenshtein <= 1 чи стем): +400 балів (-50 за одруківку).
       // - Якщо місто вказано, а відділення з іншого міста: мінус 1000 балів (жорсткий штраф).
       if (detectedCityName) {
         if (bCity === detectedCityName) {
-          score += 800;
+          score += 1000;
         } else {
           const dist = damerauLevenshtein(bCity, detectedCityName);
           if (dist <= 1 && Math.abs(bCity.length - detectedCityName.length) <= 1) {
             score += 400 - (dist * 50);
           } else if (cityStem && (bCity.startsWith(cityStem) || detectedCityName.startsWith(bCity.slice(0, 4)))) {
-            score += 350;
+            // Якщо обидва населені пункти мають повні назви (довжина >= 6) і dist > 1 — це різні міста (наприклад, Городок та Городець)
+            if (bCity.length >= 6 && detectedCityName.length >= 6 && dist > 1) {
+              score -= 1000;
+            } else {
+              score += 250;
+            }
           } else {
             score -= 1000; // жорсткий штраф за чуже місто
           }

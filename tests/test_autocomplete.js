@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 28;
+  let totalTests = 29;
 
   const { mockDocument, elementsById } = createMockEnvironment();
 
@@ -1623,6 +1623,52 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 28:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 29: Мультифасетне прогресивне звуження пошуку (Progressive Context Narrowing)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 29: Перевірка мультифасетного звуження контексту ("городок 1" -> "рівненська" -> "штейн")');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. "городок 1" -> декілька результатів з різних областей України (Рівненська, Львівська, Хмельницька тощо)
+    const res1 = window.SmartSearchEngine.searchBranches("городок 1", npPool, 10);
+    if (!res1 || res1.length < 2) {
+      throw new Error(`Очікувалось кілька результатів для 'городок 1', отримано: ${res1 ? res1.length : 0}`);
+    }
+    const distinctOblasts = new Set(res1.map(x => x.oblast));
+    if (distinctOblasts.size < 2) {
+      throw new Error(`Очікувалось представництво кількох областей для 'городок 1', отримано тільки: ${Array.from(distinctOblasts).join(', ')}`);
+    }
+
+    // 2. "городок 1 рівненська" -> фільтрація ТІЛЬКИ Рівненської області
+    const res2 = window.SmartSearchEngine.searchBranches("городок 1 рівненська", npPool, 10);
+    if (!res2 || res2.length === 0) {
+      throw new Error(`Жодного результату для 'городок 1 рівненська'`);
+    }
+    const nonRivne = res2.filter(x => !x.oblast || !x.oblast.includes('Рівнен'));
+    if (nonRivne.length > 0) {
+      throw new Error(`Знайдено не-Рівненські відділення для 'городок 1 рівненська': ${nonRivne.map(x => x.city + ' ' + x.oblast).join(', ')}`);
+    }
+    if (res2[0].city !== 'Городок' || String(res2[0].number) !== '1') {
+      throw new Error(`Топ результат для 'городок 1 рівненська' має бути Городок №1, отримано: ${res2[0].city} №${res2[0].number}`);
+    }
+
+    // 3. "городок 1 рівненська штейн" -> 1 конкретне вантажне відділення на вул. Штейнгеля
+    const res3 = window.SmartSearchEngine.searchBranches("городок 1 рівненська штейн", npPool, 10);
+    if (!res3 || res3.length !== 1) {
+      throw new Error(`Очікувався рівно 1 результат для 'городок 1 рівненська штейн', отримано: ${res3 ? res3.length : 0}`);
+    }
+    const top = res3[0];
+    if (top.city !== 'Городок' || String(top.number) !== '1' || !top.street.toLowerCase().includes('штейнгел')) {
+      throw new Error(`Результат не відповідає Відділенню №1 на вул. Штейнгеля: ${top.city} №${top.number}, ${top.street}`);
+    }
+
+    console.log('  ✓ Успіх: Прогресивне мультифасетне звуження бездоганно фільтрує базу від масового списку (9 відділень) до 1 конкретного на вул. Штейнгеля!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 29:', err.message, '\n');
   }
 
   console.log('===============================================================');

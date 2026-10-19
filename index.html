@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.22.0">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.23.0">
   
   <!-- Theme initialization (Default: Light; persists in localStorage; resets to Light on cache clear) -->
   <script>
@@ -35,7 +35,7 @@
   </script>
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.22.0">
+  <link rel="stylesheet" href="styles.css?v=8.23.0">
 </head>
 <body data-service="novaposhta">
 
@@ -187,6 +187,7 @@
             </div>
             <div class="results-type-pills" id="resultsTypeFilters" role="radiogroup" aria-label="Фільтр за типом">
               <button type="button" class="type-pill-btn active" data-type="all">Всі</button>
+              <button type="button" class="type-pill-btn" data-type="cargo">Вантажні</button>
               <button type="button" class="type-pill-btn" data-type="branch">Відділення</button>
               <button type="button" class="type-pill-btn" data-type="postomat">Поштомати</button>
             </div>
@@ -248,7 +249,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.22.0</span>
+          <span class="version-tag">v8.23.0</span>
           <span class="version-label">Історія версій</span>
         </button>
       </div>
@@ -277,8 +278,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.22.0 -->
+        <!-- Версія 8.23.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.23.0</span>
+            <span class="version-state">Прогресивне звуження пошуку (мультифасетність) та трисекційний фільтр типів</span>
+            <span class="version-date">19 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Прогресивне звуження контексту:</strong> кожне слово в багатослівному запиті (населений пункт, номер, область, вулиця) працює як додатковий звужуючий фільтр без хаотичних перемикань (наприклад: «городок 1» → «рівненська» → «штейн» звужує базу до одного точного відділення на вул. Штейнгеля).</li>
+            <li><strong>Чотирирежимний фільтр типів:</strong> додано режим «Вантажні» поруч із «Всі», «Відділення» та «Поштомати» для швидкого відокремлення великих пунктів приймання вантажів від 1000/1100 кг.</li>
+            <li><strong>Візуалізація габаритів та стандартизоване копіювання:</strong> для вантажних відділень додано бейдж ваги та максимальних габаритів («до 1100 кг, 600×220×220 см»), а при копіюванні формується повний рядок з дужками для CRM («с. Городок (Рівненський р-н, Рівненська обл.), Вантажне відділення №1: вул. барона Штейнгеля, 2-А»).</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.22.0 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.22.0</span>
             <span class="version-state">Інтеграція повного реєстру населених пунктів України (26 500+ сіл, смт, селищ та міст) через API Нової Пошти</span>
@@ -790,15 +805,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.22.0"></script>
+  <script src="data/branches.js?v=8.23.0"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.22.0"></script>
+  <script src="data/all_settlements.js?v=8.23.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.22.0"></script>
+  <script src="data/fuzzySearch.js?v=8.23.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.22.0"></script>
+  <script src="app.js?v=8.23.0"></script>
 </body>
 </html>

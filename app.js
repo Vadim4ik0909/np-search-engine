@@ -16,7 +16,7 @@
     searchQuery: '',
     currentResults: [],
     displayLimit: 10, // 5 | 10 | 20 | 'all'
-    typeFilter: 'all', // 'all' | 'branch' | 'postomat'
+    typeFilter: 'all', // 'all' | 'cargo' | 'branch' | 'postomat'
     isMapVisible: false,
     leafletMap: null,
     markersGroup: null,
@@ -512,8 +512,11 @@
     let allCityBranches = [];
     let didYouMeanText = parsed.didYouMeanText;
 
-    // Скидаємо блокування поштоматів, якщо користувач шукає звичайне відділення або не вказав 'поштомат'
-    if (/(?:відділення|відділ|вд|склад)/i.test(rawQuery) || (!/(?:поштомат|почтомат|пм)/i.test(rawQuery) && state.typeFilter === 'postomat')) {
+    // Встановлення відповідного фільтру типів за ключовими словами
+    if (/(?:вантажне|вантажний|вантаж)/i.test(rawQuery)) {
+      state.typeFilter = 'cargo';
+      updateTypeFilterUI();
+    } else if (/(?:відділення|відділ|вд|склад)/i.test(rawQuery) || (!/(?:поштомат|почтомат|пм)/i.test(rawQuery) && state.typeFilter === 'postomat')) {
       state.typeFilter = 'all';
       updateTypeFilterUI();
     }
@@ -723,35 +726,49 @@
     return parts.length > 0 ? parts.join(', ') : 'Україна';
   }
 
-  // Визначення бейджа типу та вагового обмеження
-  function getTypeBadgeInfo(branch) {
-    if (branch.typeText) {
-      let cls = 'post';
-      if (branch.type === 'cargo' || branch.typeText.includes('Вантажн') || branch.typeText.includes('1100')) cls = 'cargo';
-      else if (branch.type === 'poshtomat' || branch.typeText.includes('Поштомат')) cls = 'poshtomat';
-      else if (branch.typeText.includes('до 5 кг') || branch.typeText.includes('до 10 кг')) cls = 'pickup';
-      return { label: branch.typeText, cls };
-    }
-
-    const type = branch.typeName || '';
-    const weight = branch.totalMaxWeightAllowed || branch.maxWeight || '';
-    let cls = 'post';
-
-    if (type === 'Вантажне(ий)' || branch.number === '1') {
-      cls = 'cargo';
-      return { label: 'Вантажне (до 1100 кг)', cls };
-    } else if (type === 'Поштомат' || (branch.name && branch.name.includes('Поштомат'))) {
-      cls = 'poshtomat';
-      return { label: 'Поштомат (до 20 кг)', cls };
-    } else {
-      cls = 'post';
-      return { label: weight ? `Поштове (до ${weight} кг)` : 'Поштове (до 30 кг)', cls };
-    }
+  function isPostomatBranch(b) {
+    if (!b) return false;
+    return b.type === 'poshtomat' || b.typeClass === 'poshtomat' ||
+      (b.typeText && b.typeText.includes('Поштомат')) ||
+      (b.typeName && b.typeName.includes('Поштомат')) ||
+      (b.name && b.name.includes('Поштомат'));
   }
 
-  // Допоміжна функція: Формування рядка для копіювання в LP-CRM
-  // Приклад: «місто Ужгород - Вантажне(ий) №1: вул. Волонтерів, 16»
-  // Або: «місто Київ - Поштомат 'Нова Пошта' №1230: вул. Дніпровська, 14»
+  function isCargoBranch(b) {
+    if (!b || isPostomatBranch(b)) return false;
+    return b.type === 'PostCargoBranch' ||
+           b.typeClass === 'cargo' ||
+           (b.maxWeight && b.maxWeight >= 1000) ||
+           (b.weightLimit && b.weightLimit >= 1000) ||
+           (b.typeText && (/1[01]00\s*кг/i.test(b.typeText) || /вантажн/i.test(b.typeText))) ||
+           (b.name && /вантажн/i.test(b.name)) ||
+           (b.typeName && /вантажн/i.test(b.typeName));
+  }
+
+  function isRegularBranch(b) {
+    if (!b || isPostomatBranch(b)) return false;
+    return !isCargoBranch(b);
+  }
+
+  // Визначення бейджа типу, вагового обмеження та габаритів
+  function getTypeBadgeInfo(branch) {
+    if (isPostomatBranch(branch)) {
+      return { label: 'Поштомат (до 20 кг)', cls: 'poshtomat' };
+    }
+
+    if (isCargoBranch(branch)) {
+      const weight = branch.totalMaxWeightAllowed || branch.maxWeight || 1100;
+      const dims = branch.dimensions || branch.maxDimensions || '600×220×220 см';
+      return { label: `до ${weight} кг, ${dims}`, cls: 'cargo' };
+    }
+
+    const weight = branch.totalMaxWeightAllowed || branch.maxWeight || 30;
+    const cls = weight <= 10 ? 'pickup' : 'post';
+    return { label: `Поштове (до ${weight} кг)`, cls };
+  }
+
+  // Допоміжна функція: Формування рядка для копіювання в LP-CRM з дужками району та області
+  // Приклад: «с. Городок (Рівненський р-н, Рівненська обл.), Вантажне відділення №1: вул. барона Штейнгеля, 2-А»
   function formatLpCrmCopyString(branch) {
     let sType = branch.settlementType || '';
     const city = branch.city || '';
@@ -762,27 +779,49 @@
     }
     if (!sType) sType = 'місто';
 
-    const isNP = state.currentService === 'novaposhta' || (branch.id && branch.id.startsWith('np-'));
-    const isPostomat = branch.type === 'poshtomat' || (branch.typeText && branch.typeText.includes('Поштомат')) || (branch.typeName && branch.typeName.includes('Поштомат')) || (branch.name && branch.name.includes('Поштомат'));
+    let sTypePrefix = sType.trim().toLowerCase();
+    if (sTypePrefix === 'село') sTypePrefix = 'с.';
+    else if (sTypePrefix === 'місто') sTypePrefix = 'м.';
+    else if (sTypePrefix === 'смт' || sTypePrefix === 'селище міського типу') sTypePrefix = 'смт';
+    else if (sTypePrefix === 'селище') sTypePrefix = 'сел.';
+    else if (!sTypePrefix.endsWith('.')) sTypePrefix = sTypePrefix + '.';
 
-    let type = branch.typeName;
-    if (isPostomat) {
-      type = isNP ? "Поштомат 'Нова Пошта'" : 'Поштомат';
-    } else if (!type) {
-      if (isNP) {
-        if (branch.number === '1') type = 'Вантажне(ий)';
-        else type = 'Поштове(ий)';
-      } else {
-        type = 'Відділення';
+    let oblast = branch.oblast || '';
+    let raion = branch.raion || '';
+    if ((!oblast || !raion) && window.SmartSearchEngine) {
+      const found = window.SmartSearchEngine.UKRAINE_SETTLEMENTS.find(s => s.name.toLowerCase() === city.toLowerCase());
+      if (found) {
+        if (!oblast) oblast = found.oblast;
+        if (!raion) raion = found.raion;
       }
     }
-    if (type === 'Поштове') type = 'Поштове(ий)';
-    if (type === 'Вантажне') type = 'Вантажне(ий)';
+
+    const raionClean = (raion || '').replace(/\s*(?:район|р-н)$/i, '').trim();
+    const oblClean = (oblast || '').replace(/\s*(?:область|обл\.?)$/i, '').trim();
+
+    const geoParts = [];
+    if (raionClean && !raionClean.toLowerCase().includes(city.toLowerCase())) {
+      geoParts.push(`${raionClean} р-н`);
+    }
+    if (oblClean) {
+      geoParts.push(`${oblClean} обл.`);
+    }
+    const geoBracket = geoParts.length > 0 ? ` (${geoParts.join(', ')})` : '';
+
+    const isPost = isPostomatBranch(branch);
+    const isCarg = isCargoBranch(branch);
+
+    let typeTitle = 'Відділення';
+    if (isPost) {
+      typeTitle = 'Поштомат';
+    } else if (isCarg) {
+      typeTitle = 'Вантажне відділення';
+    }
 
     const num = branch.number || branch.postalCode || '1';
     const street = getCleanStreet(branch);
 
-    return `${sType} ${city} - ${type} №${num}: ${street}`;
+    return `${sTypePrefix} ${city}${geoBracket}, ${typeTitle} №${num}: ${street}`;
   }
 
   // Toast сповіщення про успішне копіювання
@@ -862,19 +901,19 @@
     }
 
     let typeDisplay = branch.typeName;
-    if (isPostomat) {
+    if (isPostomatBranch(branch)) {
       typeDisplay = 'Поштомат';
+    } else if (isCargoBranch(branch)) {
+      typeDisplay = 'Вантажне відділення';
     } else if (!typeDisplay) {
       if (isUkrposhta) {
         typeDisplay = 'Відділення';
-      } else if (branch.number === '1') {
-        typeDisplay = 'Вантажне(ий)';
       } else {
         typeDisplay = 'Поштове(ий)';
       }
     }
     if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
-    if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
+    if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне відділення';
 
     const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || postalCode}: ${cleanStreet}`;
 
@@ -941,12 +980,14 @@
   function renderSearchResults(branches, query, didYouMeanText, missingTargetBranch) {
     dom.searchResultsSection.classList.remove('hidden');
 
-    // 1. Фільтрація за типом (Всі | Відділення | Поштомати)
+    // 1. Фільтрація за типом (Всі | Вантажні | Відділення | Поштомати)
     let filtered = branches || [];
     if (state.typeFilter === 'postomat') {
-      filtered = filtered.filter(b => b.type === 'poshtomat' || (b.typeText && b.typeText.includes('Поштомат')) || (b.typeName && b.typeName.includes('Поштомат')) || (b.name && b.name.includes('Поштомат')));
+      filtered = filtered.filter(isPostomatBranch);
+    } else if (state.typeFilter === 'cargo') {
+      filtered = filtered.filter(isCargoBranch);
     } else if (state.typeFilter === 'branch') {
-      filtered = filtered.filter(b => !(b.type === 'poshtomat' || (b.typeText && b.typeText.includes('Поштомат')) || (b.typeName && b.typeName.includes('Поштомат')) || (b.name && b.name.includes('Поштомат'))));
+      filtered = filtered.filter(isRegularBranch);
     }
 
     dom.resultsList.innerHTML = '';
@@ -2146,12 +2187,12 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.22.0)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.23.0)
   // ==========================================================================
   function initServiceWorker() {
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.22.0', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.23.0', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2190,7 +2231,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.22.0') {
+          if (key !== 'np-ukr-cache-v8.23.0') {
             caches.delete(key);
           }
         });
