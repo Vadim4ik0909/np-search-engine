@@ -2142,20 +2142,21 @@ async function runTests() {
       throw new Error('Не знайдено підказок для "Обухів 1"');
     }
 
-    // 2. Перша підказка повинна бути саме вантажним відділенням №1 на вул. Чумацький шлях
-    const topCargo = obukhivSug[0];
-    if (!topCargo.isCargo) {
-      throw new Error(`Перше відділення для "Обухів 1" повинно бути вантажним (isCargo=true), отримано isCargo=${topCargo.isCargo}`);
+    // 1) Відсутність колізій: рівно ОДНЕ вантажне відділення №1 (вул. Чумацький шлях, 37)
+    const cargoMatches = obukhivSug.filter(s => s.isCargo || (s.title && s.title.includes('Вантажне')));
+    if (cargoMatches.length !== 1) {
+      throw new Error(`Очікувалось рівно одне вантажне відділення для "Обухів 1", отримано: ${cargoMatches.length}`);
     }
+    const topCargo = cargoMatches[0];
     if (!topCargo.title.includes('Вантажне відділення №1')) {
-      throw new Error(`Перше відділення повинно мати назву "Вантажне відділення №1", отримано: "${topCargo.title}"`);
+      throw new Error(`Вантажне відділення повинно мати назву "Вантажне відділення №1", отримано: "${topCargo.title}"`);
     }
     const cargoStreet = (topCargo.street || (topCargo.branchObj && topCargo.branchObj.street) || '').toLowerCase();
-    if (!cargoStreet.includes('чумацький')) {
-      throw new Error(`Очікувалось вантажне відділення на вул. Чумацький шлях, отримано: "${cargoStreet}"`);
+    if (!cargoStreet.includes('чумацький') || !cargoStreet.includes('37')) {
+      throw new Error(`Очікувалось вантажне відділення на вул. Чумацький шлях, 37, отримано: "${cargoStreet}"`);
     }
 
-    // 3. Відділення на вул. Сонячній не повинно мати статусу "Вантажне" з номером 1
+    // 2) Відділення на вул. Сонячна, 13 в Обухові повинно мати свій реальний номер із бази та тип "Відділення (до 30 кг)", а не "Вантажне"
     const sonyachna = obukhivSug.find(s => {
       const st = (s.street || (s.branchObj && s.branchObj.street) || '').toLowerCase();
       return st.includes('сонячна');
@@ -2163,10 +2164,10 @@ async function runTests() {
     if (!sonyachna) {
       throw new Error('Відділення на вул. Сонячній не знайдено серед підказок');
     }
-    if (sonyachna.isCargo) {
-      throw new Error('Відділення на вул. Сонячній (вага до 30 кг) помилково має isCargo=true');
+    if (String(sonyachna.branchObj.number).trim() !== '1') {
+      throw new Error(`Відділення на вул. Сонячній повинно мати реальний номер із бази "1", отримано: "${sonyachna.branchObj.number}"`);
     }
-    if (sonyachna.title.includes('Вантажне')) {
+    if (sonyachna.isCargo || sonyachna.title.includes('Вантажне')) {
       throw new Error(`Відділення на вул. Сонячній помилково маркується як вантажне: "${sonyachna.title}"`);
     }
     if (!sonyachna.title.startsWith('Відділення №1')) {
@@ -2174,6 +2175,31 @@ async function runTests() {
     }
     if (!sonyachna.weightLabel.includes('30 кг')) {
       throw new Error(`Відділення на вул. Сонячній повинно мати ліміт 30 кг, отримано: "${sonyachna.weightLabel}"`);
+    }
+
+    // Перевірка рендерингу картки для вул. Сонячна через createFullBranchCard
+    const cardSonyachna = window.createFullBranchCard(sonyachna.branchObj);
+    if (cardSonyachna.innerHTML.includes('Вантажне')) {
+      throw new Error('Картка відділення на вул. Сонячній (30 кг) помилково містить "Вантажне"!');
+    }
+    if (!cardSonyachna.innerHTML.includes('Відділення №1:')) {
+      throw new Error('Картка відділення на вул. Сонячній повинна містити "Відділення №1:"');
+    }
+
+    // 3) Прогін перевірки на валідацію типів: жодне відділення в рендері з вагою <= 30 кг не повинно отримувати заголовок "Вантажне відділення"
+    let typeViolations = 0;
+    // Перевіряємо перші 1000 відділень пулу з вагою <= 30 кг
+    for (let i = 0; i < npPool.length && i < 1500; i++) {
+      const b = npPool[i];
+      const w = parseFloat(b.totalMaxWeightAllowed || b.TotalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed || b.PlaceMaxWeightAllowed) || parseFloat(b.maxWeight) || 0;
+      const isUnder30 = (w > 0 && w <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+      if (isUnder30) {
+        const testCard = window.createFullBranchCard(b);
+        if (testCard.innerHTML.includes('Вантажне відділення') || testCard.innerHTML.includes('Вантажне(ий)')) {
+          typeViolations++;
+          throw new Error(`Відділення ${b.city} №${b.number} (вага <= 30 кг) помилково отримало статус вантажного у картці!`);
+        }
+      }
     }
 
     // 4. Перевірка UI інпуту та дропдауну
@@ -2192,7 +2218,7 @@ async function runTests() {
       throw new Error(`Перший елемент UI дропдауну повинен бути Вантажне відділення №1 (Чумацький шлях), отримано: ${firstHtml}`);
     }
 
-    console.log('  ✓ Успіх: "Обухів 1" повертає Вантажне відділення №1 (вул. Чумацький шлях), а вул. Сонячна коректно класифікована як звичайне відділення!\n');
+    console.log('  ✓ Успіх: запит "Обухів 1" виводить рівно 1 вантажне №1 (Чумацький шлях, 37), вул. Сонячна типізована як Відділення №1 (30 кг), валідація типів без порушень!\n');
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 36:', err.message, '\n');

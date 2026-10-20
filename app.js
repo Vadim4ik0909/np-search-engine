@@ -771,15 +771,22 @@
 
   function isCargoBranch(b) {
     if (!b || isPostomatBranch(b)) return false;
-    const w = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
-    const isUnder30 = (w > 0 && w <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+    const totalWeight = parseFloat(b.totalMaxWeightAllowed || b.TotalMaxWeightAllowed) || 0;
+    const placeWeight = parseFloat(b.placeMaxWeightAllowed || b.PlaceMaxWeightAllowed) || 0;
+    const maxWeight = parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || Math.max(totalWeight, placeWeight);
+
+    // Якщо вага <= 30 кг — це СТРОГО "Відділення", навіть якщо в сирому полі опису випадково трапляється слово "вантажне"
+    const isUnder30 = (maxWeight > 0 && maxWeight <= 30) ||
+      (totalWeight > 0 && totalWeight <= 30) ||
+      (placeWeight > 0 && placeWeight <= 30) ||
+      /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName, b.Description].filter(Boolean).join(' '));
     if (isUnder30) return false;
-    const hay = [b.CategoryOfWarehouse, b.type, b.typeClass, b.typeName, b.typeText, b.name, b.Description].filter(Boolean).join(' ').toLowerCase();
-    return /postcargo|cargo|вантажн/.test(hay) ||
-           w >= 1000 ||
-           b.CategoryOfWarehouse === 'Cargo' ||
-           b.typeClass === 'cargo' ||
-           (b.typeText && /1[01]00\s*кг/i.test(b.typeText));
+
+    // Статус "Вантажне відділення" ТІЛЬКИ якщо (TotalMaxWeightAllowed >= 1000 || PlaceMaxWeightAllowed >= 1000 || CategoryOfWarehouse === "Cargo")
+    return totalWeight >= 1000 ||
+           placeWeight >= 1000 ||
+           maxWeight >= 1000 ||
+           b.CategoryOfWarehouse === 'Cargo';
   }
 
   function isRegularBranch(b) {
@@ -1025,25 +1032,20 @@
       `;
     }
 
-    let typeDisplay = branch.typeName;
+    let typeDisplay;
     if (isPostomatBranch(branch)) {
       typeDisplay = 'Поштомат';
     } else if (isCargoBranch(branch)) {
       typeDisplay = 'Вантажне відділення';
-    } else if (!typeDisplay) {
-      if (isUkrposhta) {
-        typeDisplay = 'Відділення';
-      } else {
-        typeDisplay = 'Поштове(ий)';
-      }
+    } else {
+      typeDisplay = 'Відділення';
     }
-    if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
-    if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне відділення';
 
-    const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branch.number || postalCode}: ${cleanStreet}`;
+    const branchNumber = (branch.number || branch.Number || branch.postalCode || branch.PostalCode || '').toString().trim();
+    const primaryLineText = `${sType} ${branch.city || ''} - ${typeDisplay} №${branchNumber}: ${cleanStreet}`;
 
     const hlCity = highlightMatch(branch.city || '', query);
-    const hlNumber = highlightMatch(branch.number || postalCode, query);
+    const hlNumber = highlightMatch(branchNumber, query);
     const hlStreet = highlightMatch(cleanStreet, query);
     const hlGeoSub = geoSub ? highlightMatch(geoSub, query) : '';
 
@@ -1242,27 +1244,22 @@
       const cleanStreet = getCleanStreet(branch);
       const geoSub = formatGeoSub(branch);
       const typeInfo = getTypeBadgeInfo(branch);
-      const isPostomat = branch.type === 'poshtomat' || (branch.typeText && branch.typeText.includes('Поштомат')) || (branch.typeName && branch.typeName.includes('Поштомат')) || (branch.name && branch.name.includes('Поштомат'));
-
+      const isPostomat = isPostomatBranch(branch);
+      const isCargo = isCargoBranch(branch);
       const isUkrposhta = state.currentService === 'ukrposhta' || (branch.id && branch.id.startsWith('up-'));
-      const postalCode = (branch.postalCode || branch.number || '').toString().trim();
+      const branchNumber = (branch.number || branch.Number || branch.postalCode || branch.PostalCode || '').toString().trim();
+      const postalCode = (branch.postalCode || branch.PostalCode || '').toString().trim();
 
-      let typeDisplay = branch.typeName;
+      let typeDisplay;
       if (isPostomat) {
         typeDisplay = 'Поштомат';
-      } else if (!typeDisplay) {
-        if (isUkrposhta) {
-          typeDisplay = 'Відділення';
-        } else if (isCargoBranch(branch)) {
-          typeDisplay = 'Вантажне(ий)';
-        } else {
-          typeDisplay = 'Поштове(ий)';
-        }
+      } else if (isCargo) {
+        typeDisplay = 'Вантажне відділення';
+      } else {
+        typeDisplay = 'Відділення';
       }
-      if (typeDisplay === 'Поштове') typeDisplay = 'Поштове(ий)';
-      if (typeDisplay === 'Вантажне') typeDisplay = 'Вантажне(ий)';
 
-      const hlNumber = highlightMatch(branch.number || postalCode, query || state.searchQuery);
+      const hlNumber = highlightMatch(branchNumber, query || state.searchQuery);
       const hlStreet = highlightMatch(cleanStreet, query || state.searchQuery);
       const hlCity = highlightMatch(branch.city || '', query || state.searchQuery);
       const hlGeoSub = geoSub ? highlightMatch(geoSub, query || state.searchQuery) : '';

@@ -1410,12 +1410,26 @@
       const cleanCity = (b.city || '').replace(/\\n|\r?\n/g, ' ').replace(/\s*\([^)]*\)\s*$/, '').trim();
       const isPost = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || /поштомат/i.test(b.name || '') || /поштомат/i.test(b.typeName || '');
       
-      const wVal = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
-      const isUnder30 = (wVal > 0 && wVal <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
-      const isCargo = !isPost && !isUnder30 && (wVal >= 1000 || b.CategoryOfWarehouse === 'Cargo' || b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || /вантажн/i.test(b.name || '') || /вантажн/i.test(b.typeText || '') || /вантажн/i.test(b.typeName || ''));
+      const totalWeight = parseFloat(b.totalMaxWeightAllowed || b.TotalMaxWeightAllowed) || 0;
+      const placeWeight = parseFloat(b.placeMaxWeightAllowed || b.PlaceMaxWeightAllowed) || 0;
+      const maxWeight = parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || Math.max(totalWeight, placeWeight);
+
+      // Якщо вага <= 30 кг — це СТРОГО "Відділення", жодного статусу "Вантажне"
+      const isUnder30 = (maxWeight > 0 && maxWeight <= 30) ||
+        (totalWeight > 0 && totalWeight <= 30) ||
+        (placeWeight > 0 && placeWeight <= 30) ||
+        /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+
+      // Статус "Вантажне відділення" ТІЛЬКИ якщо (TotalMaxWeightAllowed >= 1000 || PlaceMaxWeightAllowed >= 1000 || CategoryOfWarehouse === "Cargo")
+      const isCargo = !isPost && !isUnder30 && (
+        totalWeight >= 1000 ||
+        placeWeight >= 1000 ||
+        maxWeight >= 1000 ||
+        b.CategoryOfWarehouse === 'Cargo'
+      );
       const kind = isPost ? 'Поштомат' : (isCargo ? 'Вантажне відділення' : 'Відділення');
 
-      const weight = wVal || (isPost ? 20 : (isCargo ? 1100 : 30));
+      const weight = isUnder30 ? (maxWeight || totalWeight || placeWeight || 30) : (maxWeight || (isPost ? 20 : (isCargo ? 1100 : 30)));
       const weightLabel = `(вага: до ${weight} кг)`;
 
       let rawStreet = (b.street || '').replace(/\\n|\r?\n/g, ' ').trim();
@@ -2344,9 +2358,21 @@
       }
 
       // Фільтр ключових слів поштомату / вантажного / звичайного відділення
-      const bWVal = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
-      const bIsUnder30 = (bWVal > 0 && bWVal <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
-      const isCargo = !isPostomat && !bIsUnder30 && (bWVal >= 1000 || b.CategoryOfWarehouse === 'Cargo' || b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || (b.typeText && /вантажн|1[01]00/i.test(b.typeText)) || (b.name && /вантажн/i.test(b.name)));
+      const totalWeight = parseFloat(b.totalMaxWeightAllowed || b.TotalMaxWeightAllowed) || 0;
+      const placeWeight = parseFloat(b.placeMaxWeightAllowed || b.PlaceMaxWeightAllowed) || 0;
+      const maxWeight = parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || Math.max(totalWeight, placeWeight);
+
+      const isUnder30 = (maxWeight > 0 && maxWeight <= 30) ||
+        (totalWeight > 0 && totalWeight <= 30) ||
+        (placeWeight > 0 && placeWeight <= 30) ||
+        /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+
+      const isCargo = !isPostomat && !isUnder30 && (
+        totalWeight >= 1000 ||
+        placeWeight >= 1000 ||
+        maxWeight >= 1000 ||
+        b.CategoryOfWarehouse === 'Cargo'
+      );
       if (hasCargoKeyword) {
         if (isCargo) score += 800;
         else score -= 1500;
