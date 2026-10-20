@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.26.3">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.26.4">
   
   <!-- Theme initialization (Default: Light; persists in localStorage; resets to Light on cache clear) -->
   <script>
@@ -35,7 +35,7 @@
   </script>
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.26.3">
+  <link rel="stylesheet" href="styles.css?v=8.26.4">
 </head>
 <body data-service="novaposhta">
 
@@ -247,7 +247,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.26.3</span>
+          <span class="version-tag">v8.26.4</span>
           
         </button>
       </div>
@@ -333,7 +333,7 @@
 
           <!-- Сповіщення про успішне надсилання -->
           <div id="feedbackSuccessBanner" class="feedback-success-banner hidden" role="status" aria-live="polite">
-            ✅ Дякуємо! Ваше повідомлення успішно надіслано.
+            ✅ Дякуємо! Фідбек успішно надіслано
           </div>
         </div>
 
@@ -357,8 +357,21 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.26.3 -->
+        <!-- Версія 8.26.4 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.26.4</span>
+            <span class="version-state">Стабілізація модального вікна фідбеку та відправки</span>
+            <span class="version-date">20 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Вибір файлів без закриття вікна:</strong> виправлено обробку кліків по дропзоні та бекдропу під час відкриття системного діалогу файлів.</li>
+            <li><strong>Миттєва відправка без CORS-зависань:</strong> запити до Google Apps Script надсилаються у режимі `no-cors` (`text/plain;charset=utf-8`).</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.26.3 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.26.3</span>
             <span class="version-state">Вбудоване модальне вікно фідбеку та баг-репортів</span>
@@ -1006,15 +1019,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.26.3"></script>
+  <script src="data/branches.js?v=8.26.4"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.26.3"></script>
+  <script src="data/all_settlements.js?v=8.26.4"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.26.3"></script>
+  <script src="data/fuzzySearch.js?v=8.26.4"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.26.3"></script>
+  <script src="app.js?v=8.26.4"></script>
 </body>
 </html>

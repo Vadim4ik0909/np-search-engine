@@ -2393,15 +2393,14 @@
   }
 
   // ==========================================================================
-  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.3)
+  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.4)
   // ==========================================================================
   function initFeedbackModal() {
     if (!dom.feedbackModal || !dom.feedbackForm) return;
 
-    let attachedFile = null;
-    let attachedDataUrl = '';
-    let attachedBase64 = '';
+    let currentFeedbackFile = null;
     let closeTimer = null;
+    const modalContainer = dom.feedbackModal.querySelector('.modal-card');
 
     function isFeedbackModalOpen() {
       return Boolean(dom.feedbackModal.open || dom.feedbackModal.hasAttribute('open'));
@@ -2415,6 +2414,7 @@
       if (dom.feedbackSuccessBanner) {
         dom.feedbackSuccessBanner.classList.add('hidden');
       }
+      setFormSubmittingState(false);
       if (typeof dom.feedbackModal.showModal === 'function') {
         if (!dom.feedbackModal.open) dom.feedbackModal.showModal();
       } else {
@@ -2435,12 +2435,11 @@
       } else {
         dom.feedbackModal.removeAttribute('open');
       }
+      setFormSubmittingState(false);
     }
 
     function clearFeedbackAttachment() {
-      attachedFile = null;
-      attachedDataUrl = '';
-      attachedBase64 = '';
+      currentFeedbackFile = null;
       if (dom.feedbackFileInput) dom.feedbackFileInput.value = '';
       if (dom.feedbackPreviewImg) dom.feedbackPreviewImg.src = '';
       if (dom.feedbackFileName) dom.feedbackFileName.textContent = '';
@@ -2469,12 +2468,17 @@
         return;
       }
 
-      attachedFile = file;
       const reader = new FileReader();
       reader.onload = () => {
         const resultStr = typeof reader.result === 'string' ? reader.result : '';
-        attachedDataUrl = resultStr;
-        attachedBase64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
+        const rawBase64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
+
+        currentFeedbackFile = {
+          name: file.name || 'screenshot.png',
+          type: file.type || 'image/png',
+          base64: rawBase64,
+          dataUrl: resultStr
+        };
 
         if (dom.feedbackPreviewImg) {
           dom.feedbackPreviewImg.src = file.type.startsWith('image/')
@@ -2482,7 +2486,7 @@
             : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
         }
         if (dom.feedbackFileName) {
-          dom.feedbackFileName.textContent = file.name || 'screenshot.png';
+          dom.feedbackFileName.textContent = currentFeedbackFile.name;
         }
         if (dom.feedbackDropzonePrompt) {
           dom.feedbackDropzonePrompt.classList.add('hidden');
@@ -2502,23 +2506,29 @@
     }
 
     if (dom.btnCloseFeedbackModal) {
-      dom.btnCloseFeedbackModal.addEventListener('click', closeFeedbackModal);
+      dom.btnCloseFeedbackModal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeFeedbackModal();
+      });
     }
 
     if (dom.btnCancelFeedback) {
-      dom.btnCancelFeedback.addEventListener('click', closeFeedbackModal);
+      dom.btnCancelFeedback.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeFeedbackModal();
+      });
     }
 
-    // Закриття по кліку на бекдроп
+    // Блокуємо спливання кліків із внутрішньої картки модалки, щоб відкриття системного вікна файлів не закривало модалку
+    if (modalContainer) {
+      modalContainer.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    // Закриття по кліку ТІЛЬКИ безпосередньо на сам бекдроп (e.target === dom.feedbackModal)
     dom.feedbackModal.addEventListener('click', (e) => {
-      const rect = dom.feedbackModal.getBoundingClientRect();
-      const isInDialog = (
-        rect.top <= e.clientY &&
-        e.clientY <= rect.bottom &&
-        rect.left <= e.clientX &&
-        e.clientX <= rect.right
-      );
-      if (!isInDialog || e.target === dom.feedbackModal) {
+      if (e.target === dom.feedbackModal) {
         closeFeedbackModal();
       }
     });
@@ -2532,19 +2542,30 @@
 
     // 1. Вибір через системний діалог файлів
     if (dom.feedbackDropzone && dom.feedbackFileInput) {
+      // Зупиняємо спливання подій click та cancel від прихованого input[type="file"]
+      dom.feedbackFileInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      dom.feedbackFileInput.addEventListener('cancel', (e) => {
+        e.stopPropagation();
+      });
+
       dom.feedbackDropzone.addEventListener('click', (e) => {
-        if (e.target.closest('#btnRemoveFeedbackFile')) return;
+        e.stopPropagation();
+        if (e.target === dom.feedbackFileInput || e.target.closest('#btnRemoveFeedbackFile')) return;
         dom.feedbackFileInput.click();
       });
 
       dom.feedbackDropzone.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          e.stopPropagation();
           dom.feedbackFileInput.click();
         }
       });
 
-      dom.feedbackFileInput.addEventListener('change', () => {
+      dom.feedbackFileInput.addEventListener('change', (e) => {
+        e.stopPropagation();
         if (dom.feedbackFileInput.files && dom.feedbackFileInput.files[0]) {
           handleSelectedFile(dom.feedbackFileInput.files[0]);
         }
@@ -2553,6 +2574,7 @@
 
     if (dom.btnRemoveFeedbackFile) {
       dom.btnRemoveFeedbackFile.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         clearFeedbackAttachment();
       });
@@ -2616,76 +2638,67 @@
       }
     });
 
-    // Відправка форми через fetch(FEEDBACK_ENDPOINT)
+    // Відправка форми через fetch(FEEDBACK_ENDPOINT) у режимі no-cors / text/plain
     dom.feedbackForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const message = dom.feedbackMessage ? dom.feedbackMessage.value.trim() : '';
-      if (!message) {
+      const feedbackMessage = dom.feedbackMessage ? dom.feedbackMessage.value.trim() : '';
+      if (!feedbackMessage) {
         if (dom.feedbackMessage) dom.feedbackMessage.focus();
         return;
       }
 
-      const type = dom.feedbackType ? dom.feedbackType.value : '🐞 Баг / Помилка';
-      const author = (dom.feedbackAuthor && dom.feedbackAuthor.value.trim()) || 'Анонімно';
+      const feedbackType = dom.feedbackType ? dom.feedbackType.value : '🐞 Баг / Помилка';
+      const feedbackAuthor = (dom.feedbackAuthor && dom.feedbackAuthor.value.trim()) || 'Анонімно';
+      const fileData = currentFeedbackFile;
 
-      const payload = {
-        type,
-        category: type,
-        message,
-        description: message,
-        text: message,
-        author,
-        name: author,
-        fileName: attachedFile ? (attachedFile.name || 'screenshot.png') : '',
-        mimeType: attachedFile ? (attachedFile.type || 'image/png') : '',
-        base64: attachedBase64 || '',
-        fileBase64: attachedBase64 || '',
-        fileData: attachedBase64 || '',
-        file: attachedBase64 || '',
-        image: attachedDataUrl || '',
+      const payload = JSON.stringify({
+        type: feedbackType,
+        description: feedbackMessage,
+        message: feedbackMessage,
+        operator: feedbackAuthor || 'Анонімно',
+        author: feedbackAuthor || 'Анонімно',
+        fileName: fileData ? fileData.name : '',
+        mimeType: fileData ? fileData.type : '',
+        fileBase64: fileData ? fileData.base64 : '',
+        base64: fileData ? fileData.base64 : '',
         service: state.currentService,
         searchQuery: state.searchQuery || (dom.searchInput ? dom.searchInput.value.trim() : ''),
-        version: 'v8.26.3',
+        version: 'v8.26.4',
         timestamp: new Date().toISOString()
-      };
+      });
 
       setFormSubmittingState(true);
 
       try {
+        // Відправляємо як text/plain + no-cors, щоб обійти CORS preflight та 302 redirect Google Apps Script
         await fetch(FEEDBACK_ENDPOINT, {
           method: 'POST',
+          mode: 'no-cors',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'text/plain;charset=utf-8'
           },
-          body: JSON.stringify(payload)
+          body: payload
         });
+
+        setFormSubmittingState(false);
+        resetFeedbackForm();
+
+        if (dom.feedbackSuccessBanner) {
+          dom.feedbackSuccessBanner.textContent = '✅ Дякуємо! Фідбек успішно надіслано';
+          dom.feedbackSuccessBanner.classList.remove('hidden');
+        }
+
+        closeTimer = setTimeout(() => {
+          if (dom.feedbackSuccessBanner) {
+            dom.feedbackSuccessBanner.classList.add('hidden');
+          }
+          closeFeedbackModal();
+        }, 1900);
       } catch (err) {
-        // Fallback для Google Apps Script у разі CORS preflight обмежень браузера
-        try {
-          await fetch(FEEDBACK_ENDPOINT, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: {
-              'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify(payload)
-          });
-        } catch (_) {}
+        console.warn('[Feedback] Помилка надсилання:', err);
       } finally {
         setFormSubmittingState(false);
       }
-
-      resetFeedbackForm();
-      if (dom.feedbackSuccessBanner) {
-        dom.feedbackSuccessBanner.classList.remove('hidden');
-      }
-
-      closeTimer = setTimeout(() => {
-        if (dom.feedbackSuccessBanner) {
-          dom.feedbackSuccessBanner.classList.add('hidden');
-        }
-        closeFeedbackModal();
-      }, 2000);
     });
   }
 
@@ -2704,7 +2717,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.3)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.4)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2715,7 +2728,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.3', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.4', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2754,7 +2767,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.3') {
+          if (key !== 'np-ukr-cache-v8.26.4') {
             caches.delete(key);
           }
         });
