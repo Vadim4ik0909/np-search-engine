@@ -247,7 +247,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.26.8</span>
+          <span class="version-tag">v8.26.9</span>
           
         </button>
       </div>
@@ -276,8 +276,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.26.8 -->
+        <!-- Версія 8.26.9 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.26.9</span>
+            <span class="version-state">Bugfix: Виправлення типізації вантажних відділень та номерів</span>
+            <span class="version-date">21 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Точна типізація вантажних відділень:</strong> статус «Вантажне відділення» присвоюється виключно відділенням з лімітом ваги від 1000 кг або відповідною категорією. Усі відділення з лімітом до 30 кг іменуються «Відділення №...».</li>
+            <li><strong>Усунення дублювання та хибного статусу:</strong> виправлено кейс «Обухів 1» — вантажне відділення №1 (вул. Чумацький шлях, 37, до 1100 кг) коректно ранжується першим, а пункт на вул. Сонячній позначається як звичайне відділення до 30 кг.</li>
+            <li><strong>Номер у підказках:</strong> номер у картці автокомпліту формується суворо з реального поля бази відділень.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.26.8 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.26.8</span>
             <span class="version-state">Bugfix & Hardening: Нормалізація пунктуації та Clipboard API Fallback</span>

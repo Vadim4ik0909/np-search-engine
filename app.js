@@ -386,9 +386,10 @@
       const placeWeight = parseFloat(item.PlaceMaxWeightAllowed) || 0;
       const desc = item.Description || '';
       const isPostomat = item.CategoryOfWarehouse === 'Postomat' || desc.toLowerCase().includes('поштомат');
-      const isCargo = totalWeight > 200 || placeWeight > 200 || desc.toLowerCase().includes('вантажне') || item.Number === '1';
-
       let maxWeight = Math.max(totalWeight, placeWeight);
+      const isUnder30 = (maxWeight > 0 && maxWeight <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test(desc);
+      const isCargo = !isPostomat && !isUnder30 && (totalWeight >= 1000 || placeWeight >= 1000 || item.CategoryOfWarehouse === 'Cargo' || desc.toLowerCase().includes('вантажне'));
+
       if (maxWeight === 0) {
         maxWeight = isCargo ? 1100 : 30;
       }
@@ -770,10 +771,14 @@
 
   function isCargoBranch(b) {
     if (!b || isPostomatBranch(b)) return false;
+    const w = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
+    const isUnder30 = (w > 0 && w <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+    if (isUnder30) return false;
     const hay = [b.CategoryOfWarehouse, b.type, b.typeClass, b.typeName, b.typeText, b.name, b.Description].filter(Boolean).join(' ').toLowerCase();
     return /postcargo|cargo|вантажн/.test(hay) ||
-           (b.maxWeight && b.maxWeight >= 1000) ||
-           (b.weightLimit && b.weightLimit >= 1000) ||
+           w >= 1000 ||
+           b.CategoryOfWarehouse === 'Cargo' ||
+           b.typeClass === 'cargo' ||
            (b.typeText && /1[01]00\s*кг/i.test(b.typeText));
   }
 
@@ -1248,7 +1253,7 @@
       } else if (!typeDisplay) {
         if (isUkrposhta) {
           typeDisplay = 'Відділення';
-        } else if (branch.number === '1') {
+        } else if (isCargoBranch(branch)) {
           typeDisplay = 'Вантажне(ий)';
         } else {
           typeDisplay = 'Поштове(ий)';
@@ -2423,7 +2428,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.8)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.9)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2434,7 +2439,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.8', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.9', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2473,7 +2478,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.8') {
+          if (key !== 'np-ukr-cache-v8.26.9') {
             caches.delete(key);
           }
         });

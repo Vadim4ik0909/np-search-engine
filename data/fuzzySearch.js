@@ -1409,10 +1409,13 @@
     function buildBranchSuggestion(b) {
       const cleanCity = (b.city || '').replace(/\\n|\r?\n/g, ' ').replace(/\s*\([^)]*\)\s*$/, '').trim();
       const isPost = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || /поштомат/i.test(b.name || '') || /поштомат/i.test(b.typeName || '');
-      const isCargo = !isPost && (b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || (b.maxWeight && b.maxWeight >= 1000) || (b.totalMaxWeightAllowed && b.totalMaxWeightAllowed >= 1000) || /вантажн/i.test(b.name || '') || /вантажн/i.test(b.typeText || ''));
+      
+      const wVal = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
+      const isUnder30 = (wVal > 0 && wVal <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+      const isCargo = !isPost && !isUnder30 && (wVal >= 1000 || b.CategoryOfWarehouse === 'Cargo' || b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || /вантажн/i.test(b.name || '') || /вантажн/i.test(b.typeText || '') || /вантажн/i.test(b.typeName || ''));
       const kind = isPost ? 'Поштомат' : (isCargo ? 'Вантажне відділення' : 'Відділення');
 
-      const weight = b.totalMaxWeightAllowed || b.maxWeight || (isPost ? 20 : (isCargo ? 1100 : 30));
+      const weight = wVal || (isPost ? 20 : (isCargo ? 1100 : 30));
       const weightLabel = `(вага: до ${weight} кг)`;
 
       let rawStreet = (b.street || '').replace(/\\n|\r?\n/g, ' ').trim();
@@ -1437,17 +1440,18 @@
         b.oblast ? `${String(b.oblast).replace(/\s*(?:область|обл\.?)$/i, '')} обл.` : ''
       ].filter(Boolean).join(', ');
 
-      const displayLine = `${kind} №${b.number} • ${weightLabel}`;
+      const bNum = b && b.number != null ? String(b.number).trim() : (b && b.postalCode ? String(b.postalCode).trim() : '');
+      const displayLine = `${kind} №${bNum} • ${weightLabel}`;
       const isMajorCity = REGIONAL_CENTERS.has(canonText(cleanCity));
       const fillText = isMajorCity
-        ? `${cleanCity} ${b.number}`.replace(/\s+/g, ' ').trim()
-        : `${cleanCity} ${b.oblast || ''} ${b.number}`.replace(/\s+/g, ' ').trim();
+        ? `${cleanCity} ${bNum}`.replace(/\s+/g, ' ').trim()
+        : `${cleanCity} ${b.oblast || ''} ${bNum}`.replace(/\s+/g, ' ').trim();
 
       return {
         mode: 'branch',
         type: isPost ? 'postomat' : 'branch',
         isCargo: isCargo,
-        title: `${kind} №${b.number}`,
+        title: `${kind} №${bNum}`,
         weightLabel: weightLabel,
         street: rawStreet,
         displayLine: displayLine,
@@ -1507,9 +1511,19 @@
           const bExact = (String(b.number) === numPrefix || String(b.postalCode) === numPrefix) ? 0 : 1;
           if (aExact !== bExact) return aExact - bExact;
 
+          // Пріоритет типу населеного пункту: місто має вищий пріоритет за село
+          const aIsCity = (a.settlementType === 'місто' || a.settlementType === 'м.' || a.settlementType === 'город') ? 1 : 0;
+          const bIsCity = (b.settlementType === 'місто' || b.settlementType === 'м.' || b.settlementType === 'город') ? 1 : 0;
+          if (aIsCity !== bIsCity) return bIsCity - aIsCity;
+
           const aPost = (a.typeClass === 'poshtomat' || a.type === 'poshtomat') ? 1 : 0;
           const bPost = (b.typeClass === 'poshtomat' || b.type === 'poshtomat') ? 1 : 0;
           if (!hasPostomatKeyword && aPost !== bPost) return aPost - bPost;
+
+          // Якщо номер та тип пункту однакові, пріоритет за більшою вагою (вантажне/повноцінне)
+          const aW = parseFloat(a.totalMaxWeightAllowed) || parseFloat(a.placeMaxWeightAllowed) || parseFloat(a.maxWeight) || parseFloat(a.weightLimit) || 0;
+          const bW = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
+          if (aW !== bW) return bW - aW;
 
           return (parseInt(a.number, 10) || 999999) - (parseInt(b.number, 10) || 999999);
         });
@@ -2330,7 +2344,9 @@
       }
 
       // Фільтр ключових слів поштомату / вантажного / звичайного відділення
-      const isCargo = b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || (b.maxWeight && b.maxWeight >= 1000) || (b.weightLimit && b.weightLimit >= 1000) || (b.typeText && /вантажн|1[01]00/i.test(b.typeText)) || (b.name && /вантажн/i.test(b.name));
+      const bWVal = parseFloat(b.totalMaxWeightAllowed) || parseFloat(b.placeMaxWeightAllowed) || parseFloat(b.maxWeight) || parseFloat(b.weightLimit) || 0;
+      const bIsUnder30 = (bWVal > 0 && bWVal <= 30) || /(?:до\s*(?:5|10|15|20|30)\s*кг|приймання-видачі)/i.test([b.name, b.typeText, b.typeName].filter(Boolean).join(' '));
+      const isCargo = !isPostomat && !bIsUnder30 && (bWVal >= 1000 || b.CategoryOfWarehouse === 'Cargo' || b.typeClass === 'cargo' || b.type === 'PostCargoBranch' || (b.typeText && /вантажн|1[01]00/i.test(b.typeText)) || (b.name && /вантажн/i.test(b.name)));
       if (hasCargoKeyword) {
         if (isCargo) score += 800;
         else score -= 1500;

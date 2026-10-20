@@ -216,7 +216,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 35;
+  let totalTests = 36;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -2126,6 +2126,76 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 35:', err.message, '\n');
+  }
+
+  // ===============================================================
+  // ТЕСТ 36: Перевірка типізації вантажних відділень та номерів для "Обухів 1"
+  // ===============================================================
+  try {
+    console.log('Тест 36: Перевірка типізації вантажних відділень та номерів ("Обухів 1")...');
+    const S = window.SmartSearchEngine;
+    const npPool = window.BRANCHES_DATA.novaposhta || [];
+
+    // 1. Отримуємо підказки для "Обухів 1"
+    const obukhivSug = S.getAutocompleteSuggestions('Обухів 1', 'novaposhta', null, npPool);
+    if (!obukhivSug || obukhivSug.length === 0) {
+      throw new Error('Не знайдено підказок для "Обухів 1"');
+    }
+
+    // 2. Перша підказка повинна бути саме вантажним відділенням №1 на вул. Чумацький шлях
+    const topCargo = obukhivSug[0];
+    if (!topCargo.isCargo) {
+      throw new Error(`Перше відділення для "Обухів 1" повинно бути вантажним (isCargo=true), отримано isCargo=${topCargo.isCargo}`);
+    }
+    if (!topCargo.title.includes('Вантажне відділення №1')) {
+      throw new Error(`Перше відділення повинно мати назву "Вантажне відділення №1", отримано: "${topCargo.title}"`);
+    }
+    const cargoStreet = (topCargo.street || (topCargo.branchObj && topCargo.branchObj.street) || '').toLowerCase();
+    if (!cargoStreet.includes('чумацький')) {
+      throw new Error(`Очікувалось вантажне відділення на вул. Чумацький шлях, отримано: "${cargoStreet}"`);
+    }
+
+    // 3. Відділення на вул. Сонячній не повинно мати статусу "Вантажне" з номером 1
+    const sonyachna = obukhivSug.find(s => {
+      const st = (s.street || (s.branchObj && s.branchObj.street) || '').toLowerCase();
+      return st.includes('сонячна');
+    });
+    if (!sonyachna) {
+      throw new Error('Відділення на вул. Сонячній не знайдено серед підказок');
+    }
+    if (sonyachna.isCargo) {
+      throw new Error('Відділення на вул. Сонячній (вага до 30 кг) помилково має isCargo=true');
+    }
+    if (sonyachna.title.includes('Вантажне')) {
+      throw new Error(`Відділення на вул. Сонячній помилково маркується як вантажне: "${sonyachna.title}"`);
+    }
+    if (!sonyachna.title.startsWith('Відділення №1')) {
+      throw new Error(`Відділення на вул. Сонячній повинно мати заголовок "Відділення №1", отримано: "${sonyachna.title}"`);
+    }
+    if (!sonyachna.weightLabel.includes('30 кг')) {
+      throw new Error(`Відділення на вул. Сонячній повинно мати ліміт 30 кг, отримано: "${sonyachna.weightLabel}"`);
+    }
+
+    // 4. Перевірка UI інпуту та дропдауну
+    searchInput.value = 'Обухів 1';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+    if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'branch') {
+      throw new Error('Дропдаун для "Обухів 1" має бути відкритий у Branch Mode');
+    }
+    const dropItems = dropdown.querySelectorAll('.autocomplete-item');
+    if (!dropItems || dropItems.length === 0) {
+      throw new Error('Дропдаун порожній для "Обухів 1"');
+    }
+    const firstHtml = dropItems[0].innerHTML;
+    if (!firstHtml.includes('Вантажне відділення') || !firstHtml.includes('Чумацький') || !firstHtml.includes('1100 кг')) {
+      throw new Error(`Перший елемент UI дропдауну повинен бути Вантажне відділення №1 (Чумацький шлях), отримано: ${firstHtml}`);
+    }
+
+    console.log('  ✓ Успіх: "Обухів 1" повертає Вантажне відділення №1 (вул. Чумацький шлях), а вул. Сонячна коректно класифікована як звичайне відділення!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 36:', err.message, '\n');
   }
 
   console.log('===============================================================');
