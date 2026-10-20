@@ -2383,7 +2383,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.1)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.2)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2394,7 +2394,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.1', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.2', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2433,7 +2433,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.1') {
+          if (key !== 'np-ukr-cache-v8.26.2') {
             caches.delete(key);
           }
         });

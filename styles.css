@@ -193,6 +193,15 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   justify-content: center;
 }
 
+.top-nav-actions {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
 .icon-tool-btn,
 .theme-toggle-btn {
   position: absolute;
@@ -210,6 +219,53 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-sm);
   z-index: 10;
+}
+
+.top-nav-actions .icon-tool-btn,
+.top-nav-actions .theme-toggle-btn {
+  position: static;
+}
+
+.btn-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+.btn-feedback:hover {
+  color: var(--text-main);
+  border-color: var(--border-subtle);
+  background: var(--bg-card-subtle);
+  transform: translateY(-1px);
+}
+
+.btn-feedback:active {
+  transform: scale(0.96);
+}
+
+.feedback-icon {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.feedback-text {
+  line-height: 1;
 }
 
 .icon-tool-btn:hover,
@@ -2174,7 +2230,17 @@ mark.hl-match,
   }
 
   .top-nav {
-    padding-right: 48px;
+    padding-right: 92px;
+  }
+
+  .btn-feedback {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .btn-feedback .feedback-text {
+    display: none;
   }
 
   .switcher-btn {
