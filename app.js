@@ -10,6 +10,8 @@
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
   // ==========================================================================
+  const FEEDBACK_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxqjrqmjrFCMpKhN6aPWL7etkafG9jyj1s8FphVs0TBrOYDKbnyCB9_SITjjWyfo7v0Q/exec';
+
   const state = {
     theme: 'light', // 'light' | 'dark' (Default: Light / біла)
     currentService: 'novaposhta', // 'novaposhta' | 'ukrposhta'
@@ -97,7 +99,26 @@
     btnSaveApiSettings: document.getElementById('btnSaveApiSettings'),
     btnTestApiKey: document.getElementById('btnTestApiKey'),
     npApiKeyInput: document.getElementById('npApiKeyInput'),
-    apiTestStatus: document.getElementById('apiTestStatus')
+    apiTestStatus: document.getElementById('apiTestStatus'),
+
+    // Модальне вікно фідбеку та баг-репортів
+    btnFeedback: document.getElementById('btnFeedback') || document.querySelector('.btn-feedback'),
+    feedbackModal: document.getElementById('feedbackModal'),
+    btnCloseFeedbackModal: document.getElementById('btnCloseFeedbackModal'),
+    btnCancelFeedback: document.getElementById('btnCancelFeedback'),
+    btnSubmitFeedback: document.getElementById('btnSubmitFeedback'),
+    feedbackForm: document.getElementById('feedbackForm'),
+    feedbackType: document.getElementById('feedbackType'),
+    feedbackMessage: document.getElementById('feedbackMessage'),
+    feedbackAuthor: document.getElementById('feedbackAuthor'),
+    feedbackDropzone: document.getElementById('feedbackDropzone'),
+    feedbackFileInput: document.getElementById('feedbackFileInput'),
+    feedbackDropzonePrompt: document.getElementById('feedbackDropzonePrompt'),
+    feedbackPreview: document.getElementById('feedbackPreview'),
+    feedbackPreviewImg: document.getElementById('feedbackPreviewImg'),
+    feedbackFileName: document.getElementById('feedbackFileName'),
+    btnRemoveFeedbackFile: document.getElementById('btnRemoveFeedbackFile'),
+    feedbackSuccessBanner: document.getElementById('feedbackSuccessBanner')
   };
 
   // ==========================================================================
@@ -2366,6 +2387,306 @@
         });
       }
     }
+
+    // Модалка зворотного зв'язку та баг-репортів (#feedbackModal)
+    initFeedbackModal();
+  }
+
+  // ==========================================================================
+  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.3)
+  // ==========================================================================
+  function initFeedbackModal() {
+    if (!dom.feedbackModal || !dom.feedbackForm) return;
+
+    let attachedFile = null;
+    let attachedDataUrl = '';
+    let attachedBase64 = '';
+    let closeTimer = null;
+
+    function isFeedbackModalOpen() {
+      return Boolean(dom.feedbackModal.open || dom.feedbackModal.hasAttribute('open'));
+    }
+
+    function openFeedbackModal() {
+      if (closeTimer) {
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+      if (dom.feedbackSuccessBanner) {
+        dom.feedbackSuccessBanner.classList.add('hidden');
+      }
+      if (typeof dom.feedbackModal.showModal === 'function') {
+        if (!dom.feedbackModal.open) dom.feedbackModal.showModal();
+      } else {
+        dom.feedbackModal.setAttribute('open', '');
+      }
+      setTimeout(() => {
+        if (dom.feedbackMessage) dom.feedbackMessage.focus();
+      }, 60);
+    }
+
+    function closeFeedbackModal() {
+      if (closeTimer) {
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+      if (typeof dom.feedbackModal.close === 'function' && dom.feedbackModal.open) {
+        dom.feedbackModal.close();
+      } else {
+        dom.feedbackModal.removeAttribute('open');
+      }
+    }
+
+    function clearFeedbackAttachment() {
+      attachedFile = null;
+      attachedDataUrl = '';
+      attachedBase64 = '';
+      if (dom.feedbackFileInput) dom.feedbackFileInput.value = '';
+      if (dom.feedbackPreviewImg) dom.feedbackPreviewImg.src = '';
+      if (dom.feedbackFileName) dom.feedbackFileName.textContent = '';
+      if (dom.feedbackPreview) dom.feedbackPreview.classList.add('hidden');
+      if (dom.feedbackDropzonePrompt) dom.feedbackDropzonePrompt.classList.remove('hidden');
+    }
+
+    function resetFeedbackForm() {
+      dom.feedbackForm.reset();
+      clearFeedbackAttachment();
+    }
+
+    function setFormSubmittingState(isSubmitting) {
+      const elements = dom.feedbackForm.querySelectorAll('input, textarea, select, button');
+      elements.forEach((el) => {
+        el.disabled = isSubmitting;
+      });
+      if (dom.btnSubmitFeedback) {
+        dom.btnSubmitFeedback.textContent = isSubmitting ? 'Надсилання...' : 'Надіслати';
+      }
+    }
+
+    function handleSelectedFile(file) {
+      if (!file) return;
+      if (!file.type || (!file.type.startsWith('image/') && !file.type.startsWith('video/'))) {
+        return;
+      }
+
+      attachedFile = file;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const resultStr = typeof reader.result === 'string' ? reader.result : '';
+        attachedDataUrl = resultStr;
+        attachedBase64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
+
+        if (dom.feedbackPreviewImg) {
+          dom.feedbackPreviewImg.src = file.type.startsWith('image/')
+            ? resultStr
+            : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+        }
+        if (dom.feedbackFileName) {
+          dom.feedbackFileName.textContent = file.name || 'screenshot.png';
+        }
+        if (dom.feedbackDropzonePrompt) {
+          dom.feedbackDropzonePrompt.classList.add('hidden');
+        }
+        if (dom.feedbackPreview) {
+          dom.feedbackPreview.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if (dom.btnFeedback) {
+      dom.btnFeedback.addEventListener('click', (e) => {
+        e.preventDefault();
+        openFeedbackModal();
+      });
+    }
+
+    if (dom.btnCloseFeedbackModal) {
+      dom.btnCloseFeedbackModal.addEventListener('click', closeFeedbackModal);
+    }
+
+    if (dom.btnCancelFeedback) {
+      dom.btnCancelFeedback.addEventListener('click', closeFeedbackModal);
+    }
+
+    // Закриття по кліку на бекдроп
+    dom.feedbackModal.addEventListener('click', (e) => {
+      const rect = dom.feedbackModal.getBoundingClientRect();
+      const isInDialog = (
+        rect.top <= e.clientY &&
+        e.clientY <= rect.bottom &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.right
+      );
+      if (!isInDialog || e.target === dom.feedbackModal) {
+        closeFeedbackModal();
+      }
+    });
+
+    // Закриття по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isFeedbackModalOpen()) {
+        closeFeedbackModal();
+      }
+    });
+
+    // 1. Вибір через системний діалог файлів
+    if (dom.feedbackDropzone && dom.feedbackFileInput) {
+      dom.feedbackDropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#btnRemoveFeedbackFile')) return;
+        dom.feedbackFileInput.click();
+      });
+
+      dom.feedbackDropzone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          dom.feedbackFileInput.click();
+        }
+      });
+
+      dom.feedbackFileInput.addEventListener('change', () => {
+        if (dom.feedbackFileInput.files && dom.feedbackFileInput.files[0]) {
+          handleSelectedFile(dom.feedbackFileInput.files[0]);
+        }
+      });
+    }
+
+    if (dom.btnRemoveFeedbackFile) {
+      dom.btnRemoveFeedbackFile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearFeedbackAttachment();
+      });
+    }
+
+    // 2. Drag-and-Drop у .feedback-dropzone
+    if (dom.feedbackDropzone) {
+      ['dragenter', 'dragover'].forEach((evtName) => {
+        dom.feedbackDropzone.addEventListener(evtName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dom.feedbackDropzone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'dragend', 'drop'].forEach((evtName) => {
+        dom.feedbackDropzone.addEventListener(evtName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dom.feedbackDropzone.classList.remove('dragover');
+        });
+      });
+
+      dom.feedbackDropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+          handleSelectedFile(dt.files[0]);
+        }
+      });
+    }
+
+    // 3. Перехоплення 'paste' (Cmd+V / Ctrl+V)
+    document.addEventListener('paste', (e) => {
+      if (!isFeedbackModalOpen()) return;
+      const clipboard = e.clipboardData;
+      if (!clipboard) return;
+
+      if (clipboard.files && clipboard.files.length > 0) {
+        const file = clipboard.files[0];
+        if (file.type && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+          handleSelectedFile(file);
+          return;
+        }
+      }
+
+      if (clipboard.items) {
+        for (let i = 0; i < clipboard.items.length; i++) {
+          const item = clipboard.items[i];
+          if (item.type && (item.type.indexOf('image') !== -1 || item.type.indexOf('video') !== -1)) {
+            const blob = item.getAsFile();
+            if (blob) {
+              const ext = (blob.type && blob.type.split('/')[1]) || 'png';
+              const namedFile = blob.name
+                ? blob
+                : new File([blob], `pasted-screenshot-${Date.now()}.${ext}`, { type: blob.type || 'image/png' });
+              handleSelectedFile(namedFile);
+              break;
+            }
+          }
+        }
+      }
+    });
+
+    // Відправка форми через fetch(FEEDBACK_ENDPOINT)
+    dom.feedbackForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = dom.feedbackMessage ? dom.feedbackMessage.value.trim() : '';
+      if (!message) {
+        if (dom.feedbackMessage) dom.feedbackMessage.focus();
+        return;
+      }
+
+      const type = dom.feedbackType ? dom.feedbackType.value : '🐞 Баг / Помилка';
+      const author = (dom.feedbackAuthor && dom.feedbackAuthor.value.trim()) || 'Анонімно';
+
+      const payload = {
+        type,
+        category: type,
+        message,
+        description: message,
+        text: message,
+        author,
+        name: author,
+        fileName: attachedFile ? (attachedFile.name || 'screenshot.png') : '',
+        mimeType: attachedFile ? (attachedFile.type || 'image/png') : '',
+        base64: attachedBase64 || '',
+        fileBase64: attachedBase64 || '',
+        fileData: attachedBase64 || '',
+        file: attachedBase64 || '',
+        image: attachedDataUrl || '',
+        service: state.currentService,
+        searchQuery: state.searchQuery || (dom.searchInput ? dom.searchInput.value.trim() : ''),
+        version: 'v8.26.3',
+        timestamp: new Date().toISOString()
+      };
+
+      setFormSubmittingState(true);
+
+      try {
+        await fetch(FEEDBACK_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        // Fallback для Google Apps Script у разі CORS preflight обмежень браузера
+        try {
+          await fetch(FEEDBACK_ENDPOINT, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch (_) {}
+      } finally {
+        setFormSubmittingState(false);
+      }
+
+      resetFeedbackForm();
+      if (dom.feedbackSuccessBanner) {
+        dom.feedbackSuccessBanner.classList.remove('hidden');
+      }
+
+      closeTimer = setTimeout(() => {
+        if (dom.feedbackSuccessBanner) {
+          dom.feedbackSuccessBanner.classList.add('hidden');
+        }
+        closeFeedbackModal();
+      }, 2000);
+    });
   }
 
   // Перевірка наявності захищеного ключа на бекенді (.env)
@@ -2383,7 +2704,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.2)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.3)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2394,7 +2715,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.2', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.3', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2433,7 +2754,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.2') {
+          if (key !== 'np-ukr-cache-v8.26.3') {
             caches.delete(key);
           }
         });
