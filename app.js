@@ -2393,52 +2393,34 @@
   }
 
   // ==========================================================================
-  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.5)
+  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.6)
   // ==========================================================================
-  /*
-   * Google Apps Script (Код.gs) універсальний парсер (JSON + form-urlencoded):
-   * let data = {};
-   * if (e.postData && e.postData.type === "application/x-www-form-urlencoded") {
-   *   data = e.parameter;
-   * } else if (e.postData && e.postData.contents) {
-   *   try { data = JSON.parse(e.postData.contents); } catch(err) { data = e.parameter || {}; }
-   * }
-   */
   async function sendFeedbackData(payload) {
-    const formBody = new URLSearchParams();
-    formBody.append('type', payload.type || 'Не вказано');
-    formBody.append('description', payload.description || '');
-    formBody.append('operator', payload.operator || 'Анонімно');
-    formBody.append('fileName', payload.fileName || '');
-    formBody.append('mimeType', payload.mimeType || '');
-    formBody.append('fileBase64', payload.fileBase64 || '');
-
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    let timeoutId = null;
-
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => {
-        if (controller) controller.abort();
-        reject(new Error('Feedback request timeout (10s)'));
-      }, 10000);
+    const jsonString = JSON.stringify({
+      type: payload.type || 'Не вказано',
+      description: payload.description || '',
+      operator: payload.operator || 'Анонімно',
+      fileName: payload.fileName || '',
+      mimeType: payload.mimeType || '',
+      fileBase64: payload.fileBase64 || ''
     });
 
+    // Збільш таймаут до 25 секунд для завантаження великих скріншотів
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
     try {
-      // Надсилаємо через fetch з no-cors та 10-секундним таймаутом
-      await Promise.race([
-        fetch(FEEDBACK_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: formBody.toString(),
-          signal: controller ? controller.signal : undefined
-        }),
-        timeoutPromise
-      ]);
+      await fetch(FEEDBACK_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: jsonString,
+        signal: controller.signal
+      });
     } finally {
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     }
   }
 
@@ -2446,6 +2428,7 @@
     if (!dom.feedbackModal || !dom.feedbackForm) return;
 
     let currentFeedbackFile = null;
+    let pendingFileReadPromise = null;
     let closeTimer = null;
     const modalContainer = dom.feedbackModal.querySelector('.modal-card');
 
@@ -2488,6 +2471,7 @@
 
     function clearFeedbackAttachment() {
       currentFeedbackFile = null;
+      pendingFileReadPromise = null;
       if (dom.feedbackFileInput) dom.feedbackFileInput.value = '';
       if (dom.feedbackPreviewImg) dom.feedbackPreviewImg.src = '';
       if (dom.feedbackFileName) dom.feedbackFileName.textContent = '';
@@ -2516,34 +2500,39 @@
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const resultStr = typeof reader.result === 'string' ? reader.result : '';
-        const rawBase64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
+      pendingFileReadPromise = new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const resultStr = typeof reader.result === 'string' ? reader.result : '';
+          const commaIdx = resultStr.indexOf(',');
+          const rawBase64 = commaIdx !== -1 ? resultStr.slice(commaIdx + 1) : resultStr;
 
-        currentFeedbackFile = {
-          name: file.name || 'screenshot.png',
-          type: file.type || 'image/png',
-          base64: rawBase64,
-          dataUrl: resultStr
+          currentFeedbackFile = {
+            name: file.name || 'screenshot.png',
+            type: file.type || 'image/png',
+            base64: rawBase64,
+            dataUrl: resultStr
+          };
+
+          if (dom.feedbackPreviewImg) {
+            dom.feedbackPreviewImg.src = file.type.startsWith('image/')
+              ? resultStr
+              : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+          }
+          if (dom.feedbackFileName) {
+            dom.feedbackFileName.textContent = currentFeedbackFile.name;
+          }
+          if (dom.feedbackDropzonePrompt) {
+            dom.feedbackDropzonePrompt.classList.add('hidden');
+          }
+          if (dom.feedbackPreview) {
+            dom.feedbackPreview.classList.remove('hidden');
+          }
+          resolve(currentFeedbackFile);
         };
-
-        if (dom.feedbackPreviewImg) {
-          dom.feedbackPreviewImg.src = file.type.startsWith('image/')
-            ? resultStr
-            : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
-        }
-        if (dom.feedbackFileName) {
-          dom.feedbackFileName.textContent = currentFeedbackFile.name;
-        }
-        if (dom.feedbackDropzonePrompt) {
-          dom.feedbackDropzonePrompt.classList.add('hidden');
-        }
-        if (dom.feedbackPreview) {
-          dom.feedbackPreview.classList.remove('hidden');
-        }
-      };
-      reader.readAsDataURL(file);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
     }
 
     if (dom.btnFeedback) {
@@ -2686,13 +2675,26 @@
       }
     });
 
-    // Відправка форми через sendFeedbackData (application/x-www-form-urlencoded + no-cors + 10s таймаут)
+    // Відправка форми через sendFeedbackData (text/plain JSON + no-cors + 25s таймаут)
     dom.feedbackForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const feedbackMessage = dom.feedbackMessage ? dom.feedbackMessage.value.trim() : '';
       if (!feedbackMessage) {
         if (dom.feedbackMessage) dom.feedbackMessage.focus();
         return;
+      }
+
+      if (dom.feedbackSuccessBanner) {
+        dom.feedbackSuccessBanner.classList.add('hidden');
+        dom.feedbackSuccessBanner.classList.remove('error');
+      }
+
+      setFormSubmittingState(true);
+
+      if (pendingFileReadPromise) {
+        try {
+          await pendingFileReadPromise;
+        } catch (_) {}
       }
 
       const feedbackType = dom.feedbackType ? dom.feedbackType.value : '🐞 Баг / Помилка';
@@ -2707,13 +2709,6 @@
         mimeType: fileData ? fileData.type : '',
         fileBase64: fileData ? fileData.base64 : ''
       };
-
-      if (dom.feedbackSuccessBanner) {
-        dom.feedbackSuccessBanner.classList.add('hidden');
-        dom.feedbackSuccessBanner.classList.remove('error');
-      }
-
-      setFormSubmittingState(true);
 
       try {
         await sendFeedbackData(payload);
@@ -2762,7 +2757,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.5)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.6)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2773,7 +2768,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.5', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.6', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2812,7 +2807,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.5') {
+          if (key !== 'np-ukr-cache-v8.26.6') {
             caches.delete(key);
           }
         });
