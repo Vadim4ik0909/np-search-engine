@@ -213,7 +213,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 33;
+  let totalTests = 34;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -1980,6 +1980,43 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 33:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 34: v8.26.1 — таб "Поштомати" для міста без номера ("київ")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 34: Запит "київ" + таб "Поштомати" виводить поштомати Києва');
+  try {
+    const resultsList = elementsById['resultsList'];
+    const resultsCount = elementsById['resultsCount'];
+    const filters = elementsById['resultsTypeFilters'];
+    const clickTab = (type) => filters.listeners.click[0]({
+      target: { closest: () => ({ getAttribute: () => type }) }
+    });
+
+    searchInput.value = 'київ';
+    dropdown.classList.add('hidden');
+    await window.__executeSearchForTest('київ');
+    clickTab('postomat');
+    await sleep(300);
+
+    const html = resultsList.innerHTML;
+    if (html.includes('не знайдено')) {
+      throw new Error('Для "київ" + таб Поштомати показано "не знайдено"');
+    }
+    if (!html.includes('📦') || /Відділення №\d+: /.test(html)) {
+      throw new Error('У табі Поштомати мають бути лише поштомати Києва: ' + html.slice(0, 300));
+    }
+    if (/^0 /.test(resultsCount.textContent || '')) {
+      throw new Error('Лічильник показує 0 для Поштоматів Києва');
+    }
+    clickTab('all');
+    await sleep(300);
+
+    console.log('  ✓ Успіх: таб "Поштомати" для "київ" повертає список поштоматів.\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 34:', err.message, '\n');
   }
 
   console.log('===============================================================');

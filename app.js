@@ -515,7 +515,7 @@
     if (/(?:вантажне|вантажний|вантаж)/i.test(rawQuery)) {
       state.typeFilter = 'cargo';
       updateTypeFilterUI();
-    } else if (/(?:відділення|відділ|вд|склад)/i.test(rawQuery) || (!/(?:поштомат|почтомат|пм)/i.test(rawQuery) && state.typeFilter === 'postomat')) {
+    } else if (/(?:відділення|відділ|вд|склад)/i.test(rawQuery)) {
       state.typeFilter = 'all';
       updateTypeFilterUI();
     }
@@ -525,7 +525,11 @@
     const allStaticBranches = getAllCurrentServiceBranches();
     let staticMatches = [];
     if (engine && allStaticBranches.length > 0) {
-      staticMatches = engine.filterBranchesByNormalizedSearch(rawQuery, allStaticBranches);
+      // Таб-фільтр застосовується до ПОВНОГО пулу, а не до обрізаних результатів пошуку
+      const tf = state.typeFilter;
+      const tabPred = tf === 'postomat' ? isPostomatBranch : tf === 'cargo' ? isCargoBranch : tf === 'branch' ? isRegularBranch : null;
+      const searchPool = tabPred ? allStaticBranches.filter(tabPred) : allStaticBranches;
+      staticMatches = engine.filterBranchesByNormalizedSearch(rawQuery, searchPool, tabPred ? 200 : 20);
     }
 
     // Перевіряємо, чи є впевнений збіг у статичній базі
@@ -755,23 +759,22 @@
     return parts.length > 0 ? parts.join(', ') : 'Україна';
   }
 
+  // Уніфікована перевірка поштомату (без урахування регістру) за всіма можливими полями
   function isPostomatBranch(b) {
     if (!b) return false;
-    return b.type === 'poshtomat' || b.typeClass === 'poshtomat' ||
-      (b.typeText && b.typeText.includes('Поштомат')) ||
-      (b.typeName && b.typeName.includes('Поштомат')) ||
-      (b.name && b.name.includes('Поштомат'));
+    const hay = [b.CategoryOfWarehouse, b.TypeOfWarehouse, b.type, b.typeClass, b.typeName, b.typeText, b.name, b.Description, b.description]
+      .filter(Boolean).join(' ').toLowerCase();
+    return /postomat|poshtomat|поштомат|почтомат/.test(hay) ||
+      b.TypeOfWarehouse === 'f9316480-5f2d-425d-bc2c-ac7cd29decf0';
   }
 
   function isCargoBranch(b) {
     if (!b || isPostomatBranch(b)) return false;
-    return b.type === 'PostCargoBranch' ||
-           b.typeClass === 'cargo' ||
+    const hay = [b.CategoryOfWarehouse, b.type, b.typeClass, b.typeName, b.typeText, b.name, b.Description].filter(Boolean).join(' ').toLowerCase();
+    return /postcargo|cargo|вантажн/.test(hay) ||
            (b.maxWeight && b.maxWeight >= 1000) ||
            (b.weightLimit && b.weightLimit >= 1000) ||
-           (b.typeText && (/1[01]00\s*кг/i.test(b.typeText) || /вантажн/i.test(b.typeText))) ||
-           (b.name && /вантажн/i.test(b.name)) ||
-           (b.typeName && /вантажн/i.test(b.typeName));
+           (b.typeText && /1[01]00\s*кг/i.test(b.typeText));
   }
 
   function isRegularBranch(b) {
@@ -2268,10 +2271,11 @@
 
         updateTypeFilterUI();
 
-        if (state.currentResults.length > 0) {
-          renderSearchResults(state.currentResults, state.searchQuery, null);
-        } else if (state.searchQuery) {
+        if (state.searchQuery) {
+          state.selectedBranch = null;
           executeSearch(state.searchQuery, false, false);
+        } else if (state.currentResults.length > 0) {
+          renderSearchResults(state.currentResults, state.searchQuery, null);
         }
       });
     }
@@ -2379,7 +2383,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.0)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.1)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2390,7 +2394,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.0', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.1', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2429,7 +2433,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.0') {
+          if (key !== 'np-ukr-cache-v8.26.1') {
             caches.delete(key);
           }
         });
@@ -2463,6 +2467,7 @@
     init();
   }
 
+  window.__executeSearchForTest = executeSearch;
   window.highlightMatch = highlightMatch;
   window.createFullBranchCard = createFullBranchCard;
   window.formatClassicCopyString = formatClassicCopyString;
