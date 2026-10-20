@@ -2494,6 +2494,18 @@ mark.hl-match,
   color: #4ade80;
 }
 
+.feedback-success-banner.error {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #dc2626;
+}
+
+[data-theme="dark"] .feedback-success-banner.error {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
 @media (max-width: 640px) {
   .feedback-modal {
     width: 95%;

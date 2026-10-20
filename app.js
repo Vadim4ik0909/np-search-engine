@@ -2393,8 +2393,55 @@
   }
 
   // ==========================================================================
-  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.4)
+  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.5)
   // ==========================================================================
+  /*
+   * Google Apps Script (Код.gs) універсальний парсер (JSON + form-urlencoded):
+   * let data = {};
+   * if (e.postData && e.postData.type === "application/x-www-form-urlencoded") {
+   *   data = e.parameter;
+   * } else if (e.postData && e.postData.contents) {
+   *   try { data = JSON.parse(e.postData.contents); } catch(err) { data = e.parameter || {}; }
+   * }
+   */
+  async function sendFeedbackData(payload) {
+    const formBody = new URLSearchParams();
+    formBody.append('type', payload.type || 'Не вказано');
+    formBody.append('description', payload.description || '');
+    formBody.append('operator', payload.operator || 'Анонімно');
+    formBody.append('fileName', payload.fileName || '');
+    formBody.append('mimeType', payload.mimeType || '');
+    formBody.append('fileBase64', payload.fileBase64 || '');
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let timeoutId = null;
+
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        if (controller) controller.abort();
+        reject(new Error('Feedback request timeout (10s)'));
+      }, 10000);
+    });
+
+    try {
+      // Надсилаємо через fetch з no-cors та 10-секундним таймаутом
+      await Promise.race([
+        fetch(FEEDBACK_ENDPOINT, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formBody.toString(),
+          signal: controller ? controller.signal : undefined
+        }),
+        timeoutPromise
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   function initFeedbackModal() {
     if (!dom.feedbackModal || !dom.feedbackForm) return;
 
@@ -2413,6 +2460,7 @@
       }
       if (dom.feedbackSuccessBanner) {
         dom.feedbackSuccessBanner.classList.add('hidden');
+        dom.feedbackSuccessBanner.classList.remove('error');
       }
       setFormSubmittingState(false);
       if (typeof dom.feedbackModal.showModal === 'function') {
@@ -2638,7 +2686,7 @@
       }
     });
 
-    // Відправка форми через fetch(FEEDBACK_ENDPOINT) у режимі no-cors / text/plain
+    // Відправка форми через sendFeedbackData (application/x-www-form-urlencoded + no-cors + 10s таймаут)
     dom.feedbackForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const feedbackMessage = dom.feedbackMessage ? dom.feedbackMessage.value.trim() : '';
@@ -2651,39 +2699,30 @@
       const feedbackAuthor = (dom.feedbackAuthor && dom.feedbackAuthor.value.trim()) || 'Анонімно';
       const fileData = currentFeedbackFile;
 
-      const payload = JSON.stringify({
-        type: feedbackType,
+      const payload = {
+        type: feedbackType || 'Не вказано',
         description: feedbackMessage,
-        message: feedbackMessage,
         operator: feedbackAuthor || 'Анонімно',
-        author: feedbackAuthor || 'Анонімно',
         fileName: fileData ? fileData.name : '',
         mimeType: fileData ? fileData.type : '',
-        fileBase64: fileData ? fileData.base64 : '',
-        base64: fileData ? fileData.base64 : '',
-        service: state.currentService,
-        searchQuery: state.searchQuery || (dom.searchInput ? dom.searchInput.value.trim() : ''),
-        version: 'v8.26.4',
-        timestamp: new Date().toISOString()
-      });
+        fileBase64: fileData ? fileData.base64 : ''
+      };
+
+      if (dom.feedbackSuccessBanner) {
+        dom.feedbackSuccessBanner.classList.add('hidden');
+        dom.feedbackSuccessBanner.classList.remove('error');
+      }
 
       setFormSubmittingState(true);
 
       try {
-        // Відправляємо як text/plain + no-cors, щоб обійти CORS preflight та 302 redirect Google Apps Script
-        await fetch(FEEDBACK_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-          },
-          body: payload
-        });
+        await sendFeedbackData(payload);
 
         setFormSubmittingState(false);
         resetFeedbackForm();
 
         if (dom.feedbackSuccessBanner) {
+          dom.feedbackSuccessBanner.classList.remove('error');
           dom.feedbackSuccessBanner.textContent = '✅ Дякуємо! Фідбек успішно надіслано';
           dom.feedbackSuccessBanner.classList.remove('hidden');
         }
@@ -2693,9 +2732,15 @@
             dom.feedbackSuccessBanner.classList.add('hidden');
           }
           closeFeedbackModal();
-        }, 1900);
+        }, 1800);
       } catch (err) {
         console.warn('[Feedback] Помилка надсилання:', err);
+        setFormSubmittingState(false);
+        if (dom.feedbackSuccessBanner) {
+          dom.feedbackSuccessBanner.classList.add('error');
+          dom.feedbackSuccessBanner.textContent = '❌ Помилка відправки. Спробуйте ще раз';
+          dom.feedbackSuccessBanner.classList.remove('hidden');
+        }
       } finally {
         setFormSubmittingState(false);
       }
@@ -2717,7 +2762,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.4)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.5)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2728,7 +2773,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.4', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.5', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2767,7 +2812,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.4') {
+          if (key !== 'np-ukr-cache-v8.26.5') {
             caches.delete(key);
           }
         });
