@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.26.6">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.26.7">
   
   <!-- Theme initialization (Default: Light; persists in localStorage; resets to Light on cache clear) -->
   <script>
@@ -35,7 +35,7 @@
   </script>
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.26.6">
+  <link rel="stylesheet" href="styles.css?v=8.26.7">
 </head>
 <body data-service="novaposhta">
 
@@ -65,10 +65,10 @@
       </div>
 
       <div class="top-nav-actions">
-        <button id="btnFeedback" type="button" class="btn-feedback" aria-haspopup="dialog" title="Повідомити про баг або запропонувати ідею">
+        <a href="https://docs.google.com/forms/d/1cORR9qpi92Ky7fymhElc74Pd51betHys2ZHSR5W4OB8/viewform" target="_blank" rel="noopener noreferrer" class="btn-feedback" title="Повідомити про баг або запропонувати ідею">
           <span class="feedback-icon">💬</span>
           <span class="feedback-text">Фідбек</span>
-        </button>
+        </a>
 
         <!-- Кнопка перемикання теми (Світла / Темна) -->
         <button id="btnThemeToggle" class="theme-toggle-btn icon-tool-btn" type="button" aria-label="Увімкнути темну тему" title="Увімкнути темну тему">
@@ -247,7 +247,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.26.6</span>
+          <span class="version-tag">v8.26.7</span>
           
         </button>
       </div>
@@ -264,87 +264,6 @@
 
   </div>
 
-  <!-- МОДАЛЬНЕ ВІКНО: ЗВОРОТНИЙ ЗВ'ЯЗОК ТА БАГ-РЕПОРТИ -->
-  <dialog id="feedbackModal" class="app-modal feedback-modal" aria-labelledby="modalFeedbackTitle">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div class="modal-title-group">
-          <h3 id="modalFeedbackTitle" class="modal-title">Зворотний зв'язок та баг-репорти</h3>
-        </div>
-        <button id="btnCloseFeedbackModal" type="button" class="btn-modal-close" aria-label="Закрити вікно">×</button>
-      </div>
-
-      <form id="feedbackForm" class="feedback-form">
-        <div class="modal-body feedback-modal-body">
-          <!-- Вибір типу -->
-          <div class="settings-form-group">
-            <label for="feedbackType" class="setting-label">Тип звернення</label>
-            <select id="feedbackType" name="type" class="setting-input feedback-select">
-              <option value="🐞 Баг / Помилка">🐞 Баг / Помилка</option>
-              <option value="💡 Нова ідея">💡 Нова ідея</option>
-              <option value="🎨 Незручний UI">🎨 Незручний UI</option>
-            </select>
-          </div>
-
-          <!-- Опис проблеми або ідеї -->
-          <div class="settings-form-group">
-            <label for="feedbackMessage" class="setting-label">Опис звернення <span class="required-mark">*</span></label>
-            <textarea
-              id="feedbackMessage"
-              name="message"
-              class="setting-input feedback-textarea"
-              rows="4"
-              required
-              placeholder="Опис проблеми або ідеї (що шукали, номер відділення/поштомату, що пішло не так)..."
-            ></textarea>
-          </div>
-
-          <!-- Зона для скріншота (.feedback-dropzone) -->
-          <div class="settings-form-group">
-            <label class="setting-label">Скріншот або відео (необов'язково)</label>
-            <div id="feedbackDropzone" class="feedback-dropzone" tabindex="0" role="button" aria-label="Додати скріншот або відео">
-              <input id="feedbackFileInput" type="file" accept="image/*,video/*" class="feedback-file-input" hidden>
-              <div id="feedbackDropzonePrompt" class="feedback-dropzone-prompt">
-                <span class="feedback-dropzone-icon">📎</span>
-                <span class="feedback-dropzone-text">Перетягніть скріншот, натисніть для вибору або вставте з буфера (Cmd/Ctrl + V)</span>
-              </div>
-              <div id="feedbackPreview" class="feedback-preview hidden">
-                <img id="feedbackPreviewImg" class="feedback-preview-img" src="" alt="Прев'ю скріншота">
-                <div class="feedback-preview-meta">
-                  <span id="feedbackFileName" class="feedback-file-name"></span>
-                </div>
-                <button id="btnRemoveFeedbackFile" type="button" class="btn-remove-feedback-file" title="Видалити файл" aria-label="Видалити файл">×</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Поле імені або позивного -->
-          <div class="settings-form-group">
-            <label for="feedbackAuthor" class="setting-label">Ваше ім'я або позивний</label>
-            <input
-              id="feedbackAuthor"
-              name="author"
-              type="text"
-              class="setting-input"
-              placeholder="Анонімно або позивний"
-              autocomplete="off"
-            >
-          </div>
-
-          <!-- Сповіщення про успішне надсилання -->
-          <div id="feedbackSuccessBanner" class="feedback-success-banner hidden" role="status" aria-live="polite">
-            ✅ Дякуємо! Фідбек успішно надіслано
-          </div>
-        </div>
-
-        <div class="modal-footer feedback-modal-footer">
-          <button id="btnCancelFeedback" type="button" class="btn-secondary-action">Скасувати</button>
-          <button id="btnSubmitFeedback" type="submit" class="btn-primary-action">Надіслати</button>
-        </div>
-      </form>
-    </div>
-  </dialog>
-
   <!-- МОДАЛЬНЕ ВІКНО: ІСТОРІЯ ВЕРСІЙ САЙТУ (Native Dialog) -->
   <dialog id="versionModal" class="app-modal" aria-labelledby="modalVersionTitle">
     <div class="modal-card">
@@ -357,8 +276,20 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.26.6 -->
+        <!-- Версія 8.26.7 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.26.7</span>
+            <span class="version-state">Пряме відкриття Google Форми зворотного зв'язку у новій вкладці</span>
+            <span class="version-date">20 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Стандартна форма фідбеку:</strong> кнопка «💬 Фідбек» у шапці відкриває офіційну Google Форму у новій вкладці (`target="_blank"`).</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.26.6 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.26.6</span>
             <span class="version-state">Прямий JSON-транспорт `text/plain` для великих скріншотів</span>
@@ -1045,15 +976,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.26.6"></script>
+  <script src="data/branches.js?v=8.26.7"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.26.6"></script>
+  <script src="data/all_settlements.js?v=8.26.7"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.26.6"></script>
+  <script src="data/fuzzySearch.js?v=8.26.7"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.26.6"></script>
+  <script src="app.js?v=8.26.7"></script>
 </body>
 </html>

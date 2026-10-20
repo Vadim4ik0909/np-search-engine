@@ -10,8 +10,6 @@
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
   // ==========================================================================
-  const FEEDBACK_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxqjrqmjrFCMpKhN6aPWL7etkafG9jyj1s8FphVs0TBrOYDKbnyCB9_SITjjWyfo7v0Q/exec';
-
   const state = {
     theme: 'light', // 'light' | 'dark' (Default: Light / біла)
     currentService: 'novaposhta', // 'novaposhta' | 'ukrposhta'
@@ -99,26 +97,7 @@
     btnSaveApiSettings: document.getElementById('btnSaveApiSettings'),
     btnTestApiKey: document.getElementById('btnTestApiKey'),
     npApiKeyInput: document.getElementById('npApiKeyInput'),
-    apiTestStatus: document.getElementById('apiTestStatus'),
-
-    // Модальне вікно фідбеку та баг-репортів
-    btnFeedback: document.getElementById('btnFeedback') || document.querySelector('.btn-feedback'),
-    feedbackModal: document.getElementById('feedbackModal'),
-    btnCloseFeedbackModal: document.getElementById('btnCloseFeedbackModal'),
-    btnCancelFeedback: document.getElementById('btnCancelFeedback'),
-    btnSubmitFeedback: document.getElementById('btnSubmitFeedback'),
-    feedbackForm: document.getElementById('feedbackForm'),
-    feedbackType: document.getElementById('feedbackType'),
-    feedbackMessage: document.getElementById('feedbackMessage'),
-    feedbackAuthor: document.getElementById('feedbackAuthor'),
-    feedbackDropzone: document.getElementById('feedbackDropzone'),
-    feedbackFileInput: document.getElementById('feedbackFileInput'),
-    feedbackDropzonePrompt: document.getElementById('feedbackDropzonePrompt'),
-    feedbackPreview: document.getElementById('feedbackPreview'),
-    feedbackPreviewImg: document.getElementById('feedbackPreviewImg'),
-    feedbackFileName: document.getElementById('feedbackFileName'),
-    btnRemoveFeedbackFile: document.getElementById('btnRemoveFeedbackFile'),
-    feedbackSuccessBanner: document.getElementById('feedbackSuccessBanner')
+    apiTestStatus: document.getElementById('apiTestStatus')
   };
 
   // ==========================================================================
@@ -2387,359 +2366,6 @@
         });
       }
     }
-
-    // Модалка зворотного зв'язку та баг-репортів (#feedbackModal)
-    initFeedbackModal();
-  }
-
-  // ==========================================================================
-  // МОДАЛЬНЕ ВІКНО ФІДБЕКУ ТА БАГ-РЕПОРТІВ (v8.26.6)
-  // ==========================================================================
-  async function sendFeedbackData(payload) {
-    const jsonString = JSON.stringify({
-      type: payload.type || 'Не вказано',
-      description: payload.description || '',
-      operator: payload.operator || 'Анонімно',
-      fileName: payload.fileName || '',
-      mimeType: payload.mimeType || '',
-      fileBase64: payload.fileBase64 || ''
-    });
-
-    // Збільш таймаут до 25 секунд для завантаження великих скріншотів
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
-
-    try {
-      await fetch(FEEDBACK_ENDPOINT, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: jsonString,
-        signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  function initFeedbackModal() {
-    if (!dom.feedbackModal || !dom.feedbackForm) return;
-
-    let currentFeedbackFile = null;
-    let pendingFileReadPromise = null;
-    let closeTimer = null;
-    const modalContainer = dom.feedbackModal.querySelector('.modal-card');
-
-    function isFeedbackModalOpen() {
-      return Boolean(dom.feedbackModal.open || dom.feedbackModal.hasAttribute('open'));
-    }
-
-    function openFeedbackModal() {
-      if (closeTimer) {
-        clearTimeout(closeTimer);
-        closeTimer = null;
-      }
-      if (dom.feedbackSuccessBanner) {
-        dom.feedbackSuccessBanner.classList.add('hidden');
-        dom.feedbackSuccessBanner.classList.remove('error');
-      }
-      setFormSubmittingState(false);
-      if (typeof dom.feedbackModal.showModal === 'function') {
-        if (!dom.feedbackModal.open) dom.feedbackModal.showModal();
-      } else {
-        dom.feedbackModal.setAttribute('open', '');
-      }
-      setTimeout(() => {
-        if (dom.feedbackMessage) dom.feedbackMessage.focus();
-      }, 60);
-    }
-
-    function closeFeedbackModal() {
-      if (closeTimer) {
-        clearTimeout(closeTimer);
-        closeTimer = null;
-      }
-      if (typeof dom.feedbackModal.close === 'function' && dom.feedbackModal.open) {
-        dom.feedbackModal.close();
-      } else {
-        dom.feedbackModal.removeAttribute('open');
-      }
-      setFormSubmittingState(false);
-    }
-
-    function clearFeedbackAttachment() {
-      currentFeedbackFile = null;
-      pendingFileReadPromise = null;
-      if (dom.feedbackFileInput) dom.feedbackFileInput.value = '';
-      if (dom.feedbackPreviewImg) dom.feedbackPreviewImg.src = '';
-      if (dom.feedbackFileName) dom.feedbackFileName.textContent = '';
-      if (dom.feedbackPreview) dom.feedbackPreview.classList.add('hidden');
-      if (dom.feedbackDropzonePrompt) dom.feedbackDropzonePrompt.classList.remove('hidden');
-    }
-
-    function resetFeedbackForm() {
-      dom.feedbackForm.reset();
-      clearFeedbackAttachment();
-    }
-
-    function setFormSubmittingState(isSubmitting) {
-      const elements = dom.feedbackForm.querySelectorAll('input, textarea, select, button');
-      elements.forEach((el) => {
-        el.disabled = isSubmitting;
-      });
-      if (dom.btnSubmitFeedback) {
-        dom.btnSubmitFeedback.textContent = isSubmitting ? 'Надсилання...' : 'Надіслати';
-      }
-    }
-
-    function handleSelectedFile(file) {
-      if (!file) return;
-      if (!file.type || (!file.type.startsWith('image/') && !file.type.startsWith('video/'))) {
-        return;
-      }
-
-      pendingFileReadPromise = new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const resultStr = typeof reader.result === 'string' ? reader.result : '';
-          const commaIdx = resultStr.indexOf(',');
-          const rawBase64 = commaIdx !== -1 ? resultStr.slice(commaIdx + 1) : resultStr;
-
-          currentFeedbackFile = {
-            name: file.name || 'screenshot.png',
-            type: file.type || 'image/png',
-            base64: rawBase64,
-            dataUrl: resultStr
-          };
-
-          if (dom.feedbackPreviewImg) {
-            dom.feedbackPreviewImg.src = file.type.startsWith('image/')
-              ? resultStr
-              : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
-          }
-          if (dom.feedbackFileName) {
-            dom.feedbackFileName.textContent = currentFeedbackFile.name;
-          }
-          if (dom.feedbackDropzonePrompt) {
-            dom.feedbackDropzonePrompt.classList.add('hidden');
-          }
-          if (dom.feedbackPreview) {
-            dom.feedbackPreview.classList.remove('hidden');
-          }
-          resolve(currentFeedbackFile);
-        };
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      });
-    }
-
-    if (dom.btnFeedback) {
-      dom.btnFeedback.addEventListener('click', (e) => {
-        e.preventDefault();
-        openFeedbackModal();
-      });
-    }
-
-    if (dom.btnCloseFeedbackModal) {
-      dom.btnCloseFeedbackModal.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeFeedbackModal();
-      });
-    }
-
-    if (dom.btnCancelFeedback) {
-      dom.btnCancelFeedback.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeFeedbackModal();
-      });
-    }
-
-    // Блокуємо спливання кліків із внутрішньої картки модалки, щоб відкриття системного вікна файлів не закривало модалку
-    if (modalContainer) {
-      modalContainer.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    }
-
-    // Закриття по кліку ТІЛЬКИ безпосередньо на сам бекдроп (e.target === dom.feedbackModal)
-    dom.feedbackModal.addEventListener('click', (e) => {
-      if (e.target === dom.feedbackModal) {
-        closeFeedbackModal();
-      }
-    });
-
-    // Закриття по Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && isFeedbackModalOpen()) {
-        closeFeedbackModal();
-      }
-    });
-
-    // 1. Вибір через системний діалог файлів
-    if (dom.feedbackDropzone && dom.feedbackFileInput) {
-      // Зупиняємо спливання подій click та cancel від прихованого input[type="file"]
-      dom.feedbackFileInput.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-      dom.feedbackFileInput.addEventListener('cancel', (e) => {
-        e.stopPropagation();
-      });
-
-      dom.feedbackDropzone.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (e.target === dom.feedbackFileInput || e.target.closest('#btnRemoveFeedbackFile')) return;
-        dom.feedbackFileInput.click();
-      });
-
-      dom.feedbackDropzone.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          e.stopPropagation();
-          dom.feedbackFileInput.click();
-        }
-      });
-
-      dom.feedbackFileInput.addEventListener('change', (e) => {
-        e.stopPropagation();
-        if (dom.feedbackFileInput.files && dom.feedbackFileInput.files[0]) {
-          handleSelectedFile(dom.feedbackFileInput.files[0]);
-        }
-      });
-    }
-
-    if (dom.btnRemoveFeedbackFile) {
-      dom.btnRemoveFeedbackFile.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        clearFeedbackAttachment();
-      });
-    }
-
-    // 2. Drag-and-Drop у .feedback-dropzone
-    if (dom.feedbackDropzone) {
-      ['dragenter', 'dragover'].forEach((evtName) => {
-        dom.feedbackDropzone.addEventListener(evtName, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          dom.feedbackDropzone.classList.add('dragover');
-        });
-      });
-
-      ['dragleave', 'dragend', 'drop'].forEach((evtName) => {
-        dom.feedbackDropzone.addEventListener(evtName, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          dom.feedbackDropzone.classList.remove('dragover');
-        });
-      });
-
-      dom.feedbackDropzone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        if (dt && dt.files && dt.files.length > 0) {
-          handleSelectedFile(dt.files[0]);
-        }
-      });
-    }
-
-    // 3. Перехоплення 'paste' (Cmd+V / Ctrl+V)
-    document.addEventListener('paste', (e) => {
-      if (!isFeedbackModalOpen()) return;
-      const clipboard = e.clipboardData;
-      if (!clipboard) return;
-
-      if (clipboard.files && clipboard.files.length > 0) {
-        const file = clipboard.files[0];
-        if (file.type && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
-          handleSelectedFile(file);
-          return;
-        }
-      }
-
-      if (clipboard.items) {
-        for (let i = 0; i < clipboard.items.length; i++) {
-          const item = clipboard.items[i];
-          if (item.type && (item.type.indexOf('image') !== -1 || item.type.indexOf('video') !== -1)) {
-            const blob = item.getAsFile();
-            if (blob) {
-              const ext = (blob.type && blob.type.split('/')[1]) || 'png';
-              const namedFile = blob.name
-                ? blob
-                : new File([blob], `pasted-screenshot-${Date.now()}.${ext}`, { type: blob.type || 'image/png' });
-              handleSelectedFile(namedFile);
-              break;
-            }
-          }
-        }
-      }
-    });
-
-    // Відправка форми через sendFeedbackData (text/plain JSON + no-cors + 25s таймаут)
-    dom.feedbackForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const feedbackMessage = dom.feedbackMessage ? dom.feedbackMessage.value.trim() : '';
-      if (!feedbackMessage) {
-        if (dom.feedbackMessage) dom.feedbackMessage.focus();
-        return;
-      }
-
-      if (dom.feedbackSuccessBanner) {
-        dom.feedbackSuccessBanner.classList.add('hidden');
-        dom.feedbackSuccessBanner.classList.remove('error');
-      }
-
-      setFormSubmittingState(true);
-
-      if (pendingFileReadPromise) {
-        try {
-          await pendingFileReadPromise;
-        } catch (_) {}
-      }
-
-      const feedbackType = dom.feedbackType ? dom.feedbackType.value : '🐞 Баг / Помилка';
-      const feedbackAuthor = (dom.feedbackAuthor && dom.feedbackAuthor.value.trim()) || 'Анонімно';
-      const fileData = currentFeedbackFile;
-
-      const payload = {
-        type: feedbackType || 'Не вказано',
-        description: feedbackMessage,
-        operator: feedbackAuthor || 'Анонімно',
-        fileName: fileData ? fileData.name : '',
-        mimeType: fileData ? fileData.type : '',
-        fileBase64: fileData ? fileData.base64 : ''
-      };
-
-      try {
-        await sendFeedbackData(payload);
-
-        setFormSubmittingState(false);
-        resetFeedbackForm();
-
-        if (dom.feedbackSuccessBanner) {
-          dom.feedbackSuccessBanner.classList.remove('error');
-          dom.feedbackSuccessBanner.textContent = '✅ Дякуємо! Фідбек успішно надіслано';
-          dom.feedbackSuccessBanner.classList.remove('hidden');
-        }
-
-        closeTimer = setTimeout(() => {
-          if (dom.feedbackSuccessBanner) {
-            dom.feedbackSuccessBanner.classList.add('hidden');
-          }
-          closeFeedbackModal();
-        }, 1800);
-      } catch (err) {
-        console.warn('[Feedback] Помилка надсилання:', err);
-        setFormSubmittingState(false);
-        if (dom.feedbackSuccessBanner) {
-          dom.feedbackSuccessBanner.classList.add('error');
-          dom.feedbackSuccessBanner.textContent = '❌ Помилка відправки. Спробуйте ще раз';
-          dom.feedbackSuccessBanner.classList.remove('hidden');
-        }
-      } finally {
-        setFormSubmittingState(false);
-      }
-    });
   }
 
   // Перевірка наявності захищеного ключа на бекенді (.env)
@@ -2757,7 +2383,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.6)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.7)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2768,7 +2394,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.6', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.7', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2807,7 +2433,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.6') {
+          if (key !== 'np-ukr-cache-v8.26.7') {
             caches.delete(key);
           }
         });
