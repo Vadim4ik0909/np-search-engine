@@ -819,6 +819,21 @@
     // Склеювання маркерів поштоматів (п/м -> пм)
     text = text.replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм');
 
+    // 0.1. М'яке очищення пунктуації (розділювачі із месенджерів та CRM: коми, крапки з комою, слеші)
+    text = text.replace(/[,;]+/g, ' ');
+    // Слеші: якщо з пробілами або між словами ("Львів / Наукова", "Київ/222") — перетворюємо на пробіл; у номерах будинків ("10/2", "12/а") зберігаємо
+    text = text.replace(/\s*[\/\\]+\s+/g, ' ').replace(/\s+[\/\\]+\s*/g, ' ');
+    text = text.replace(/(?<!\d)[\/\\]+|[\/\\]+(?![0-9a-zа-яіїєґ])/giu, ' ');
+
+    // 0.2. Скорочення населених пунктів із крапками ("м. Київ", "с. Підгайці", "смт. Олександрівка")
+    text = text.replace(/(?<!\p{L})(?:м|с|смт|сел|обл|р-н)\.(?:\s*|(?=\p{L}))/giu, ' ');
+    // Крапки, що не є частиною номера/десяткового дробу (напр. "№222." або "буд.")
+    text = text.replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
+
+    // 0.3. Окремо стоячі топонімічні префікси ("місто Київ", "село Підгайці", "смт Олександрівка", "м Київ", "с Підгайці")
+    text = text.replace(/(?<!\p{L})(?:селище міського типу|смт|селище|місто|село)\s+(?=[А-Яа-яІіЇїЄєA-Za-z])/giu, ' ');
+    text = text.replace(/(?<!\p{L})(?:м|с)\s+(?=[А-Яа-яІіЇїЄєA-Za-z])/giu, ' ');
+
     // 1. Очищення пунктуації та мусорних символів (дефіси, тире, підкреслення, повтори знаків)
     // Наприклад: "нова пошта --- коломи я 6" -> "нова пошта коломи я 6"
     text = text.replace(/[-_–—~*+=/\\#№!?:;.,]{2,}/g, ' ');
@@ -972,6 +987,13 @@
     corrected = corrected.replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2')
                          .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм');
 
+    // Очищення пунктуації (коми, крапки з комою, слеші крім номерів будинків)
+    corrected = corrected.replace(/[,;]+/g, ' ')
+                         .replace(/\s*[\/\\]+\s+/g, ' ').replace(/\s+[\/\\]+\s*/g, ' ')
+                         .replace(/(?<!\d)[\/\\]+|[\/\\]+(?![0-9a-zа-яіїєґ])/giu, ' ')
+                         .replace(/(?<!\p{L})(?:м|с|смт|сел|обл|р-н)\.(?:\s*|(?=\p{L}))/giu, ' ')
+                         .replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
+
     // Автоматично розділяємо склеєні літери та цифри (наприклад, «підгайці1» -> «підгайці 1», «київ2» -> «київ 2»)
     corrected = corrected.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
                          .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
@@ -1082,7 +1104,7 @@
     }
 
     stripped = stripped
-      .replace(/[,.-]/g, ' ')
+      .replace(/[,.;/\\-]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();
@@ -1286,7 +1308,28 @@
   // 7. LP-CRM ІНТЕРАКТИВНИЙ АВТОКОМПЛІТ (Режим топонімів City Mode + Режим відділень Branch Mode)
   function getAutocompleteSuggestions(query, currentService, liveCityBranches = null, staticBranches = null) {
     if (!query || query.trim().length < 2) return [];
-    const qClean = fixKeyboardLayout(stripApostrophes(query.trim()));
+    let qClean = fixKeyboardLayout(stripApostrophes(query.trim()));
+
+    // М'яка нормалізація пунктуації та скорочень
+    qClean = qClean.replace(/[,;]+/g, ' ')
+                   .replace(/\s*[\/\\]+\s+/g, ' ').replace(/\s+[\/\\]+\s*/g, ' ')
+                   .replace(/(?<!\d)[\/\\]+|[\/\\]+(?![0-9a-zа-яіїєґ])/giu, ' ')
+                   .replace(/(?<!\p{L})(?:м|с|смт|сел|обл|р-н)\.(?:\s*|(?=\p{L}))/giu, ' ')
+                   .replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
+
+    // Визначаємо, чи користувач явно вказав префікс населеного пункту (смт / село / місто)
+    let preferredType = null;
+    if (/(?<!\p{L})(?:смт|селище міського типу)(?!\p{L})/iu.test(qClean)) {
+      preferredType = 'смт';
+    } else if (/(?<!\p{L})(?:село|с(?!\p{L}))/iu.test(qClean)) {
+      preferredType = 'село';
+    } else if (/(?<!\p{L})(?:місто|м(?!\p{L}))/iu.test(qClean)) {
+      preferredType = 'місто';
+    }
+
+    qClean = qClean.replace(/(?<!\p{L})(?:селище міського типу|смт|селище|місто|село)\s+(?=[А-Яа-яІіЇїЄєA-Za-z])/giu, ' ')
+                   .replace(/(?<!\p{L})(?:м|с)\s+(?=[А-Яа-яІіЇїЄєA-Za-z])/giu, ' ');
+
     const qLower = qClean.toLowerCase();
     const normalizedQuery = qLower.replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
     if (!normalizedQuery || normalizedQuery.length < 2) return [];
@@ -1514,6 +1557,11 @@
     const activeSet = getActiveBranchSettlementSet(pool);
     const sortSettlementVariants = (arr) => {
       return arr.slice().sort((a, b) => {
+        if (preferredType) {
+          const aPref = normalizeSettlementBadge(a.type) === preferredType ? 1 : 0;
+          const bPref = normalizeSettlementBadge(b.type) === preferredType ? 1 : 0;
+          if (aPref !== bPref) return bPref - aPref;
+        }
         if (activeSet) {
           const aC = canonText(a.cleanName || a.name);
           const bC = canonText(b.cleanName || b.name);
@@ -1534,14 +1582,19 @@
 
     // КРОК 2: Введено точну назву населеного пункту (City Suggestion Mode) —
     // показуємо всі варіанти з районами та областями у форматі LP-CRM (напр. "Олександрівка", "Городок", "Підгайці")
+    const exactBaseMatches = [];
     for (let s of UKRAINE_SETTLEMENTS) {
       const sLower = canonText(s.name);
       const sNorm = normalizeLocativeCase(sLower);
       const isExact = sLower === normalizedQuery || sNorm === normalizedQuery ||
                       (s.aliases && s.aliases.some(a => canonText(a) === normalizedQuery));
       if (isExact) {
-        pushSettlementSuggestion(s);
+        exactBaseMatches.push(s);
       }
+    }
+    const sortedExactBase = sortSettlementVariants(exactBaseMatches);
+    for (let i = 0; i < sortedExactBase.length; i++) {
+      pushSettlementSuggestion(sortedExactBase[i]);
     }
 
     const normQueryLoc = normalizeLocativeCase(normalizedQuery);
@@ -1832,7 +1885,7 @@
     'бульв', 'провулок', 'пров', 'площа', 'пл', 'шосе', '№', '#', 'номер',
     'нова', 'пошта', 'пошти', 'нової', 'нп', 'укрпошта', 'укрпошти',
     'у', 'в', 'на', 'по', 'до', 'з', 'із', 'зі', 'біля', 'для', 'та', 'і',
-    'район', 'району', 'р-н', 'р-он', 'область', 'області', 'обл', 'смт', 'селище', 'село', 'місто'
+    'район', 'району', 'р-н', 'р-он', 'область', 'області', 'обл', 'смт', 'селище', 'сел', 'село', 'с', 'місто', 'м'
   ]);
 
   function matchesWord(tok, w) {
@@ -1885,8 +1938,16 @@
     query = stripApostrophes(query);
     let text = fixKeyboardLayout(query.trim().replace(/^[\s=+\-*•—–~#№\\\/]+/, ''))
       .replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2')
-      .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм')
-      .replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
+      .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм');
+
+    // Очищення пунктуації (коми, крапки з комою, слеші крім номерів будинків, скорочення з крапками)
+    text = text.replace(/[,;]+/g, ' ')
+      .replace(/\s*[\/\\]+\s+/g, ' ').replace(/\s+[\/\\]+\s*/g, ' ')
+      .replace(/(?<!\d)[\/\\]+|[\/\\]+(?![0-9a-zа-яіїєґ])/giu, ' ')
+      .replace(/(?<!\p{L})(?:м|с|смт|сел|обл|р-н)\.(?:\s*|(?=\p{L}))/giu, ' ')
+      .replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
+
+    text = text.replace(/([А-Яа-яІіЇїЄєA-Za-z])(\d+)/gu, '$1 $2')
       .replace(/(\d+)([А-Яа-яІіЇїЄєA-Za-z])/gu, '$1 $2');
 
     // 1. Номер відділення або поштомату
@@ -1923,8 +1984,10 @@
     }
 
     // 4. Очищення службових слів
-    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|село|місто|відділення|віділення|відділ|вантажне|вантажний|вантаж|карго|cargo|поштомат|поштомата|поштомати|почтомат|пошт|пм|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
-      .replace(/[,.-]/g, ' ')
+    text = text.replace(/(?<!\p{L})(?:район|району|р-н|р-он|область|області|обл|смт|селище|сел|село|с|місто|м|відділення|віділення|відділ|вантажне|вантажний|вантаж|карго|cargo|поштомат|поштомата|поштомати|почтомат|пошт|пм|нова\s+пошта|укрпошта|вулиця|вул|просп|проспект|бульв|бульвар|пл|площа|шосе|провулок|пров|номер|№|#)(?!\p{L})/giu, ' ')
+      .replace(/(?<!\p{L})(?:селище міського типу|смт|селище|місто|село)\s+(?=[А-Яа-яІіЇїЄєA-Za-z])/giu, ' ')
+      .replace(/(?<!\p{L})(?:м|с)\s+(?=[А-Яа-яІіЇїЄєA-Za-z])/giu, ' ')
+      .replace(/[,.;/\\-]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 

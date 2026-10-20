@@ -247,7 +247,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.26.7</span>
+          <span class="version-tag">v8.26.8</span>
           
         </button>
       </div>
@@ -276,8 +276,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.26.7 -->
+        <!-- Версія 8.26.8 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.26.8</span>
+            <span class="version-state">Bugfix & Hardening: Нормалізація пунктуації та Clipboard API Fallback</span>
+            <span class="version-date">20 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Очищення вхідного рядка від пунктуації:</strong> токенізатор м'яко вичищає коми, слеші, крапки з комою та скорочення населених пунктів ("м.", "с.", "смт.") без збоїв у пошуку міст ("м. Київ, 222", "Львів / Наукова", "  Одеса   1  ", "Тернопіль; 5").</li>
+            <li><strong>Clipboard API Fallback:</strong> додано надійний резервний сценарій копіювання через тимчасовий `textarea` та `document.execCommand('copy')` при блокуванні або відмові `navigator.clipboard`.</li>
+            <li><strong>Стабільний таймер бейджа:</strong> багаторазові кліки підряд коректно скидають таймер та гарантують повернення початкового стану кнопки без зависань у DOM.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.26.7 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.26.7</span>
             <span class="version-state">Пряме відкриття Google Форми зворотного зв'язку у новій вкладці</span>

@@ -932,24 +932,54 @@
   }
 
   function copyTextToClipboard(text, btnElement, successText) {
-    if (!navigator.clipboard) {
+    function execCommandFallback(str) {
       const ta = document.createElement('textarea');
-      ta.value = text;
+      ta.value = str;
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '-9999px';
+      ta.style.opacity = '0';
+      ta.setAttribute('readonly', '');
       document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
+      ta.focus();
+      if (typeof ta.select === 'function') {
+        ta.select();
+      }
+      if (ta.setSelectionRange) {
+        ta.setSelectionRange(0, str.length);
+      }
+      try {
+        document.execCommand('copy');
+      } catch (e) {
+        console.warn('Fallback copy error:', e);
+      }
       document.body.removeChild(ta);
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).catch(() => {
+        execCommandFallback(text);
+      });
     } else {
-      navigator.clipboard.writeText(text);
+      execCommandFallback(text);
     }
 
     if (btnElement) {
-      const origHtml = btnElement.innerHTML;
+      if (!btnElement._originalHtml) {
+        btnElement._originalHtml = btnElement.innerHTML;
+      }
+      if (btnElement._copyTimeout) {
+        clearTimeout(btnElement._copyTimeout);
+      }
       btnElement.classList.add('copied');
       btnElement.innerHTML = `<span>✓</span> <span>${successText || 'Скопійовано!'}</span>`;
-      setTimeout(() => {
+      btnElement._copyTimeout = setTimeout(() => {
         btnElement.classList.remove('copied');
-        btnElement.innerHTML = origHtml;
+        if (btnElement._originalHtml) {
+          btnElement.innerHTML = btnElement._originalHtml;
+          delete btnElement._originalHtml;
+        }
+        delete btnElement._copyTimeout;
       }, 2000);
     }
 
@@ -2125,7 +2155,17 @@
         return;
       }
       let cityPool = null;
-      const candidate = val.split(/[, ]+/)[0].toLowerCase();
+      let candidate = null;
+      if (window.SmartSearchEngine) {
+        const facets = window.SmartSearchEngine.extractFacets(val);
+        if (facets && facets.city) {
+          candidate = facets.city.toLowerCase();
+        }
+      }
+      if (!candidate) {
+        const cleanVal = val.replace(/^(?:м|с|смт|сел|місто|село|селище)\.?\s*/i, '').trim();
+        candidate = cleanVal.split(/[, /;.]+/)[0].toLowerCase();
+      }
       if (candidate && liveWarehousesCache.novaposhta.has(candidate)) {
         cityPool = liveWarehousesCache.novaposhta.get(candidate);
       }
@@ -2383,7 +2423,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.7)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.8)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2394,7 +2434,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.26.7', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.8', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2433,7 +2473,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.26.7') {
+          if (key !== 'np-ukr-cache-v8.26.8') {
             caches.delete(key);
           }
         });

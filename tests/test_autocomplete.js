@@ -116,6 +116,7 @@ class MockElement {
             const el = new MockElement(tagName);
             el.className = cls;
             el.innerHTML = this._innerHTML.slice(startIdx, t.index);
+            this.children.push(el);
             return el;
           }
         }
@@ -162,6 +163,7 @@ class MockElement {
 
   focus() { this.isFocused = true; }
   blur() { this.isFocused = false; }
+  select() { this.isSelected = true; }
   setSelectionRange(s, e) { this.selectionStart = s; this.selectionEnd = e; }
   scrollIntoView() {}
 }
@@ -187,6 +189,7 @@ function createMockEnvironment() {
     createElement(tag) { return new MockElement(tag); },
     createDocumentFragment() { return new MockElement('fragment'); },
     body: new MockElement('body'),
+    execCommand(cmd) { this.lastExecCommand = cmd; return true; },
     addEventListener(event, fn) {
       if (!docListeners[event]) docListeners[event] = [];
       docListeners[event].push(fn);
@@ -213,7 +216,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 34;
+  let totalTests = 35;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -2017,6 +2020,112 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 34:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 35: v8.26.8 — Нормалізація пунктуації та скорочень ("м. Київ, 222", "Львів / Наукова")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 35: Нормалізація розділових знаків: "м. Київ, 222" та "Львів / Наукова"');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+    const S = window.SmartSearchEngine;
+
+    // 1. Пошук рушієм за запитом "м. Київ, 222" -> Відділення №222 у м. Київ
+    const resKyiv222 = S.searchBranches('м. Київ, 222', npPool, 5);
+    if (!resKyiv222 || resKyiv222.length === 0) {
+      throw new Error('Жодного результату не знайдено для "м. Київ, 222"');
+    }
+    const topKyiv = resKyiv222[0];
+    if (topKyiv.city !== 'Київ' || String(topKyiv.number) !== '222') {
+      throw new Error(`Очікувалось Відділення №222 у м. Київ, отримано: ${topKyiv.city} №${topKyiv.number}`);
+    }
+
+    // 2. Автокомпліт для "м. Київ, 222" повинен запропонувати Відділення №222
+    const sugKyiv222 = S.getAutocompleteSuggestions('м. Київ, 222', 'novaposhta', null, npPool);
+    if (!sugKyiv222 || sugKyiv222.length === 0 || !sugKyiv222.some(s => s.branchObj && String(s.branchObj.number) === '222' && s.branchObj.city === 'Київ')) {
+      throw new Error('Автокомпліт не повернув Відділення №222 для "м. Київ, 222"');
+    }
+
+    // 3. Пошук рушієм за запитом "Львів / Наукова" -> відділення на вул. Наукова у Львові
+    const resLvivNauk = S.searchBranches('Львів / Наукова', npPool, 5);
+    if (!resLvivNauk || resLvivNauk.length === 0) {
+      throw new Error('Жодного результату не знайдено для "Львів / Наукова"');
+    }
+    const topLviv = resLvivNauk[0];
+    const topLvivStreet = (topLviv.street || topLviv.address || topLviv.name || '').toLowerCase();
+    if (topLviv.city !== 'Львів' || !topLvivStreet.includes('наукова')) {
+      throw new Error(`Очікувалось відділення на вул. Наукова у Львові, отримано: ${topLviv.city}, ${topLvivStreet}`);
+    }
+
+    // 4. Автокомпліт для "Львів / Наукова" повинен запропонувати відділення на Науковій
+    const sugLvivNauk = S.getAutocompleteSuggestions('Львів / Наукова', 'novaposhta', null, npPool);
+    if (!sugLvivNauk || sugLvivNauk.length === 0 || !sugLvivNauk.some(s => s.branchObj && (s.branchObj.street || s.branchObj.address || '').toLowerCase().includes('наукова'))) {
+      throw new Error('Автокомпліт не повернув відділення на вул. Наукова для "Львів / Наукова"');
+    }
+
+    // 5. Перевірка введення в інпут "м. Київ, 222" через UI
+    searchInput.value = 'м. Київ, 222';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+    if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'branch') {
+      throw new Error('Дропдаун для "м. Київ, 222" має бути відкритий у Branch Mode');
+    }
+    const kyivItems = dropdown.querySelectorAll('.autocomplete-item');
+    if (!kyivItems || kyivItems.length === 0 || !kyivItems[0].innerHTML.includes('222')) {
+      throw new Error('Перший пункт дропдауну для "м. Київ, 222" повинен містити №222');
+    }
+
+    // 6. Перевірка введення в інпут "Львів / Наукова" через UI
+    searchInput.value = 'Львів / Наукова';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(360);
+    if (dropdown.classList.contains('hidden') || dropdown.getAttribute('data-mode') !== 'branch') {
+      throw new Error('Дропдаун для "Львів / Наукова" має бути відкритий у Branch Mode');
+    }
+    const lvivItems = dropdown.querySelectorAll('.autocomplete-item');
+    if (!lvivItems || lvivItems.length === 0 || !lvivItems[0].innerHTML.includes('Наукова')) {
+      throw new Error('Перший пункт дропдауну для "Львів / Наукова" повинен містити вул. Наукова');
+    }
+
+    // 7. Перевірка Clipboard API Fallback та скидання таймера багаторазових кліків
+    const card = window.createFullBranchCard(topKyiv);
+    const btnShort = card.querySelector('.btn-copy-short');
+    if (!btnShort) throw new Error('Не знайдено .btn-copy-short на картці');
+
+    // Тест fallback: clipboard.writeText падає з помилкою (напр. у iframe чи без дозволу)
+    const prevClipboard = global.navigator.clipboard;
+    global.navigator.clipboard = {
+      writeText: () => Promise.reject(new Error('Clipboard blocked by security/iframe'))
+    };
+    mockDocument.lastExecCommand = null;
+
+    btnShort.dispatchEvent({ type: 'click', stopPropagation: () => {} });
+    await sleep(50);
+    if (mockDocument.lastExecCommand !== 'copy') {
+      throw new Error('Резервний механізм document.execCommand("copy") не спрацював при збої navigator.clipboard');
+    }
+    if (!btnShort.classList.contains('copied')) {
+      throw new Error('Кнопка копіювання повинна отримати клас .copied після кліку');
+    }
+
+    // Багаторазовий клік через 500мс
+    await sleep(500);
+    btnShort.dispatchEvent({ type: 'click', stopPropagation: () => {} });
+    await sleep(1600); // 2100мс від 1-го кліку, 1600мс від 2-го: має залишатися .copied
+    if (!btnShort.classList.contains('copied')) {
+      throw new Error('Таймер скидання збився при повторному кліку (кнопка передчасно скинулася)');
+    }
+
+    await sleep(600); // 2200мс від 2-го кліку: має скинутись і повернути початковий текст
+    if (btnShort.classList.contains('copied') || btnShort.innerHTML.includes('Скопійовано!')) {
+      throw new Error('Бейдж «Скопійовано!» завис у DOM після завершення таймера другого кліку');
+    }
+    global.navigator.clipboard = prevClipboard;
+
+    console.log('  ✓ Успіх: "м. Київ, 222", "Львів / Наукова", clipboard fallback та таймер копіювання працюють ідеально!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 35:', err.message, '\n');
   }
 
   console.log('===============================================================');
