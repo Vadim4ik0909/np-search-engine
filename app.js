@@ -161,10 +161,7 @@
 
       // Відновлюємо поштомати для Нової пошти
       if (dom.btnQuickPostomat) dom.btnQuickPostomat.style.display = '';
-      if (dom.resultsTypeFilters) {
-        const postomatPill = dom.resultsTypeFilters.querySelector('[data-type="postomat"]');
-        if (postomatPill) postomatPill.style.display = '';
-      }
+      applyTypeFiltersVisibility();
     } else {
       dom.btnUkrposhta.classList.add('active');
       dom.btnUkrposhta.setAttribute('aria-selected', 'true');
@@ -177,10 +174,7 @@
 
       // Приховуємо кнопку «Поштомат» та фільтр «Поштомати» для Укрпошти (в Укрпошти немає поштоматів)
       if (dom.btnQuickPostomat) dom.btnQuickPostomat.style.display = 'none';
-      if (dom.resultsTypeFilters) {
-        const postomatPill = dom.resultsTypeFilters.querySelector('[data-type="postomat"]');
-        if (postomatPill) postomatPill.style.display = 'none';
-      }
+      applyTypeFiltersVisibility();
 
       // Скидаємо фільтр типів на 'all'
       state.typeFilter = 'all';
@@ -207,6 +201,7 @@
     if (dom.didYouMeanBox) dom.didYouMeanBox.classList.add('hidden');
     state.currentResults = [];
     state.selectedBranch = null;
+    renderRecentHistory();
 
     if (state.isMapVisible) {
       updateMapMarkers(getAllCurrentServiceBranches());
@@ -1014,17 +1009,6 @@
     const hlStreet = highlightMatch(cleanStreet, query);
     const hlGeoSub = geoSub ? highlightMatch(geoSub, query) : '';
 
-    let ukrposhtaIndexBadgeHtml = '';
-    let copyIndexBtnHtml = '';
-    if (isUkrposhta && postalCode) {
-      ukrposhtaIndexBadgeHtml = `<span class="ukrposhta-index-badge">📮 ІНДЕКС: ${escapeHtml(postalCode)}</span>`;
-      copyIndexBtnHtml = `
-        <button class="btn-copy-index-action" type="button" title="Скопіювати суто 5 цифр індексу для CRM">
-          📋 Індекс ${escapeHtml(postalCode)}
-        </button>
-      `;
-    }
-
     card.innerHTML = `
       <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
       <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
@@ -1049,8 +1033,6 @@
         <button class="btn-copy-action btn-copy-detailed" type="button" title="Скопіювати розширений CRM-формат (з областю, районом та вагою)">
           📋 Детально
         </button>
-        ${copyIndexBtnHtml}
-        ${ukrposhtaIndexBadgeHtml}
         <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
         <span class="status-pill"><span class="status-dot"></span> Працює</span>
       </div>
@@ -1069,14 +1051,6 @@
       btnCopyDetailed.addEventListener('click', (e) => {
         e.stopPropagation();
         copyTextToClipboard(detailedCopyText, btnCopyDetailed, 'Детально скопійовано!');
-      });
-    }
-
-    const btnCopyIndex = card.querySelector('.btn-copy-index-action');
-    if (btnCopyIndex) {
-      btnCopyIndex.addEventListener('click', (e) => {
-        e.stopPropagation();
-        copyTextToClipboard(postalCode, btnCopyIndex, 'Індекс скопійовано!');
       });
     }
 
@@ -1122,7 +1096,8 @@
     if (filtered.length === 0) {
       if (dom.didYouMeanBox) dom.didYouMeanBox.classList.add('hidden');
       if (dom.limitSelector) dom.limitSelector.style.display = 'none';
-      if (dom.resultsTypeFilters) dom.resultsTypeFilters.style.display = 'none';
+      // Панель табів залишається видимою, щоб можна було переключитись на інший таб
+      applyTypeFiltersVisibility();
       dom.resultsCount.textContent = '0 відділень';
 
       if (missingTargetBranch) {
@@ -1199,13 +1174,7 @@
 
     // РЕЖИМ 2: ПОШУК ПО АДРЕСІ — ПОКАЗУЄМО СУТО ЗБІГИ АДРЕСИ В 1 КОЛОНКУ (як в LP-CRM)
     if (dom.limitSelector) dom.limitSelector.style.display = '';
-    if (dom.resultsTypeFilters) {
-      dom.resultsTypeFilters.style.display = '';
-      const postomatPill = dom.resultsTypeFilters.querySelector('[data-type="postomat"]');
-      if (postomatPill) {
-        postomatPill.style.display = state.currentService === 'ukrposhta' ? 'none' : '';
-      }
-    }
+    applyTypeFiltersVisibility();
     dom.resultsCount.textContent = `${filtered.length} збігів адреси`;
 
     let limitNum = 20;
@@ -1274,7 +1243,6 @@
         <div class="address-match-right">
           ${isUkrposhta && postalCode ? `<span class="ukrposhta-index-badge-sm">📮 ІНДЕКС: ${escapeHtml(postalCode)}</span>` : ''}
           <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
-          <span class="address-match-select-btn">Обрати ➔</span>
         </div>
       `;
 
@@ -1416,9 +1384,10 @@
       count: resultsCount
     });
 
-    const topFive = filtered.slice(0, 5);
-    saveSearchHistory(topFive);
-    renderRecentHistory(topFive);
+    const topFive = filtered.filter(item => item.service === state.currentService).slice(0, 5);
+    const otherServices = filtered.filter(item => item.service !== state.currentService).slice(0, 5);
+    saveSearchHistory(topFive.concat(otherServices));
+    renderRecentHistory();
   }
 
   function formatRelativeTime(timestamp) {
@@ -1435,7 +1404,7 @@
   }
 
   function renderRecentHistory(items) {
-    const list = items || getSearchHistory();
+    const list = (items || getSearchHistory()).filter(item => item.service === state.currentService);
     dom.recentHistoryList.innerHTML = '';
 
     if (list.length === 0) {
@@ -2104,6 +2073,17 @@
     });
   }
 
+  // Показує панель табів; для Укрпошти ховає «Вантажні» та «Поштомати»
+  function applyTypeFiltersVisibility() {
+    if (!dom.resultsTypeFilters) return;
+    dom.resultsTypeFilters.style.display = '';
+    const isUP = state.currentService === 'ukrposhta';
+    ['cargo', 'postomat'].forEach(t => {
+      const pill = dom.resultsTypeFilters.querySelector(`[data-type="${t}"]`);
+      if (pill) pill.style.display = isUP ? 'none' : '';
+    });
+  }
+
   function updateTypeFilterUI() {
     if (!dom.resultsTypeFilters) return;
     dom.resultsTypeFilters.querySelectorAll('.type-pill-btn').forEach(b => {
@@ -2261,28 +2241,6 @@
       }
     });
 
-    // Швидкий режим поштоматів (разовий швидкий шорткат вставки слова «поштомат», без блокування фільтра)
-    if (dom.btnQuickPostomat) {
-      dom.btnQuickPostomat.addEventListener('click', (e) => {
-        e.preventDefault();
-        let val = dom.searchInput.value.trim();
-        if (!val) {
-          dom.searchInput.value = 'поштомат ';
-        } else if (!/(?:поштомат|почтомат|пм)/i.test(val)) {
-          dom.searchInput.value = `${val} поштомат `;
-        }
-        dom.btnClearSearch.classList.remove('hidden');
-        focusSearchInputAtEnd(true);
-        setTimeout(() => focusSearchInputAtEnd(true), 25);
-
-        if (val.length > 0) {
-          executeSearch(dom.searchInput.value, true, true);
-        } else {
-          dom.searchInput.dispatchEvent(new Event('input'));
-        }
-      });
-    }
-
     // Limit Selector (5 | 10 | 20 | Всі)
     if (dom.limitSelector) {
       dom.limitSelector.addEventListener('click', (e) => {
@@ -2312,6 +2270,8 @@
 
         if (state.currentResults.length > 0) {
           renderSearchResults(state.currentResults, state.searchQuery, null);
+        } else if (state.searchQuery) {
+          executeSearch(state.searchQuery, false, false);
         }
       });
     }
@@ -2419,7 +2379,7 @@
   }
 
   // ==========================================================================
-  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.25.1)
+  // РЕЄСТРАЦІЯ ТА АВТОМАТИЧНЕ ОНОВЛЕННЯ SERVICE WORKER (v8.26.0)
   // ==========================================================================
   function initServiceWorker() {
     try {
@@ -2430,7 +2390,7 @@
 
     if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       navigator.serviceWorker
-        .register('./sw.js?v=8.25.1', { updateViaCache: 'none' })
+        .register('./sw.js?v=8.26.0', { updateViaCache: 'none' })
         .then((reg) => {
           // Примусова перевірка наявності оновлення
           reg.update();
@@ -2469,7 +2429,7 @@
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((key) => {
-          if (key !== 'np-ukr-cache-v8.25.1') {
+          if (key !== 'np-ukr-cache-v8.26.0') {
             caches.delete(key);
           }
         });

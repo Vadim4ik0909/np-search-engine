@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.25.1">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=8.26.0">
   
   <!-- Theme initialization (Default: Light; persists in localStorage; resets to Light on cache clear) -->
   <script>
@@ -35,7 +35,7 @@
   </script>
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=8.25.1">
+  <link rel="stylesheet" href="styles.css?v=8.26.0">
 </head>
 <body data-service="novaposhta">
 
@@ -93,9 +93,6 @@
       <!-- 2. НАД ПОШУКОМ: ШВИДКИЙ ПОШТОМАТ (ЗЛІВА) ТА КАРТА (СПРАВА) -->
       <div class="search-actions-bar">
         <div class="search-actions-left">
-          <button id="btnQuickPostomat" class="btn-quick-postomat" type="button" title="Швидко додати «поштомат» у пошук">
-            📦 Поштомат
-          </button>
           <span class="active-service-tag" id="activeServiceTag" style="display:none;">Нова пошта</span>
           <span class="search-tip">Шукайте за назвою міста, номером відділення, вулицею чи індексом</span>
         </div>
@@ -161,12 +158,6 @@
           </div>
 
           <button type="submit" id="btnSearchSubmit" class="btn-search-submit">
-            <span class="search-submit-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </span>
             <span class="search-submit-text">Шукати</span>
           </button>
         </form>
@@ -249,8 +240,8 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v8.25.1</span>
-          <span class="version-label">Історія версій</span>
+          <span class="version-tag">v8.26.0</span>
+          
         </button>
       </div>
 
@@ -278,8 +269,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 8.25.1 -->
+        <!-- Версія 8.26.0 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v8.26.0</span>
+            <span class="version-state">Глобальне очищення інтерфейсу та розділена історія пошуку</span>
+            <span class="version-date">20 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Чистіший головний екран:</strong> м'якша заливка активної служби, кнопка «Шукати» без іконки, прибрано кнопку «Поштомат», у підвалі лише бейдж версії.</li>
+            <li><strong>Окрема історія для кожної служби:</strong> у вкладці Нова пошта — лише її запити, у вкладці Укрпошта — лише запити Укрпошти.</li>
+            <li><strong>Результати та таби:</strong> прибрано кнопку «Обрати ➔», панель табів не зникає при 0 результатів, для Укрпошти лише «Всі» та «Відділення»; у картці Укрпошти прибрано дублі індексу.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 8.25.1 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v8.25.1</span>
             <span class="version-state">Чистий 2-рядковий UX відділень, усунення over-highlighting та префіксні номери</span>
@@ -874,15 +879,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Дані відділень -->
-  <script src="data/branches.js?v=8.25.1"></script>
+  <script src="data/branches.js?v=8.26.0"></script>
 
   <!-- Повний реєстр населених пунктів України (26 500+ сіл, смт, селищ, міст) -->
-  <script src="data/all_settlements.js?v=8.25.1"></script>
+  <script src="data/all_settlements.js?v=8.26.0"></script>
 
   <!-- Розумний двигун пошуку та виправлення одруків -->
-  <script src="data/fuzzySearch.js?v=8.25.1"></script>
+  <script src="data/fuzzySearch.js?v=8.26.0"></script>
 
   <!-- Головна логіка застосунку -->
-  <script src="app.js?v=8.25.1"></script>
+  <script src="app.js?v=8.26.0"></script>
 </body>
 </html>

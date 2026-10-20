@@ -2217,3 +2217,22 @@ mark.hl-match,
     font-size: 12px;
   }
 }
+
+/* v8.26.0: м'яка заливка активного перемикача служби */
+.switcher-btn.active {
+  background: color-mix(in srgb, var(--brand-color) 16%, transparent);
+  color: var(--text-main);
+  border-color: color-mix(in srgb, var(--brand-color) 38%, transparent);
+  box-shadow: none;
+}
+
+/* v8.26.0: кнопка «Шукати» — тільки текст по центру */
+.btn-search-submit {
+  justify-content: center;
+  text-align: center;
+}
+
+/* v8.26.0: картка результату клікабельна сама по собі */
+.address-match-row {
+  cursor: pointer;
+}

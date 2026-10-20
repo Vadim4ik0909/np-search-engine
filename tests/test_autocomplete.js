@@ -860,8 +860,8 @@ async function runTests() {
     if (limitSelector.style.display !== 'none') {
       throw new Error('limitSelector повинен бути прихований (display: none) при empty state');
     }
-    if (resultsTypeFilters.style.display !== 'none') {
-      throw new Error('resultsTypeFilters повинен бути прихований (display: none) при empty state');
+    if (resultsTypeFilters.style.display === 'none') {
+      throw new Error('resultsTypeFilters НЕ повинен ховатися (display: none) при empty state (v8.26.0)');
     }
 
     // 3. ПЕРЕВІРКА ЛАКОНІЧНОСТІ КАРТКИ ТОЧНОГО ЗБІГУ ("київ 111")
@@ -1169,10 +1169,12 @@ async function runTests() {
       throw new Error("У картці відділення Укрпошти відсутній поштовий індекс 11051");
     }
 
-    // Перевірка наявності бейджа або кнопки копіювання індексу в один клік
-    const hasIndexAction = fullText.includes('btn-copy-index-action') || fullText.includes('ukrposhta-index-badge');
-    if (!hasIndexAction) {
-      throw new Error("У картці Укрпошти відсутній блок швидкого копіювання індексу (.btn-copy-index-action або .ukrposhta-index-badge)");
+    // v8.26.0: дублюючі теги індексу у підвалі картки прибрані
+    if (fullText.includes('btn-copy-index-action') || fullText.includes('ІНДЕКС:')) {
+      throw new Error("У підвалі картки Укрпошти не повинно бути дублюючих тегів індексу");
+    }
+    if (fullText.includes('Обрати ➔')) {
+      throw new Error("Кнопка 'Обрати ➔' повинна бути видалена");
     }
 
     // 5. Перевірка UI для запиту "житомир нові білокоровичі" (без номера)
