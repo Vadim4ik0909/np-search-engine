@@ -216,7 +216,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 37;
+  let totalTests = 38;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -2289,6 +2289,65 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 37:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 38: Калібрування ранжування v1.3.7 ("Городок 1", "Борщів Чортківський Бандери 1", "Тарасівка Фастівський")
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 38: Калібрування ранжування v1.3.7 ("Городок 1", "Борщів Чортківський Бандери 1", "Тарасівка Фастівський")');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. "Городок 1" -> першим строго Відділення №1 (номер будинку не має права перебивати номер відділення)
+    const resGorodok1 = window.SmartSearchEngine.searchBranches('Городок 1', npPool, 10);
+    if (!resGorodok1 || resGorodok1.length === 0) {
+      throw new Error('Запит "Городок 1" повернув 0 результатів');
+    }
+    if (String(resGorodok1[0].number) !== '1' || canon(resGorodok1[0].city) !== 'городок') {
+      throw new Error(`Для "Городок 1" першим має бути строго Відділення №1, отримано: ${resGorodok1[0].city} №${resGorodok1[0].number}`);
+    }
+
+    // Додаткова перевірка: навіть якщо у Відділенні №2 вказано будинок 1 на схожій вулиці, №1 отримує +5000 і перемагає
+    const mockCompetitionPool = [
+      { id: 'np-comp-2', city: 'Городок', oblast: 'Львівська', raion: 'Городоцький', number: '2', street: 'вул. Львівська, 1', name: 'Відділення №2: вул. Львівська, 1' },
+      { id: 'np-comp-1', city: 'Городок', oblast: 'Львівська', raion: 'Городоцький', number: '1', street: 'вул. Львівська, 38л', name: 'Відділення №1: вул. Львівська, 38л' }
+    ];
+    const resComp = window.SmartSearchEngine.searchBranches('Городок Львівська 1', mockCompetitionPool, 5);
+    if (!resComp || resComp.length === 0 || String(resComp[0].number) !== '1') {
+      throw new Error(`Пріоритет номера відділення порушено: отримано №${resComp[0] ? resComp[0].number : 'null'} замість №1`);
+    }
+
+    // 2. "Борщів Чортківський Бандери 1" -> Відділення №1 у м. Борщів (без домішування с. Садки)
+    const resBorshchiv = window.SmartSearchEngine.searchBranches('Борщів Чортківський Бандери 1', npPool, 10);
+    if (!resBorshchiv || resBorshchiv.length === 0) {
+      throw new Error('Запит "Борщів Чортківський Бандери 1" повернув 0 результатів');
+    }
+    if (canon(resBorshchiv[0].city) !== 'борщів' || String(resBorshchiv[0].number) !== '1') {
+      throw new Error(`Очікувалось Борщів №1, отримано: ${resBorshchiv[0].city} №${resBorshchiv[0].number}`);
+    }
+    if (resBorshchiv.some(b => canon(b.city) !== 'борщів')) {
+      const leaked = resBorshchiv.filter(b => canon(b.city) !== 'борщів').map(b => b.city).join(', ');
+      throw new Error(`Порушено ізоляцію населеного пункту Борщів: домішано сторонні села (${leaked})`);
+    }
+
+    // 3. "Тарасівка Фастівський" -> с. Тарасівка знайдено завдяки маппінгу районів КАТОТТГ (навіть якщо в базі район Києво-Святошинський)
+    const resTarasivkaReal = window.SmartSearchEngine.searchBranches('Тарасівка Фастівський', npPool, 10);
+    if (!resTarasivkaReal || resTarasivkaReal.length === 0 || canon(resTarasivkaReal[0].city) !== 'тарасівка') {
+      throw new Error('Запит "Тарасівка Фастівський" не знайшов с. Тарасівка в основній базі');
+    }
+    const mockOldRaionPool = [
+      { id: 'np-tar-ks', city: 'Тарасівка', settlementType: 'село', oblast: 'Київська', raion: 'Києво-Святошинський', number: '1', street: 'вул. Київська, 90б', name: 'Відділення №1: вул. Київська, 90б' },
+      { id: 'np-tar-other', city: 'Тарасівка', settlementType: 'село', oblast: 'Полтавська', raion: 'Гребінківський', number: '1', street: 'вул. Центральна, 1', name: 'Відділення №1' }
+    ];
+    const resTarasivkaOld = window.SmartSearchEngine.searchBranches('Тарасівка Фастівський', mockOldRaionPool, 5);
+    if (!resTarasivkaOld || resTarasivkaOld.length === 0 || resTarasivkaOld[0].raion !== 'Києво-Святошинський') {
+      throw new Error('Запит "Тарасівка Фастівський" не зіставив Фастівський р-н зі старим Києво-Святошинським р-ном');
+    }
+
+    console.log('  ✓ Успіх: "Городок 1" -> №1 (+5000 пріоритет), "Борщів Чортківський Бандери 1" -> ізольовано м. Борщів №1 (без с. Садки), "Тарасівка Фастівський" -> КАТОТТГ маппінг працює бездоганно!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 38:', err.message, '\n');
   }
 
   console.log('===============================================================');
