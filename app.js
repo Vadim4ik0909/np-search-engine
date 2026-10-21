@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.3.2';
+  const APP_VERSION = '1.3.3';
 
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
@@ -19,6 +19,7 @@
     currentResults: [],
     displayLimit: 10, // 5 | 10 | 20 | 'all'
     typeFilter: 'all', // 'all' | 'cargo' | 'branch' | 'postomat'
+    mapTypeFilter: 'all', // 'all' | 'cargo' | 'branch' | 'postomat'
     isMapVisible: false,
     leafletMap: null,
     markersGroup: null,
@@ -79,6 +80,8 @@
     mapMarkersCount: document.getElementById('mapMarkersCount'),
     btnGeoLocate: document.getElementById('btnGeoLocate'),
     btnCloseMap: document.getElementById('btnCloseMap'),
+    branchesMap: document.getElementById('branchesMap'),
+    mapTypeFilters: document.getElementById('mapTypeFilters'),
 
     // Найчастіші запити та історія
     frequentChipsGrid: document.getElementById('frequentChipsGrid'),
@@ -205,8 +208,17 @@
     state.selectedBranch = null;
     renderRecentHistory();
 
+    if (serviceName === 'ukrposhta' && (state.mapTypeFilter === 'cargo' || state.mapTypeFilter === 'postomat')) {
+      state.mapTypeFilter = 'all';
+    }
+    updateMapTypeFilterUI();
+
     if (state.isMapVisible) {
-      updateMapMarkers(state.currentResults.slice(0, 20));
+      if (state.currentResults && state.currentResults.length > 0) {
+        updateMapMarkers(state.currentResults.slice(0, 20));
+      } else {
+        updateVisibleMarkersFromViewport();
+      }
     }
   }
 
@@ -678,13 +690,15 @@
         mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName).slice(0, 20);
       }
 
-      updateMapMarkers(mapBranches, targetBranch);
-      if (targetBranch && targetBranch.lat && targetBranch.lng) {
-        state.leafletMap.flyTo([targetBranch.lat, targetBranch.lng], 14, { duration: 1.0 });
-      } else if (parsed.matchedSettlement && parsed.matchedSettlement.lat) {
-        state.leafletMap.flyTo([parsed.matchedSettlement.lat, parsed.matchedSettlement.lng], 13, { duration: 1.0 });
-      } else if (mapBranches.length === 0 && ukraineBounds) {
-        state.leafletMap.fitBounds(ukraineBounds);
+      if (mapBranches.length > 0) {
+        updateMapMarkers(mapBranches, targetBranch);
+        if (targetBranch && targetBranch.lat && targetBranch.lng) {
+          state.leafletMap.flyTo([targetBranch.lat, targetBranch.lng], 14, { duration: 1.0 });
+        } else if (parsed && parsed.matchedSettlement && parsed.matchedSettlement.lat) {
+          state.leafletMap.flyTo([parsed.matchedSettlement.lat, parsed.matchedSettlement.lng], 13, { duration: 1.0 });
+        }
+      } else {
+        updateVisibleMarkersFromViewport();
       }
     }
     } catch (err) {
@@ -947,37 +961,35 @@
     }, 2800);
   }
 
-  function copyTextToClipboard(text, btnElement, successText) {
-    function execCommandFallback(str) {
-      const ta = document.createElement('textarea');
-      ta.value = str;
-      ta.style.position = 'fixed';
-      ta.style.top = '0';
-      ta.style.left = '-9999px';
-      ta.style.opacity = '0';
-      ta.setAttribute('readonly', '');
-      document.body.appendChild(ta);
-      ta.focus();
-      if (typeof ta.select === 'function') {
-        ta.select();
-      }
-      if (ta.setSelectionRange) {
-        ta.setSelectionRange(0, str.length);
-      }
-      try {
-        document.execCommand('copy');
-      } catch (e) {
-        console.warn('Fallback copy error:', e);
-      }
-      document.body.removeChild(ta);
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    if (typeof ta.select === 'function') {
+      ta.select();
     }
+    try {
+      document.execCommand('copy');
+    } catch (e) {
+      console.warn('Fallback copy error:', e);
+    }
+    document.body.removeChild(ta);
+  }
 
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      navigator.clipboard.writeText(text).catch(() => {
-        execCommandFallback(text);
-      });
-    } else {
-      execCommandFallback(text);
+  function copyTextToClipboard(text, btnElement, successText) {
+    if (!text) return;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).catch(() => {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
+    } catch (e) {
+      fallbackCopy(text);
     }
 
     if (btnElement) {
@@ -1501,6 +1513,15 @@
     ? L.latLngBounds(L.latLng(44.0, 22.0), L.latLng(52.5, 40.5))
     : null;
 
+  let mapMoveDebounceTimer = null;
+
+  function debounceUpdateVisibleMarkers() {
+    clearTimeout(mapMoveDebounceTimer);
+    mapMoveDebounceTimer = setTimeout(() => {
+      updateVisibleMarkersFromViewport();
+    }, 200);
+  }
+
   function initMapIfNeeded() {
     if (state.leafletMap) return;
     if (typeof L === 'undefined') return;
@@ -1527,12 +1548,31 @@
 
     state.markersGroup = L.layerGroup().addTo(state.leafletMap);
 
+    // Слухач подій переміщення та зуму карти для динамічного підвантаження
+    state.leafletMap.on('moveend zoomend', debounceUpdateVisibleMarkers);
+
     // Початковий вигляд: територія України
     if (bounds) {
       state.leafletMap.fitBounds(bounds);
     } else {
       state.leafletMap.setView([48.5, 31.5], 6);
     }
+  }
+
+  function updateMapTypeFilterUI() {
+    if (!dom.mapTypeFilters) return;
+    const current = state.mapTypeFilter || 'all';
+    const btns = dom.mapTypeFilters.querySelectorAll('.map-filter-btn');
+    btns.forEach(btn => {
+      const type = btn.getAttribute('data-map-type');
+      if (type === current) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+      } else {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      }
+    });
   }
 
   function toggleMapView() {
@@ -1547,7 +1587,8 @@
       dom.btnToggleMap.setAttribute('aria-label', 'Сховати карту');
 
       initMapIfNeeded();
-      
+      updateMapTypeFilterUI();
+
       setTimeout(() => {
         if (window.leafMap) window.leafMap.invalidateSize();
         if (state.leafletMap) state.leafletMap.invalidateSize();
@@ -1557,16 +1598,20 @@
 
         if (state.currentResults && state.currentResults.length > 0) {
           mapBranches = state.currentResults.slice(0, 20);
+          renderMapMarkers(mapBranches, targetBranch, true);
         } else if (state.searchQuery && window.SmartSearchEngine) {
           const parsed = window.SmartSearchEngine.parseQuery(state.searchQuery);
           if (parsed && parsed.matchedSettlement) {
             const sName = parsed.matchedSettlement.name.toLowerCase();
             const allBranches = getAllCurrentServiceBranches();
             mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName).slice(0, 20);
+            renderMapMarkers(mapBranches, targetBranch, true);
+          } else {
+            updateVisibleMarkersFromViewport();
           }
+        } else {
+          updateVisibleMarkersFromViewport();
         }
-
-        updateMapMarkers(mapBranches, targetBranch);
       }, 150);
     } else {
       dom.mapSection.classList.add('hidden');
@@ -1583,6 +1628,59 @@
         state.userLocationMarker = null;
       }
     }
+  }
+
+  function updateVisibleMarkersFromViewport() {
+    if (!state.leafletMap || !state.markersGroup || !state.isMapVisible) return;
+
+    let bounds;
+    try {
+      bounds = state.leafletMap.getBounds();
+    } catch (e) {
+      return;
+    }
+    if (!bounds || !bounds.isValid()) return;
+
+    const zoom = state.leafletMap.getZoom();
+    const allBranches = getAllCurrentServiceBranches();
+    const filterType = state.mapTypeFilter || 'all';
+
+    const maxLimit = zoom < 11 ? 45 : 60;
+    const visibleBranches = [];
+
+    const south = bounds.getSouth();
+    const north = bounds.getNorth();
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+
+    for (let i = 0; i < allBranches.length; i++) {
+      const b = allBranches[i];
+      if (!b.lat || !b.lng) continue;
+
+      if (b.lat < south || b.lat > north || b.lng < west || b.lng > east) {
+        continue;
+      }
+
+      if (filterType === 'cargo') {
+        if (!isCargoBranch(b)) continue;
+      } else if (filterType === 'branch') {
+        if (isPostomatBranch(b) || isCargoBranch(b)) continue;
+      } else if (filterType === 'postomat') {
+        if (!isPostomatBranch(b)) continue;
+      }
+
+      if (zoom < 11) {
+        const isHub = isCargoBranch(b) || b.number === 1 || b.number === '1';
+        if (!isHub) continue;
+      }
+
+      visibleBranches.push(b);
+      if (visibleBranches.length >= maxLimit) {
+        break;
+      }
+    }
+
+    renderMapMarkers(visibleBranches, state.selectedBranch, false);
   }
 
   function createCustomPin(isNP, isHighlighted = false) {
@@ -1612,23 +1710,13 @@
     });
   }
 
-  function updateMapMarkers(branches, highlightedBranch = null) {
+  function renderMapMarkers(branches, highlightedBranch = null, autoFitBounds = true) {
     if (!state.leafletMap || !state.markersGroup) return;
 
     state.markersGroup.clearLayers();
 
-    // Захист від зависання: суворо не більше 20 точок одночасно
-    const safeBranches = (branches || []).slice(0, 20);
+    const safeBranches = (branches || []).slice(0, 60);
     dom.mapMarkersCount.textContent = `(${safeBranches.length} відділень)`;
-
-    const boundsObj = ukraineBounds || (typeof L !== 'undefined' && L.latLngBounds ? L.latLngBounds(L.latLng(44.0, 22.0), L.latLng(52.5, 40.5)) : null);
-
-    if (safeBranches.length === 0) {
-      if (boundsObj && state.leafletMap) {
-        state.leafletMap.fitBounds(boundsObj);
-      }
-      return;
-    }
 
     const isNP = state.currentService === 'novaposhta';
     const regularPin = createCustomPin(isNP, false);
@@ -1648,11 +1736,8 @@
           zIndexOffset: isTarget ? 1000 : 0
         });
 
-        const gmapsLink = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`;
         const accentColor = isNP ? '#fb7185' : '#ffd200';
-        const btnTextColor = isNP ? '#ffffff' : '#0b0f19';
-
-        const lpCopyStr = formatLpCrmCopyString(b);
+        const lpCopyStr = formatClassicCopyString(b);
         const popupContent = `
           <div style="font-family: var(--font-main); min-width: 240px; padding: 4px;">
             ${isTarget ? '<div style="font-size:11px; font-weight:700; color:' + accentColor + '; text-transform:uppercase; margin-bottom:4px;">⭐ Вибране відділення</div>' : ''}
@@ -1663,7 +1748,6 @@
               <button type="button" class="btn-popup-copy" data-copy="${escapeHtml(lpCopyStr)}">
                 📋 Скопіювати
               </button>
-              <a href="${gmapsLink}" target="_blank" style="display: inline-block; background: ${accentColor}; color: ${btnTextColor}; padding: 6px 12px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: 700;">🚗 Маршрут</a>
             </div>
           </div>
         `;
@@ -1684,15 +1768,17 @@
       }, 250);
     }
 
-    if (bounds.length > 0) {
+    if (autoFitBounds && bounds.length > 0) {
       if (highlightedBranch && highlightedBranch.lat && highlightedBranch.lng) {
         state.leafletMap.setView([highlightedBranch.lat, highlightedBranch.lng], 14, { animate: true });
       } else {
         state.leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
       }
-    } else if (boundsObj) {
-      state.leafletMap.fitBounds(boundsObj);
     }
+  }
+
+  function updateMapMarkers(branches, highlightedBranch = null) {
+    renderMapMarkers(branches, highlightedBranch, true);
   }
 
   function getUserLocation() {
@@ -2378,7 +2464,7 @@
       state.currentResults = [];
       state.selectedBranch = null;
       if (state.isMapVisible) {
-        updateMapMarkers([]);
+        updateVisibleMarkersFromViewport();
       }
       dom.searchInput.focus();
     });
@@ -2386,6 +2472,17 @@
     dom.btnCloseResults.addEventListener('click', () => {
       dom.searchResultsSection.classList.add('hidden');
     });
+
+    if (dom.mapTypeFilters) {
+      dom.mapTypeFilters.addEventListener('click', (e) => {
+        const btn = e.target.closest('.map-filter-btn');
+        if (!btn) return;
+        const type = btn.getAttribute('data-map-type') || 'all';
+        state.mapTypeFilter = type;
+        updateMapTypeFilterUI();
+        updateVisibleMarkersFromViewport();
+      });
+    }
 
     dom.btnToggleMap.addEventListener('click', toggleMapView);
     if (dom.btnCloseMap) {
