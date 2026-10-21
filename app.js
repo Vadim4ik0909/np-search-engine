@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.3.3';
+  const APP_VERSION = '1.3.4';
 
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
@@ -22,7 +22,10 @@
     mapTypeFilter: 'all', // 'all' | 'cargo' | 'branch' | 'postomat'
     isMapVisible: false,
     leafletMap: null,
+    currentTileLayer: null,
+    currentTileTheme: null,
     markersGroup: null,
+    branchMarkersMap: new Map(),
     userLocationMarker: null,
     apiKeyNP: localStorage.getItem('np_api_key') || '',
     hasServerKey: false,
@@ -129,6 +132,10 @@
       const label = isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему';
       dom.btnThemeToggle.setAttribute('aria-label', label);
       dom.btnThemeToggle.setAttribute('title', label);
+    }
+
+    if (typeof updateMapTileLayerTheme === 'function') {
+      updateMapTileLayerTheme(theme);
     }
 
     if (saveToStorage) {
@@ -978,7 +985,7 @@
     document.body.removeChild(ta);
   }
 
-  function copyTextToClipboard(text, btnElement, successText) {
+  function copyTextToClipboard(text, btnElement, successText = 'Скопійовано!', duration = 2000) {
     if (!text) return;
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -1000,7 +1007,7 @@
         clearTimeout(btnElement._copyTimeout);
       }
       btnElement.classList.add('copied');
-      btnElement.innerHTML = `<span>✓</span> <span>${successText || 'Скопійовано!'}</span>`;
+      btnElement.innerHTML = `<span>✓</span> <span>${successText}</span>`;
       btnElement._copyTimeout = setTimeout(() => {
         btnElement.classList.remove('copied');
         if (btnElement._originalHtml) {
@@ -1008,7 +1015,7 @@
           delete btnElement._originalHtml;
         }
         delete btnElement._copyTimeout;
-      }, 2000);
+      }, duration);
     }
 
     showToast(text);
@@ -1213,6 +1220,8 @@
       container.innerHTML = backBtnHtml;
 
       const card = createFullBranchCard(branch, query || state.searchQuery);
+      card.addEventListener('mouseenter', () => setMarkerHighlightedOnMap(branch, true));
+      card.addEventListener('mouseleave', () => setMarkerHighlightedOnMap(branch, false));
       container.appendChild(card);
       dom.resultsList.appendChild(container);
 
@@ -1304,6 +1313,9 @@
           state.leafletMap.flyTo([branch.lat, branch.lng], 15, { duration: 1.0 });
         }
       };
+
+      row.addEventListener('mouseenter', () => setMarkerHighlightedOnMap(branch, true));
+      row.addEventListener('mouseleave', () => setMarkerHighlightedOnMap(branch, false));
 
       row.addEventListener('click', selectThis);
       row.addEventListener('keydown', (e) => {
@@ -1507,11 +1519,92 @@
   }
 
   // ==========================================================================
-  // 5. ТЕМНА КАРТА LEAFLET (OPENSTREETMAP + DARK MODE CSS)
+  // 5. ТЕМНА / СВІТЛА КАРТА LEAFLET (АДАПТИВНІ ТАЙЛИ + CARTO / OSM)
   // ==========================================================================
   const ukraineBounds = (typeof L !== 'undefined' && L.latLngBounds)
     ? L.latLngBounds(L.latLng(44.0, 22.0), L.latLng(52.5, 40.5))
     : null;
+
+  const MAP_TILES = {
+    light: {
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      options: {
+        minZoom: 6,
+        maxZoom: 18,
+        subdomains: 'abcd',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+      }
+    },
+    dark: {
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
+      options: {
+        minZoom: 6,
+        maxZoom: 18,
+        subdomains: 'abcd',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+      }
+    }
+  };
+
+  function getBranchUniqueKey(b) {
+    if (!b) return '';
+    if (b.id) return String(b.id);
+    if (b.ref) return String(b.ref);
+    const city = (b.city || '').toLowerCase().trim();
+    const num = (b.number || b.Number || b.postalCode || '').toString().trim();
+    if (city && num) return `${city}_${num}`;
+    if (b.lat && b.lng) return `${b.lat}_${b.lng}`;
+    return String(b.name || '');
+  }
+
+  function renderSelectedBranch(branch) {
+    if (!branch) return;
+    state.selectedBranch = branch;
+    if (dom.searchResultsSection) {
+      dom.searchResultsSection.classList.remove('hidden');
+    }
+
+    const list = (state.currentResults && state.currentResults.length > 0)
+      ? state.currentResults
+      : [branch];
+
+    renderSearchResults(list, state.searchQuery || branch.city || '');
+  }
+
+  function setMarkerHighlightedOnMap(branch, isHover) {
+    if (!state.isMapVisible || !state.leafletMap || !state.branchMarkersMap) return;
+    const bKey = getBranchUniqueKey(branch);
+    const marker = state.branchMarkersMap.get(bKey);
+    if (!marker) return;
+
+    const el = marker.getElement();
+    if (el) {
+      if (isHover) {
+        el.classList.add('marker-hovered');
+        marker.setZIndexOffset(9999);
+      } else {
+        el.classList.remove('marker-hovered');
+        const isTarget = state.selectedBranch && getBranchUniqueKey(state.selectedBranch) === bKey;
+        marker.setZIndexOffset(isTarget ? 1000 : 0);
+      }
+    }
+  }
+
+  function updateMapTileLayerTheme(theme) {
+    if (!state.leafletMap || typeof L === 'undefined') return;
+    const targetTheme = theme === 'dark' ? 'dark' : 'light';
+    if (state.currentTileTheme === targetTheme && state.currentTileLayer) return;
+
+    const tileConf = MAP_TILES[targetTheme];
+    const newLayer = L.tileLayer(tileConf.url, tileConf.options);
+
+    newLayer.addTo(state.leafletMap);
+    if (state.currentTileLayer) {
+      state.leafletMap.removeLayer(state.currentTileLayer);
+    }
+    state.currentTileLayer = newLayer;
+    state.currentTileTheme = targetTheme;
+  }
 
   let mapMoveDebounceTimer = null;
 
@@ -1539,12 +1632,11 @@
 
     window.leafMap = state.leafletMap;
 
-    // Стандартні відкриті тайли OpenStreetMap без обмежень та вотермарок
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      minZoom: 6,
-      maxZoom: 18,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
-    }).addTo(state.leafletMap);
+    // Адаптивна картографічна підкладка: CartoDB Voyager для світлої / CartoDB Dark Matter для темної
+    const initialTheme = state.theme === 'dark' ? 'dark' : 'light';
+    const tileConf = MAP_TILES[initialTheme];
+    state.currentTileLayer = L.tileLayer(tileConf.url, tileConf.options).addTo(state.leafletMap);
+    state.currentTileTheme = initialTheme;
 
     state.markersGroup = L.layerGroup().addTo(state.leafletMap);
 
@@ -1710,10 +1802,67 @@
     });
   }
 
+  function formatPopupContent(b, isTarget, isNP) {
+    const lpCopyStr = formatClassicCopyString(b);
+    const cleanStreet = getCleanStreet(b);
+
+    let typeDisplay;
+    if (isPostomatBranch(b)) {
+      typeDisplay = 'Поштомат';
+    } else if (isCargoBranch(b)) {
+      typeDisplay = 'Вантажне відділення';
+    } else {
+      typeDisplay = 'Відділення';
+    }
+
+    const branchNumber = (b.number || b.Number || b.postalCode || b.PostalCode || '').toString().trim();
+
+    let badgeText = '';
+    let badgeCls = 'map-badge-regular';
+    if (isPostomatBranch(b)) {
+      badgeText = '📮 Поштомат: до 20 кг';
+      badgeCls = 'map-badge-postomat';
+    } else if (isCargoBranch(b)) {
+      const weight = b.totalMaxWeightAllowed || b.maxWeight || 1100;
+      const dims = b.dimensions || b.maxDimensions || '600×220×220 см';
+      badgeText = `🚛 Вантажне: до ${weight} кг (${dims})`;
+      badgeCls = 'map-badge-cargo';
+    } else {
+      const isUp = state.currentService === 'ukrposhta' || (b.id && b.id.startsWith('up-'));
+      const weight = b.totalMaxWeightAllowed || b.maxWeight || 30;
+      if (isUp) {
+        badgeText = `📮 Індекс: ${branchNumber} (до ${weight} кг)`;
+        badgeCls = 'map-badge-up';
+      } else {
+        badgeText = `🏬 До ${weight} кг`;
+        badgeCls = 'map-badge-regular';
+      }
+    }
+
+    return `
+      <div class="map-popup-card">
+        <div class="map-popup-top">
+          <span class="map-popup-badge ${badgeCls}">${escapeHtml(badgeText)}</span>
+          ${isTarget ? '<span class="map-popup-target">⭐ Вибране</span>' : ''}
+        </div>
+        <div class="map-popup-title">${escapeHtml(typeDisplay)} №${escapeHtml(branchNumber)}</div>
+        <div class="map-popup-street">📍 <strong>${escapeHtml(b.city)}</strong>, ${escapeHtml(cleanStreet)}</div>
+        <div class="map-popup-actions">
+          <button type="button" class="btn-popup-copy" data-copy="${escapeHtml(lpCopyStr)}">
+            📋 Скопіювати
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderMapMarkers(branches, highlightedBranch = null, autoFitBounds = true) {
     if (!state.leafletMap || !state.markersGroup) return;
 
     state.markersGroup.clearLayers();
+    if (state.branchMarkersMap) {
+      state.branchMarkersMap.clear();
+    }
 
     const safeBranches = (branches || []).slice(0, 60);
     dom.mapMarkersCount.textContent = `(${safeBranches.length} відділень)`;
@@ -1736,23 +1885,22 @@
           zIndexOffset: isTarget ? 1000 : 0
         });
 
-        const accentColor = isNP ? '#fb7185' : '#ffd200';
-        const lpCopyStr = formatClassicCopyString(b);
-        const popupContent = `
-          <div style="font-family: var(--font-main); min-width: 240px; padding: 4px;">
-            ${isTarget ? '<div style="font-size:11px; font-weight:700; color:' + accentColor + '; text-transform:uppercase; margin-bottom:4px;">⭐ Вибране відділення</div>' : ''}
-            <strong style="color: ${accentColor}; font-size: 14.5px; display: block; margin-bottom: 4px;">${escapeHtml(b.name)}</strong>
-            <p style="margin: 4px 0; font-size: 12.5px; color: var(--text-main); font-weight: 500;">📍 <strong>${escapeHtml(b.city)}</strong>, ${escapeHtml(b.address || b.street)}</p>
-            <p style="margin: 4px 0; font-size: 11.5px; color: var(--text-muted);">🕒 ${escapeHtml(b.schedule || 'Пн-Пт 08:00-19:00')}</p>
-            <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <button type="button" class="btn-popup-copy" data-copy="${escapeHtml(lpCopyStr)}">
-                📋 Скопіювати
-              </button>
-            </div>
-          </div>
-        `;
+        const bKey = getBranchUniqueKey(b);
+        marker._branchId = bKey;
+        marker._branch = b;
+        if (state.branchMarkersMap) {
+          state.branchMarkersMap.set(bKey, marker);
+        }
 
+        const popupContent = formatPopupContent(b, isTarget, isNP);
         marker.bindPopup(popupContent);
+
+        // Двосторонній фокус: клік на маркер відкриває балун та автоматично вибирає повну картку
+        marker.on('click', () => {
+          renderSelectedBranch(b);
+          marker.openPopup();
+        });
+
         state.markersGroup.addLayer(marker);
         bounds.push([b.lat, b.lng]);
 
@@ -2176,6 +2324,11 @@
         selectAutocompleteItem(item);
       };
 
+      if (item.branchObj) {
+        el.addEventListener('mouseenter', () => setMarkerHighlightedOnMap(item.branchObj, true));
+        el.addEventListener('mouseleave', () => setMarkerHighlightedOnMap(item.branchObj, false));
+      }
+
       el.addEventListener('mousedown', handleSelect);
       el.addEventListener('pointerdown', handleSelect);
 
@@ -2537,7 +2690,7 @@
         if (copyBtn) {
           const text = copyBtn.getAttribute('data-copy');
           if (text) {
-            copyTextToClipboard(text, copyBtn, 'Скопійовано!');
+            copyTextToClipboard(text, copyBtn, 'Скопійовано!', 1500);
           }
         }
       });
@@ -2673,6 +2826,10 @@
   window.__executeSearchForTest = executeSearch;
   window.highlightMatch = highlightMatch;
   window.createFullBranchCard = createFullBranchCard;
+  window.renderSelectedBranch = renderSelectedBranch;
+  window.selectBranch = renderSelectedBranch;
+  window.setMarkerHighlightedOnMap = setMarkerHighlightedOnMap;
+  window.updateMapTileLayerTheme = updateMapTileLayerTheme;
   window.formatClassicCopyString = formatClassicCopyString;
   window.formatDetailedCopyString = formatDetailedCopyString;
   window.formatLpCrmCopyString = formatDetailedCopyString;
