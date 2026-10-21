@@ -13,6 +13,29 @@
     'z': 'я', 'x': 'ч', 'c': 'с', 'v': 'м', 'b': 'и', 'n': 'т', 'm': 'ь', ',': 'б', '.': 'ю', '/': '.'
   };
 
+  // 1.00 М'ЯКЕ ОЧИЩЕННЯ СМІТТЄВИХ СИМВОЛІВ ЧАТІВ ТА МЕСЕНДЖЕРІВ
+  function sanitizeChatQuery(raw) {
+    if (!raw) return '';
+    let text = stripApostrophes(String(raw).trim());
+
+    // 1. Видалення лапок усіх видів (« », " ", ' ', “ ”, „ ”, ` `)
+    text = text.replace(/[«»""''“”„`]/g, ' ');
+
+    // 2. Видалення дужок усіх видів: ( ), [ ], { }
+    text = text.replace(/[()[\]{}]/g, ' ');
+
+    // 3. Нормалізація знаків номерів ("№ 5", "№5", "# 5", "#5") -> відокремлюємо пробілами для надійного парсингу
+    text = text.replace(/([№#]+)\s*(\d+)/g, ' № $2 ');
+    // Видаляємо дубльовані чи ізольовані знаки номерів, що не стосуються цифр
+    text = text.replace(/(?<!\d)[№#]+(?!\d)/g, ' ');
+
+    // 4. Повторювані розділові знаки та сміттєві послідовності чатів (---, ===, ..., ???, !!!, ///, \\\)
+    text = text.replace(/[-_–—~*+=/\\!?:;.,]{2,}/g, ' ');
+    text = text.replace(/^[\s=+\-*•—–~#№\\\/]+|[\s=+\-*•—–~#№\\\/]+$/g, '');
+
+    return text.trim();
+  }
+
   function fixKeyboardLayout(text) {
     if (!text) return '';
     let t = text.trim();
@@ -178,7 +201,7 @@
     { name: 'Хмельницька', aliases: ['хмель', 'ххмель', 'хмел', 'хм'] },
     { name: 'Тернопільська', aliases: ['терн', 'терноп'] },
     { name: 'Івано-Франківська', aliases: ['франк', 'іф', 'иф', 'прикарпаття'] },
-    { name: 'Дніпропетровська', aliases: ['дніпро', 'днепр', 'дн'] },
+    { name: 'Дніпропетровська', aliases: ['дніпропетр', 'днепропетр', 'дніпровськ', 'дн'] },
     { name: 'Вінницька', aliases: ['вінн', 'винн'] },
     { name: 'Запорізька', aliases: ['запор', 'зп'] },
     { name: 'Львівська', aliases: ['льв'] },
@@ -196,6 +219,44 @@
     { name: 'Кіровоградська', aliases: ['кіров', 'киров', 'кіровогр', 'кроп', 'кіровоград', 'кропивницький'] },
     { name: 'Київська', aliases: ['київськ', 'кв'] }
   ];
+
+  // 2.2. СЛОВНИК ПОПУЛЯРНИХ СКОРОЧЕНЬ ТА СЛЕНГОВИХ НАЗВ МІСТ (City Aliases)
+  const CITY_SHORT_ALIASES = new Map([
+    ['днепр', 'дніпро'],
+    ['днепропетровск', 'дніпро'],
+    ['дніпропетровськ', 'дніпро'],
+    ['дн', 'дніпро'],
+    ['кв', 'київ'],
+    ['киев', 'київ'],
+    ['льв', 'львів'],
+    ['львов', 'львів'],
+    ['хар', 'харків'],
+    ['харьков', 'харків'],
+    ['од', 'одеса'],
+    ['одесса', 'одеса'],
+    ['хмел', 'хмельницький'],
+    ['зп', 'запоріжжя'],
+    ['запорожье', 'запоріжжя'],
+    ['запор', 'запоріжжя'],
+    ['вин', 'вінниця'],
+    ['винница', 'вінниця'],
+    ['полт', 'полтава'],
+    ['жит', 'житомир'],
+    ['черн', 'чернігів'],
+    ['черк', 'черкаси'],
+    ['ровно', 'рівне'],
+    ['терн', 'тернопіль'],
+    ['тернополь', 'тернопіль'],
+    ['франк', 'івано-франківськ'],
+    ['ивано-франковск', 'івано-франківськ'],
+    ['луцк', 'луцьк'],
+    ['николаев', 'миколаїв'],
+    ['мик', 'миколаїв'],
+    ['ужг', 'ужгород'],
+    ['кроп', 'кропивницький'],
+    ['кривбас', 'кривий ріг'],
+    ['кривой рог', 'кривий ріг']
+  ]);
 
   function isOblastToken(tok) {
     if (!tok) return null;
@@ -713,8 +774,11 @@
   // 5.1. РОЗПІЗНАВАННЯ МІСТА (Точне O(1) або нечітке Levenshtein Distance <= 2)
   function findSettlementByNameOrFuzzy(word, contextOblast, contextRaion) {
     if (!word || word.length < 2) return null;
-    const w = word.toLowerCase().trim();
-    if (isOblastToken(w) && w !== 'дніпро') return null;
+    let w = word.toLowerCase().trim();
+    if (CITY_SHORT_ALIASES.has(w)) {
+      w = CITY_SHORT_ALIASES.get(w);
+    }
+    if (isOblastToken(w) && w !== 'дніпро' && w !== 'днепр') return null;
     const wNorm = normalizeLocativeCase(w);
     // Форми без апострофів ("пятихатки" -> П'ятихатки, "пʼятихатки" -> П'ятихатки)
     const wA = canonText(w);
@@ -811,7 +875,7 @@
   function normalizeSearchTokens(rawQuery) {
     if (!rawQuery) return { tokens: [], cleanText: '', hasPostomatKeyword: false, hasBranchKeyword: false, detectedCity: null };
 
-    let text = stripApostrophes(rawQuery.trim()).replace(/^[\s=+\-*•—–~#№\\\/]+/, '');
+    let text = sanitizeChatQuery(rawQuery);
 
     // 0. Склеювання розірваних поштових індексів (Space-separated Postal Code: "79 049" -> "79049")
     text = text.replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2');
@@ -871,7 +935,7 @@
       const next = filteredTokens[i + 1];
 
       // Якщо токен є скороченням області (наприклад "хмель", "терн", "зп"), зберігаємо його як є і не замінюємо на місто
-      if (isOblastToken(cur) && cur !== 'дніпро') {
+      if (isOblastToken(cur) && cur !== 'дніпро' && cur !== 'днепр') {
         mergedTokens.push(cur);
         continue;
       }
@@ -979,8 +1043,8 @@
       };
     }
 
-    // Крок 1. Перемикання розкладки
-    let corrected = fixKeyboardLayout(stripApostrophes(rawQuery.trim()).replace(/^[\s=+\-*•—–~#№\\\/]+/, ''));
+    // Крок 1. Перемикання розкладки та очищення чат-синтаксису
+    let corrected = fixKeyboardLayout(sanitizeChatQuery(rawQuery));
     const isLayoutFixed = corrected.toLowerCase() !== rawQuery.trim().toLowerCase();
 
     // Склеювання розірваних поштових індексів ("79 049" -> "79049") та маркерів поштоматів
@@ -1307,8 +1371,8 @@
 
   // 7. LP-CRM ІНТЕРАКТИВНИЙ АВТОКОМПЛІТ (Режим топонімів City Mode + Режим відділень Branch Mode)
   function getAutocompleteSuggestions(query, currentService, liveCityBranches = null, staticBranches = null) {
-    if (!query || query.trim().length < 2) return [];
-    let qClean = fixKeyboardLayout(stripApostrophes(query.trim()));
+    if (!query || query.trim().length < 1) return [];
+    let qClean = fixKeyboardLayout(sanitizeChatQuery(query));
 
     // М'яка нормалізація пунктуації та скорочень
     qClean = qClean.replace(/[,;]+/g, ' ')
@@ -1332,10 +1396,14 @@
 
     const qLower = qClean.toLowerCase();
     const normalizedQuery = qLower.replace(/[^a-zа-яіїєґ0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
-    if (!normalizedQuery || normalizedQuery.length < 2) return [];
+    if (!normalizedQuery || normalizedQuery.length < 1) return [];
 
     const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
     if (tokens.length === 0) return [];
+    let resolvedFirstToken = tokens[0];
+    if (CITY_SHORT_ALIASES.has(resolvedFirstToken)) {
+      resolvedFirstToken = CITY_SHORT_ALIASES.get(resolvedFirstToken);
+    }
 
     const suggestions = [];
     const seen = new Set();
@@ -1642,7 +1710,7 @@
     }
 
     // КРОК 1: Префіксний пошук населених пунктів (City Suggestion Mode)
-    const firstToken = tokens[0];
+    const firstToken = resolvedFirstToken || tokens[0];
     const matchesSettlementTokens = (sNameLower, sAliases, sRaion, sOblast) => {
       if (tokens.length === 1) {
         return sNameLower.startsWith(firstToken) || sNameLower.startsWith(normalizedQuery) ||
@@ -1718,6 +1786,23 @@
               normalizedQuery + ' '
             );
           }
+        }
+      }
+    }
+
+    // КРОК 2 (Cascading Relaxed Fallback для автокомпліту): якщо нічого не знайдено, шукаємо за аліасами або нечітким збігом
+    if (suggestions.length === 0) {
+      const aliasToken = tokens.find(t => CITY_SHORT_ALIASES.has(t));
+      if (aliasToken) {
+        const canonicalCity = CITY_SHORT_ALIASES.get(aliasToken);
+        const s = findSettlementByNameOrFuzzy(canonicalCity);
+        if (s) {
+          pushSettlementSuggestion(s, canonicalCity + ' ');
+        }
+      } else if (firstToken.length >= 2) {
+        const fuzzyS = findSettlementByNameOrFuzzy(firstToken);
+        if (fuzzyS) {
+          pushSettlementSuggestion(fuzzyS);
         }
       }
     }
@@ -1963,8 +2048,7 @@
     if (!query) {
       return { city: null, number: null, oblast: null, raion: null, streetTokens: [], settlementOblast: null };
     }
-    query = stripApostrophes(query);
-    let text = fixKeyboardLayout(query.trim().replace(/^[\s=+\-*•—–~#№\\\/]+/, ''))
+    let text = fixKeyboardLayout(sanitizeChatQuery(query))
       .replace(/(\b\d{2})\s+(\d{3}\b)/g, '$1$2')
       .replace(/(?<!\p{L})п\/м(?!\p{L})/giu, 'пм');
 
@@ -2548,8 +2632,97 @@
 
     // 2. ДИНАМІЧНИЙ ПОРІГ РЕЛЕВАНТНОСТІ (Top-K Filter)
     if (matched.length === 0) {
-      _searchLruCache.set(cacheKey, []);
-      return [];
+      // КРОК 2 (Cascading Relaxed/Fuzzy Fallback):
+      // Якщо Крок 1 (суворий скоринг) повернув 0 результатів (через одрук, скорочення чи помилку типу "кв 15", "днепр 5", "льв наук", "пошт 33159"):
+      // 1. Автоматично шукати за префіксами, аліасами та нечіткими коренями топонімів
+      // 2. Дозволити збіг більшості токенів (Relaxed OR)
+      const fallbackCity = detectedCityName ||
+        (tokens.find(t => CITY_SHORT_ALIASES.has(t)) ? CITY_SHORT_ALIASES.get(tokens.find(t => CITY_SHORT_ALIASES.has(t))) : null);
+
+      const wordTokens = tokens.filter(t => !/^\d+$/.test(t) && !STOP_WORDS.has(t));
+      const stems = wordTokens.map(w => ({ raw: w, stem: getUkrainianStem(w) }));
+
+      for (let i = 0; i < branches.length; i++) {
+        const b = branches[i];
+        let score = 0;
+        let matchCount = 0;
+
+        const isPostomat = b.typeClass === 'poshtomat' || b.type === 'poshtomat' || (b.name && b.name.toLowerCase().includes('поштомат'));
+        const bNum = (b.number || '').toString();
+        const bCity = (b._canonCity && b._canonCityRaw === b.city) ? b._canonCity : (b._canonCityRaw = b.city, b._canonCity = canonCity(b.city));
+        const bStreet = b._canonStreet !== undefined ? b._canonStreet : (b._canonStreet = canonText((b.street || '') + ' ' + (b.address || '')));
+        const bPostal = (b.postalCode || '').toString();
+
+        // 1. Топонім / Місто (аліас, точний або префіксний збіг)
+        if (fallbackCity) {
+          if (bCity === fallbackCity) {
+            score += 1000;
+            matchCount++;
+          } else if (bCity.startsWith(fallbackCity.slice(0, 3))) {
+            score += 400;
+            matchCount++;
+          }
+        } else {
+          for (let s of stems) {
+            if (bCity.includes(s.raw) || (s.stem.length >= 3 && bCity.includes(s.stem))) {
+              score += 600;
+              matchCount++;
+              break;
+            }
+          }
+        }
+
+        // 2. Номер або індекс
+        if (hasExplicitNumber) {
+          for (let t = 0; t < numTokens.length; t++) {
+            const numTok = numTokens[t];
+            if (bNum === numTok || bPostal === numTok) {
+              score += 1200;
+              matchCount++;
+            } else if (bNum.startsWith(numTok)) {
+              score += 500;
+              matchCount++;
+            } else if (bStreet.includes(numTok)) {
+              score += 250;
+            }
+          }
+        }
+
+        // 3. Вулиця та нечіткі корені (Relaxed OR)
+        for (let s of stems) {
+          if (bStreet.includes(s.raw)) {
+            score += 500;
+            matchCount++;
+          } else if (s.stem.length >= 3 && bStreet.includes(s.stem)) {
+            score += 350;
+            matchCount++;
+          } else if (matchStreetOrAddress(b, s.raw)) {
+            score += 300;
+            matchCount++;
+          }
+        }
+
+        // 4. Поштомат / вантажне
+        if (hasPostomatKeyword) {
+          if (isPostomat) score += 300;
+          else score -= 400;
+        } else if (hasCargoKeyword) {
+          if (!isPostomat) score += 300;
+        }
+
+        // 5. Ваговий бонус за кількість токенів, що збіглися
+        if (matchCount > 0) {
+          score += matchCount * 100;
+          if (score >= 250) {
+            matched.push({ branch: b, score });
+          }
+        }
+      }
+
+      if (matched.length === 0) {
+        _searchLruCache.set(cacheKey, []);
+        return [];
+      }
     }
 
     matched.sort((a, b) => {
@@ -2558,7 +2731,7 @@
     });
 
     const leaderScore = matched[0].score;
-    if (leaderScore < 300) {
+    if (leaderScore < 250) {
       _searchLruCache.set(cacheKey, []);
       return [];
     }

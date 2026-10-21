@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.3.5';
+  const APP_VERSION = '1.3.6';
 
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
@@ -2216,7 +2216,9 @@
 
   function closeAutocomplete() {
     if (!dom.autocompleteDropdown) return;
+    clearTimeout(autocompleteDebounceTimer);
     dom.autocompleteDropdown.classList.add('hidden');
+    dom.autocompleteDropdown.style.display = 'none';
     dom.autocompleteDropdown.innerHTML = '';
     activeAutocompleteIndex = -1;
     autocompleteItems = [];
@@ -2374,6 +2376,7 @@
         <span>За запитом «<strong>${escapeHtml(query)}</strong>» міст чи відділень не знайдено</span>
       `;
       dom.autocompleteDropdown.appendChild(emptyEl);
+      dom.autocompleteDropdown.style.display = '';
       dom.autocompleteDropdown.classList.remove('hidden');
       isAutocompleteOpen = true;
       return;
@@ -2459,10 +2462,12 @@
 
       el.addEventListener('mousedown', handleSelect);
       el.addEventListener('pointerdown', handleSelect);
+      el.addEventListener('click', handleSelect);
 
       dom.autocompleteDropdown.appendChild(el);
     });
 
+    dom.autocompleteDropdown.style.display = '';
     dom.autocompleteDropdown.classList.remove('hidden');
     isAutocompleteOpen = true;
   }

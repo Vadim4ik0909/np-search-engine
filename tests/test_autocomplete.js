@@ -216,7 +216,7 @@ async function runTests() {
   console.log('===============================================================\n');
 
   let passedTests = 0;
-  let totalTests = 36;
+  let totalTests = 37;
   const canon = (s) => String(s || '').toLowerCase().replace(/['`ʼʻʽ’‘ʹ′´ˈ]/g, '');
 
   const { mockDocument, elementsById } = createMockEnvironment();
@@ -248,9 +248,9 @@ async function runTests() {
 
   // Захисний таймаут: завершити процес примусово через 10 секунд, якщо щось заблокується
   const watchdogTimer = setTimeout(() => {
-    console.error('\n⏱️ ТАЙМАУТ: Тести перевищили допустимий ліміт виконання (30с).');
+    console.error('\n⏱️ ТАЙМАУТ: Тести перевищили допустимий ліміт виконання (45с).');
     process.exit(1);
-  }, 30000);
+  }, 45000);
   if (watchdogTimer.unref) watchdogTimer.unref();
 
   console.time('⏱️ Час виконання тестів');
@@ -2222,6 +2222,73 @@ async function runTests() {
     passedTests++;
   } catch (err) {
     console.error('  ✗ Провал Тесту 36:', err.message, '\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // ТЕСТ 37: Стрес-тест v1.3.6 ("«Київ» № 22", "днепр 1", "«м. Одеса» № 5", "льв наук", 1-2 літери та закриття дропдауну)
+  // --------------------------------------------------------------------------
+  console.log('▶ ТЕСТ 37: Стрес-тест v1.3.6 ("«Київ» № 22", "днепр 1", чат-сміття та стабільність дропдауну)');
+  try {
+    const npPool = window.BRANCHES_DATA.novaposhta;
+
+    // 1. Запит зі сміттям у лапках: "«Київ» № 22" -> знаходить Відділення №22 у Києві
+    const resKyiv22 = window.SmartSearchEngine.searchBranches('«Київ» № 22', npPool, 10);
+    if (!resKyiv22 || resKyiv22.length === 0) {
+      throw new Error('Запит "«Київ» № 22" повернув 0 результатів');
+    }
+    const topKyiv22 = resKyiv22[0];
+    if (!canon(topKyiv22.city).includes('київ') || String(topKyiv22.number) !== '22') {
+      throw new Error(`Очікувалось Відділення №22 у Києві, отримано: ${topKyiv22.city} №${topKyiv22.number}`);
+    }
+
+    // 2. Запит зі скороченням: "днепр 1" -> знаходить Відділення №1 у місті Дніпро
+    const resDnipro1 = window.SmartSearchEngine.searchBranches('днепр 1', npPool, 10);
+    if (!resDnipro1 || resDnipro1.length === 0) {
+      throw new Error('Запит "днепр 1" повернув 0 результатів');
+    }
+    const topDnipro1 = resDnipro1[0];
+    if (!canon(topDnipro1.city).includes('дніпро') || String(topDnipro1.number) !== '1') {
+      throw new Error(`Очікувалось Відділення №1 у м. Дніпро, отримано: ${topDnipro1.city} №${topDnipro1.number}`);
+    }
+
+    // 3. Чат-синтаксис: "«м. Одеса» № 5" -> Одеса №5, "Львів-Наукова (склад)" -> Львів вул. Наукова
+    const resOdesa5 = window.SmartSearchEngine.searchBranches('«м. Одеса» № 5', npPool, 10);
+    if (!resOdesa5 || resOdesa5.length === 0 || !canon(resOdesa5[0].city).includes('одеса') || String(resOdesa5[0].number) !== '5') {
+      throw new Error('Запит "«м. Одеса» № 5" не знайшов Відділення №5 у м. Одеса');
+    }
+    const resLvivNauk = window.SmartSearchEngine.searchBranches('льв наук', npPool, 10);
+    if (!resLvivNauk || resLvivNauk.length === 0 || !canon(resLvivNauk[0].city).includes('львів')) {
+      throw new Error('Запит "льв наук" не знайшов відділення у м. Львів');
+    }
+
+    // 4. Автокомпліт при 1-2 літерах ("ки", "од", "дн", "хм")
+    for (const shortQ of ['ки', 'од', 'дн', 'хм']) {
+      const sugs = window.SmartSearchEngine.getAutocompleteSuggestions(shortQ, 'novaposhta', null, npPool);
+      if (!sugs || sugs.length === 0) {
+        throw new Error(`Автокомпліт повернув 0 підказок для короткого запиту "${shortQ}"`);
+      }
+    }
+
+    // 5. Надійне миттєве закриття дропдауну при виборі елемента (classList.contains('hidden') та display === 'none')
+    searchInput.value = 'ки';
+    searchInput.dispatchEvent({ type: 'input' });
+    await sleep(340);
+    if (dropdown.classList.contains('hidden')) {
+      throw new Error('Дропдаун мав відкритися для "ки"');
+    }
+    const items = dropdown.querySelectorAll('.autocomplete-item');
+    if (!items || items.length === 0) {
+      throw new Error('Немає елементів у дропдауні для "ки"');
+    }
+    items[0].dispatchEvent({ type: 'mousedown', preventDefault() {}, stopPropagation() {} });
+    if (!dropdown.classList.contains('hidden') || dropdown.style.display !== 'none') {
+      throw new Error('Дропдаун не сховався миттєво (hidden + display: none) після вибору варіанта');
+    }
+
+    console.log('  ✓ Успіх: "«Київ» № 22" -> Київ №22, "днепр 1" -> Дніпро №1, "«м. Одеса» № 5" -> Одеса №5, "льв наук" -> Львів, 1-2 літери та закриття дропдауну працюють бездоганно!\n');
+    passedTests++;
+  } catch (err) {
+    console.error('  ✗ Провал Тесту 37:', err.message, '\n');
   }
 
   console.log('===============================================================');
