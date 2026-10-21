@@ -433,6 +433,10 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
   border: 1px solid var(--border-light);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
+  height: 580px;
+  min-height: 580px;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-header {
@@ -545,14 +549,15 @@ body[data-service="ukrposhta"] .map-filter-btn[data-service-filter="novaposhta"]
 }
 
 .leaflet-map-canvas {
+  flex: 1;
   height: 100%;
-  min-height: 400px;
+  min-height: 480px;
   width: 100%;
   z-index: 1;
   background: var(--bg-card);
 }
 
-/* OpenStreetMap плитки за замовчуванням у світлій темі — чисті, природні */
+/* OpenStreetMap та CartoDB плитки за замовчуванням — чисті, без сітки та без водяних знаків */
 .leaflet-tile {
   filter: none;
 }
@@ -561,9 +566,9 @@ body[data-service="ukrposhta"] .map-filter-btn[data-service-filter="novaposhta"]
   background: var(--bg-card) !important;
 }
 
-/* OpenStreetMap фільтр інверсії лише для темної теми */
+/* CartoDB Dark Matter вже має нативні контрастні темні кольори, додаткова інверсія заборонена */
 [data-theme="dark"] .leaflet-tile {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%);
+  filter: none;
 }
 
 [data-theme="dark"] .leaflet-container {
@@ -1457,6 +1462,55 @@ mark.hl-match,
   opacity: 0.85;
 }
 
+.btn-reset-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-reset-selection:hover {
+  background: var(--bg-card-hover);
+  color: var(--brand-color);
+  border-color: var(--brand-border);
+}
+
+.btn-card-close-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 2;
+}
+
+.btn-card-close-x:hover {
+  background: var(--bg-card-hover);
+  color: var(--brand-color);
+  border-color: var(--brand-border);
+}
+
 .selected-badge-indicator {
   font-size: 11.5px;
   font-weight: 700;
@@ -1495,6 +1549,7 @@ mark.hl-match,
   line-height: 1.35;
   display: block;
   word-break: break-word;
+  padding-right: 36px;
 }
 
 .card-primary-line .city-highlight {
@@ -2396,6 +2451,15 @@ mark.hl-match,
 }
 
 @media (max-width: 640px) {
+  .map-card {
+    height: 440px;
+    min-height: 440px;
+  }
+
+  .leaflet-map-canvas {
+    min-height: 340px;
+  }
+
   .app-layout {
     padding: 16px 16px 90px 16px;
   }

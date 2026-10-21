@@ -254,7 +254,7 @@
       <!-- Лівий нижній кут: Історія версій сайту -->
       <div class="corner-left">
         <button id="btnVersionHistory" class="corner-pill-btn" aria-haspopup="dialog">
-          <span class="version-tag">v1.3.4</span>
+          <span class="version-tag">v1.3.5</span>
           
         </button>
       </div>
@@ -283,8 +283,22 @@
       </div>
 
       <div class="modal-body changelog-scroll">
-        <!-- Версія 1.3.4 -->
+        <!-- Версія 1.3.5 -->
         <div class="changelog-item current">
+          <div class="version-pill-header">
+            <span class="version-badge">v1.3.5</span>
+            <span class="version-state">Stable OSM Tiles, Zero Layout Jump & Reset Selection</span>
+            <span class="version-date">21 Жовтня 2026</span>
+          </div>
+          <ul class="version-features-list">
+            <li><strong>Усунення сітки «API KEY REQUIRED» (Tile Layer Fix):</strong> перехід на стабільні публічні тайли OpenStreetMap для світлої теми та CartoDB Dark Matter для темної без обмежень чи водяних знаків, із відображенням реальних міст і вулиць України.</li>
+            <li><strong>Ліквідація стрибків екрана (Zero Layout Jump):</strong> зафіксовано стабільну висоту карти, додано <code>autoPan: false</code> та <code>autoPanPadding: L.point(10, 10)</code> при відкритті балуна та заблоковано будь-які зміщення скролу при виборі точки.</li>
+            <li><strong>Логіка скасування вибору (Reset Selection):</strong> додано кнопку «✕ Скинути вибір» та хрестик на картку обраного відділення, очищення підсвітки маркера на карті та автоматичне скидання фільтра на «Всі» у разі порожнього таба.</li>
+          </ul>
+        </div>
+
+        <!-- Версія 1.3.4 -->
+        <div class="changelog-item">
           <div class="version-pill-header">
             <span class="version-badge">v1.3.4</span>
             <span class="version-state">Bidirectional Sync, Marker Popup UX & Adaptive Tiles</span>

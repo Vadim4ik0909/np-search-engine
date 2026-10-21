@@ -2,7 +2,7 @@
 
 > **Високопродуктивний клієнтський рушій миттєвого пошуку, дезамбігуації та уніфікації поштових відділень і поштоматів по всій Україні.**
 
-[![Версія](https://img.shields.io/badge/version-v1.3.4-blue?style=flat-square)](https://github.com/vadym-des/np-search-engine/releases)
+[![Версія](https://img.shields.io/badge/version-v1.3.5-blue?style=flat-square)](https://github.com/vadym-des/np-search-engine/releases)
 [![База населених пунктів](https://img.shields.io/badge/settlements-26%2C588-orange?style=flat-square)](./data/all_settlements.js)
 [![База відділень](https://img.shields.io/badge/warehouses%20%26%20postomats-55%2C185-success?style=flat-square)](./data/all_warehouses.js)
 [![Швидкість відгуку](https://img.shields.io/badge/latency-%3C%202ms-brightgreen?style=flat-square)](#-технічна-архітектура-та-алгоритми)
@@ -234,7 +234,8 @@ node scripts/download_all_warehouses.js
 ## 🗺️ Історія релізів (Changelog Summary) та Roadmap
 
 ### Історія версій (SemVer):
-* **v1.3.4 (Current Stable):** Двосторонній фокус та синхронізація списку й карти (Hover Sync & Instant Select), оновлений Marker Pop-up UX із бейджами ваги/габаритів та копіюванням у CRM, адаптивна картографічна підкладка CartoDB (Voyager для світлої / Dark Matter для темної).
+* **v1.3.5 (Current Stable):** Усунення сітки «API KEY REQUIRED» через стабільні тайли OpenStreetMap та CartoDB Dark Matter, повна ліквідація стрибків екрана (Zero Layout Jump) при виборі точки карти, фіксована висота контейнера карти, кнопка «✕ Скинути вибір» та автоматичне скидання порожніх фільтрів.
+* **v1.3.4:** Двосторонній фокус та синхронізація списку й карти (Hover Sync & Instant Select), оновлений Marker Pop-up UX із бейджами ваги/габаритів та копіюванням у CRM, адаптивна картографічна підкладка CartoDB (Voyager для світлої / Dark Matter для темної).
 * **v1.3.3:** Динамічне підвантаження карти (BBox & Zoom-level), панель фільтрів типу відділень, надійний Clipboard Fallback та видалення сторонніх кнопок маршруту.
 * **v1.3.2:** Оптимізація та стабілізація Leaflet карти: виклик `invalidateSize()`, Canvas-рендер, межі України (`ukraineBounds`, zoom 6–18).
 * **v1.3.1:** Сувора типізація вантажних хабів ($\ge$1000 кг), нормалізація пунктуації (`Київ, 222`, `Львів / Наукова`), захист токенів, 36/36 автотестів.

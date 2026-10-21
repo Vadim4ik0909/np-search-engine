@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.3.4';
+  const APP_VERSION = '1.3.5';
 
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
@@ -1073,6 +1073,8 @@
     const hlGeoSub = geoSub ? highlightMatch(geoSub, query) : '';
 
     card.innerHTML = `
+      <button type="button" class="btn-card-close-x" title="Скинути вибір" aria-label="Скинути вибір">✕</button>
+
       <!-- Рядок 1: місто [Місто] - [Тип] №[Номер]: [Вулиця] (одне речення без іконок та крапок) -->
       <div class="card-primary-line" title="${escapeHtml(primaryLineText)}">
         <span class="city-highlight">${escapeHtml(sType)} ${hlCity}</span>
@@ -1096,6 +1098,9 @@
         <button class="btn-copy-action btn-copy-detailed" type="button" title="Скопіювати розширений CRM-формат (з областю, районом та вагою)">
           📋 Детально
         </button>
+        <button class="btn-copy-action btn-reset-selection" type="button" title="Скинути вибір">
+          ✕ Скинути вибір
+        </button>
         <span class="weight-pill ${typeInfo.cls}">${escapeHtml(typeInfo.label)}</span>
         <span class="status-pill"><span class="status-dot"></span> Працює</span>
       </div>
@@ -1117,7 +1122,75 @@
       });
     }
 
+    const btnCloseX = card.querySelector('.btn-card-close-x');
+    if (btnCloseX) {
+      btnCloseX.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetBranchSelection();
+      });
+    }
+
+    const btnResetFoot = card.querySelector('.btn-reset-selection');
+    if (btnResetFoot) {
+      btnResetFoot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetBranchSelection();
+      });
+    }
+
     return card;
+  }
+
+  function resetBranchSelection() {
+    const previousBranch = state.selectedBranch;
+    state.selectedBranch = null;
+
+    // 1) Знімати підсвітку/активний стан із маркера на карті
+    if (typeof updateMapMarkersHighlight === 'function') {
+      updateMapMarkersHighlight(null);
+    } else if (previousBranch && typeof setMarkerHighlightedOnMap === 'function') {
+      setMarkerHighlightedOnMap(previousBranch, false);
+    }
+    if (state.leafletMap) {
+      state.leafletMap.closePopup();
+    }
+
+    // 2) Якщо активний таб фільтра порожній (наприклад, "Поштомати" у селі, де їх немає), не блокувати інтерфейс, а коректно скидати фільтр на "Всі"
+    const resultsPool = (state.currentResults && state.currentResults.length > 0) ? state.currentResults : [];
+    if (resultsPool.length > 0 && state.typeFilter !== 'all') {
+      let hasMatching = false;
+      if (state.typeFilter === 'postomat') {
+        hasMatching = resultsPool.some(isPostomatBranch);
+      } else if (state.typeFilter === 'cargo') {
+        hasMatching = resultsPool.some(isCargoBranch);
+      } else if (state.typeFilter === 'branch') {
+        hasMatching = resultsPool.some(isRegularBranch);
+      }
+      if (!hasMatching) {
+        state.typeFilter = 'all';
+        updateTypeFilterUI();
+      }
+    }
+
+    if (state.mapTypeFilter !== 'all') {
+      state.mapTypeFilter = 'all';
+      updateMapTypeFilterUI();
+    }
+
+    // 3) Прибирати картку вибраного відділення (повертати стан до загального огляду або списку міст)
+    if (state.currentResults && state.currentResults.length > 1) {
+      renderSearchResults(state.currentResults, state.searchQuery || (previousBranch ? previousBranch.city : '') || '');
+    } else {
+      if (dom.searchResultsSection) {
+        dom.searchResultsSection.classList.add('hidden');
+      }
+      if (dom.resultsList) {
+        dom.resultsList.innerHTML = '';
+      }
+      if (state.isMapVisible && state.leafletMap) {
+        updateVisibleMarkersFromViewport();
+      }
+    }
   }
 
   function renderSearchResults(branches, query, didYouMeanText, missingTargetBranch) {
@@ -1125,13 +1198,22 @@
 
     // 1. Фільтрація за типом (Всі | Вантажні | Відділення | Поштомати)
     let filtered = branches || [];
+    let typedFiltered = filtered;
     if (state.typeFilter === 'postomat') {
-      filtered = filtered.filter(isPostomatBranch);
+      typedFiltered = filtered.filter(isPostomatBranch);
     } else if (state.typeFilter === 'cargo') {
-      filtered = filtered.filter(isCargoBranch);
+      typedFiltered = filtered.filter(isCargoBranch);
     } else if (state.typeFilter === 'branch') {
-      filtered = filtered.filter(isRegularBranch);
+      typedFiltered = filtered.filter(isRegularBranch);
     }
+
+    // Якщо активний таб фільтра порожній (наприклад, "Поштомати" у селі, де їх немає), не блокувати інтерфейс, а коректно скидати фільтр на "Всі"
+    if (state.typeFilter !== 'all' && typedFiltered.length === 0 && filtered.length > 0) {
+      state.typeFilter = 'all';
+      updateTypeFilterUI();
+      typedFiltered = filtered;
+    }
+    filtered = typedFiltered;
 
     dom.resultsList.innerHTML = '';
 
@@ -1205,17 +1287,19 @@
       container.className = 'selected-branch-container';
       container.style.width = '100%';
 
-      let backBtnHtml = '';
-      if (filtered.length > 1) {
-        backBtnHtml = `
-          <div class="selected-branch-header">
+      const backBtnHtml = `
+        <div class="selected-branch-header">
+          ${filtered.length > 1 ? `
             <button type="button" class="btn-back-to-matches" id="btnBackToMatches">
               <span>←</span>
               <span>Показати всі збіги адреси (${filtered.length})</span>
             </button>
-          </div>
-        `;
-      }
+          ` : '<div></div>'}
+          <button type="button" class="btn-reset-selection" id="btnResetSelection" title="Скинути вибір">
+            <span>✕ Скинути вибір</span>
+          </button>
+        </div>
+      `;
 
       container.innerHTML = backBtnHtml;
 
@@ -1225,14 +1309,20 @@
       container.appendChild(card);
       dom.resultsList.appendChild(container);
 
-      if (filtered.length > 1) {
-        const btnBack = container.querySelector('#btnBackToMatches');
-        if (btnBack) {
-          btnBack.addEventListener('click', () => {
-            state.selectedBranch = null;
-            renderSearchResults(branches, query, didYouMeanText, missingTargetBranch);
-          });
-        }
+      const btnBack = container.querySelector('#btnBackToMatches');
+      if (btnBack) {
+        btnBack.addEventListener('click', (e) => {
+          e.preventDefault();
+          resetBranchSelection();
+        });
+      }
+
+      const btnResetHeader = container.querySelector('#btnResetSelection');
+      if (btnResetHeader) {
+        btnResetHeader.addEventListener('click', (e) => {
+          e.preventDefault();
+          resetBranchSelection();
+        });
       }
       return;
     }
@@ -1527,21 +1617,18 @@
 
   const MAP_TILES = {
     light: {
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       options: {
-        minZoom: 6,
-        maxZoom: 18,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }
     },
     dark: {
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       options: {
-        minZoom: 6,
-        maxZoom: 18,
+        maxZoom: 19,
         subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
       }
     }
   };
@@ -1557,6 +1644,35 @@
     return String(b.name || '');
   }
 
+  function updateMapMarkersHighlight(targetBranch = state.selectedBranch) {
+    if (!state.leafletMap || !state.branchMarkersMap) return;
+    const isNP = state.currentService === 'novaposhta';
+    const regularPin = createCustomPin(isNP, false);
+    const highlightedPin = createCustomPin(isNP, true);
+    const targetKey = targetBranch ? getBranchUniqueKey(targetBranch) : null;
+
+    state.branchMarkersMap.forEach((marker, key) => {
+      const isTarget = Boolean(targetKey && (
+        key === targetKey ||
+        (targetBranch.id && marker._branch && marker._branch.id === targetBranch.id) ||
+        (targetBranch.number && marker._branch && marker._branch.number &&
+         marker._branch.number.toString() === targetBranch.number.toString() &&
+         (marker._branch.city || '').toLowerCase() === (targetBranch.city || '').toLowerCase())
+      ));
+
+      marker.setIcon(isTarget ? highlightedPin : regularPin);
+      marker.setZIndexOffset(isTarget ? 1000 : 0);
+      const el = marker.getElement();
+      if (el) {
+        if (isTarget) {
+          el.classList.add('highlighted-marker');
+        } else {
+          el.classList.remove('highlighted-marker');
+        }
+      }
+    });
+  }
+
   function renderSelectedBranch(branch) {
     if (!branch) return;
     state.selectedBranch = branch;
@@ -1564,10 +1680,13 @@
       dom.searchResultsSection.classList.remove('hidden');
     }
 
+    updateMapMarkersHighlight(branch);
+
     const list = (state.currentResults && state.currentResults.length > 0)
       ? state.currentResults
       : [branch];
 
+    // Заборонено викликати window.scrollTo() чи стрибати фокусом вниз сторінки
     renderSearchResults(list, state.searchQuery || branch.city || '');
   }
 
@@ -1627,12 +1746,12 @@
       maxBounds: bounds,
       maxBoundsViscosity: 1.0,
       minZoom: 6,
-      maxZoom: 18
+      maxZoom: 19
     });
 
     window.leafMap = state.leafletMap;
 
-    // Адаптивна картографічна підкладка: CartoDB Voyager для світлої / CartoDB Dark Matter для темної
+    // Адаптивна картографічна підкладка: OpenStreetMap для світлої / CartoDB Dark Matter для темної
     const initialTheme = state.theme === 'dark' ? 'dark' : 'light';
     const tileConf = MAP_TILES[initialTheme];
     state.currentTileLayer = L.tileLayer(tileConf.url, tileConf.options).addTo(state.leafletMap);
@@ -1893,10 +2012,16 @@
         }
 
         const popupContent = formatPopupContent(b, isTarget, isNP);
-        marker.bindPopup(popupContent);
+        marker.bindPopup(popupContent, {
+          autoPan: false,
+          autoPanPadding: (typeof L !== 'undefined' && L.point) ? L.point(10, 10) : [10, 10]
+        });
 
-        // Двосторонній фокус: клік на маркер відкриває балун та автоматично вибирає повну картку
-        marker.on('click', () => {
+        // Двосторонній фокус: клік на маркер відкриває балун та автоматично вибирає повну картку без стрибків екрана
+        marker.on('click', (e) => {
+          if (e && e.originalEvent && typeof e.originalEvent.stopPropagation === 'function') {
+            e.originalEvent.stopPropagation();
+          }
           renderSelectedBranch(b);
           marker.openPopup();
         });
@@ -1963,7 +2088,10 @@
           weight: 3,
           opacity: 1,
           fillOpacity: 0.95
-        }).addTo(state.leafletMap).bindPopup('📍 Ви знаходитесь тут').openPopup();
+        }).addTo(state.leafletMap).bindPopup('📍 Ви знаходитесь тут', {
+          autoPan: false,
+          autoPanPadding: (typeof L !== 'undefined' && L.point) ? L.point(10, 10) : [10, 10]
+        }).openPopup();
 
         state.leafletMap.setView([userLat, userLng], 13);
       },
@@ -2828,6 +2956,7 @@
   window.createFullBranchCard = createFullBranchCard;
   window.renderSelectedBranch = renderSelectedBranch;
   window.selectBranch = renderSelectedBranch;
+  window.resetBranchSelection = resetBranchSelection;
   window.setMarkerHighlightedOnMap = setMarkerHighlightedOnMap;
   window.updateMapTileLayerTheme = updateMapTileLayerTheme;
   window.formatClassicCopyString = formatClassicCopyString;
