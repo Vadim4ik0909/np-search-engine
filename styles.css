@@ -493,7 +493,8 @@ body[data-service="ukrposhta"] #btnNovaPoshta:hover {
 }
 
 .leaflet-map-canvas {
-  height: 380px;
+  height: 100%;
+  min-height: 400px;
   width: 100%;
   z-index: 1;
   background: var(--bg-card);

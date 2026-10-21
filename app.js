@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  const APP_VERSION = '1.3.1';
+  const APP_VERSION = '1.3.2';
 
   // ==========================================================================
   // СТАН ДОДАТКУ (STATE)
@@ -206,7 +206,7 @@
     renderRecentHistory();
 
     if (state.isMapVisible) {
-      updateMapMarkers(getAllCurrentServiceBranches());
+      updateMapMarkers(state.currentResults.slice(0, 20));
     }
   }
 
@@ -663,28 +663,30 @@
       recordSearchHistory(rawQuery, results.length);
     }
 
-    // Оновлення карти: показуємо ВСІ відділення знайденого міста, а шукане відділення виділяємо!
+    // Оновлення карти: показуємо до 20 відділень знайденого міста, а шукане відділення виділяємо!
     if (state.isMapVisible && state.leafletMap) {
-      let mapBranches = allCityBranches.length > 0 ? allCityBranches : [];
+      let mapBranches = [];
       let targetBranch = results.length === 1 ? results[0] : (results.length > 0 ? results[0] : null);
 
-      if (mapBranches.length === 0 && parsed.matchedSettlement) {
+      if (results.length > 0) {
+        mapBranches = results.slice(0, 20);
+      } else if (allCityBranches.length > 0) {
+        mapBranches = allCityBranches.slice(0, 20);
+      } else if (parsed && parsed.matchedSettlement) {
         const allBranches = getAllCurrentServiceBranches();
         const sName = parsed.matchedSettlement.name.toLowerCase();
-        mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName);
-      }
-
-      if (mapBranches.length === 0) {
-        mapBranches = results.length > 0 ? results : getAllCurrentServiceBranches();
+        mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName).slice(0, 20);
       }
 
       updateMapMarkers(mapBranches, targetBranch);
       if (targetBranch && targetBranch.lat && targetBranch.lng) {
-        state.leafletMap.flyTo([targetBranch.lat, targetBranch.lng], 14, { duration: 1.2 });
+        state.leafletMap.flyTo([targetBranch.lat, targetBranch.lng], 14, { duration: 1.0 });
       } else if (parsed.matchedSettlement && parsed.matchedSettlement.lat) {
-        state.leafletMap.flyTo([parsed.matchedSettlement.lat, parsed.matchedSettlement.lng], 13, { duration: 1.2 });
+        state.leafletMap.flyTo([parsed.matchedSettlement.lat, parsed.matchedSettlement.lng], 13, { duration: 1.0 });
+      } else if (mapBranches.length === 0 && ukraineBounds) {
+        state.leafletMap.fitBounds(ukraineBounds);
       }
-      }
+    }
     } catch (err) {
       console.error('executeSearch ERROR:', err);
     }
@@ -1495,19 +1497,42 @@
   // ==========================================================================
   // 5. ТЕМНА КАРТА LEAFLET (OPENSTREETMAP + DARK MODE CSS)
   // ==========================================================================
+  const ukraineBounds = (typeof L !== 'undefined' && L.latLngBounds)
+    ? L.latLngBounds(L.latLng(44.0, 22.0), L.latLng(52.5, 40.5))
+    : null;
+
   function initMapIfNeeded() {
     if (state.leafletMap) return;
+    if (typeof L === 'undefined') return;
 
-    // Центр України
-    state.leafletMap = L.map('branchesMap').setView([48.5, 31.5], 6);
+    const bounds = ukraineBounds || (L.latLngBounds && L.latLngBounds(L.latLng(44.0, 22.0), L.latLng(52.5, 40.5)));
+
+    // Ініціалізація карти з Canvas-рендерером та жорсткими межами України
+    state.leafletMap = L.map('branchesMap', {
+      preferCanvas: true,
+      maxBounds: bounds,
+      maxBoundsViscosity: 1.0,
+      minZoom: 6,
+      maxZoom: 18
+    });
+
+    window.leafMap = state.leafletMap;
 
     // Стандартні відкриті тайли OpenStreetMap без обмежень та вотермарок
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+      minZoom: 6,
+      maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
     }).addTo(state.leafletMap);
 
     state.markersGroup = L.layerGroup().addTo(state.leafletMap);
+
+    // Початковий вигляд: територія України
+    if (bounds) {
+      state.leafletMap.fitBounds(bounds);
+    } else {
+      state.leafletMap.setView([48.5, 31.5], 6);
+    }
   }
 
   function toggleMapView() {
@@ -1524,20 +1549,21 @@
       initMapIfNeeded();
       
       setTimeout(() => {
-        state.leafletMap.invalidateSize();
-        const allBranches = getAllCurrentServiceBranches();
-        let mapBranches = [];
-        let targetBranch = state.currentResults.length === 1 ? state.currentResults[0] : (state.currentResults.length > 0 ? state.currentResults[0] : null);
+        if (window.leafMap) window.leafMap.invalidateSize();
+        if (state.leafletMap) state.leafletMap.invalidateSize();
 
-        if (state.searchQuery && window.SmartSearchEngine) {
+        let mapBranches = [];
+        let targetBranch = state.selectedBranch || (state.currentResults.length > 0 ? state.currentResults[0] : null);
+
+        if (state.currentResults && state.currentResults.length > 0) {
+          mapBranches = state.currentResults.slice(0, 20);
+        } else if (state.searchQuery && window.SmartSearchEngine) {
           const parsed = window.SmartSearchEngine.parseQuery(state.searchQuery);
           if (parsed && parsed.matchedSettlement) {
             const sName = parsed.matchedSettlement.name.toLowerCase();
-            mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName);
+            const allBranches = getAllCurrentServiceBranches();
+            mapBranches = allBranches.filter(b => b.city && b.city.toLowerCase() === sName).slice(0, 20);
           }
-        }
-        if (mapBranches.length === 0) {
-          mapBranches = state.currentResults.length > 0 ? state.currentResults : allBranches;
         }
 
         updateMapMarkers(mapBranches, targetBranch);
@@ -1549,6 +1575,13 @@
       dom.btnToggleMap.setAttribute('aria-expanded', 'false');
       dom.btnToggleMap.setAttribute('title', 'Показати карту');
       dom.btnToggleMap.setAttribute('aria-label', 'Показати карту');
+      if (state.markersGroup) {
+        state.markersGroup.clearLayers();
+      }
+      if (state.userLocationMarker && state.leafletMap) {
+        state.leafletMap.removeLayer(state.userLocationMarker);
+        state.userLocationMarker = null;
+      }
     }
   }
 
@@ -1583,9 +1616,19 @@
     if (!state.leafletMap || !state.markersGroup) return;
 
     state.markersGroup.clearLayers();
-    dom.mapMarkersCount.textContent = `(${branches.length} відділень)`;
 
-    if (branches.length === 0) return;
+    // Захист від зависання: суворо не більше 20 точок одночасно
+    const safeBranches = (branches || []).slice(0, 20);
+    dom.mapMarkersCount.textContent = `(${safeBranches.length} відділень)`;
+
+    const boundsObj = ukraineBounds || (typeof L !== 'undefined' && L.latLngBounds ? L.latLngBounds(L.latLng(44.0, 22.0), L.latLng(52.5, 40.5)) : null);
+
+    if (safeBranches.length === 0) {
+      if (boundsObj && state.leafletMap) {
+        state.leafletMap.fitBounds(boundsObj);
+      }
+      return;
+    }
 
     const isNP = state.currentService === 'novaposhta';
     const regularPin = createCustomPin(isNP, false);
@@ -1593,7 +1636,7 @@
     const bounds = [];
     let targetMarker = null;
 
-    branches.forEach(b => {
+    safeBranches.forEach(b => {
       if (b.lat && b.lng) {
         const isTarget = highlightedBranch && (
           (highlightedBranch.id && b.id === highlightedBranch.id) ||
@@ -1647,6 +1690,8 @@
       } else {
         state.leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
       }
+    } else if (boundsObj) {
+      state.leafletMap.fitBounds(boundsObj);
     }
   }
 
@@ -2331,8 +2376,9 @@
       closeAutocomplete();
       state.searchQuery = '';
       state.currentResults = [];
+      state.selectedBranch = null;
       if (state.isMapVisible) {
-        updateMapMarkers(getAllCurrentServiceBranches());
+        updateMapMarkers([]);
       }
       dom.searchInput.focus();
     });
@@ -2342,7 +2388,23 @@
     });
 
     dom.btnToggleMap.addEventListener('click', toggleMapView);
-    dom.btnCloseMap.addEventListener('click', toggleMapView);
+    if (dom.btnCloseMap) {
+      dom.btnCloseMap.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.isMapVisible) toggleMapView();
+      });
+    }
+    if (dom.mapSection) {
+      dom.mapSection.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target && (target.id === 'btnCloseMap' || (target.closest && target.closest('#btnCloseMap')))) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (state.isMapVisible) toggleMapView();
+        }
+      });
+    }
     dom.btnGeoLocate.addEventListener('click', getUserLocation);
 
     dom.btnClearHistory.addEventListener('click', () => {

@@ -2,7 +2,7 @@
 
 > **Високопродуктивний клієнтський рушій миттєвого пошуку, дезамбігуації та уніфікації поштових відділень і поштоматів по всій Україні.**
 
-[![Версія](https://img.shields.io/badge/version-v1.3.1-blue?style=flat-square)](https://github.com/vadym-des/np-search-engine/releases)
+[![Версія](https://img.shields.io/badge/version-v1.3.2-blue?style=flat-square)](https://github.com/vadym-des/np-search-engine/releases)
 [![База населених пунктів](https://img.shields.io/badge/settlements-26%2C588-orange?style=flat-square)](./data/all_settlements.js)
 [![База відділень](https://img.shields.io/badge/warehouses%20%26%20postomats-55%2C185-success?style=flat-square)](./data/all_warehouses.js)
 [![Швидкість відгуку](https://img.shields.io/badge/latency-%3C%202ms-brightgreen?style=flat-square)](#-технічна-архітектура-та-алгоритми)
@@ -234,7 +234,8 @@ node scripts/download_all_warehouses.js
 ## 🗺️ Історія релізів (Changelog Summary) та Roadmap
 
 ### Історія версій (SemVer):
-* **v1.3.1 (Current Stable):** Сувора типізація вантажних хабів ($\ge$1000 кг), нормалізація пунктуації (`Київ, 222`, `Львів / Наукова`), захист токенів, 36/36 автотестів.
+* **v1.3.2 (Current Stable):** Оптимізація та стабілізація Leaflet карти: виклик `invalidateSize()`, Canvas-рендер, межі України (`ukraineBounds`, zoom 6–18), ліміт до 20 маркерів.
+* **v1.3.1:** Сувора типізація вантажних хабів ($\ge$1000 кг), нормалізація пунктуації (`Київ, 222`, `Львів / Наукова`), захист токенів, 36/36 автотестів.
 * **v1.2.0:** Реалізація Dual-Mode Clipboard (клієнтський vs CRM формат), надійний fallback для `iframe` у CRM.
 * **v1.1.0:** Інтеграція адресної бази Укрпошти, прямий пошук за 5-значними поштовими індексами.
 * **v1.0.0:** Перший мажорний реліз клієнтського рушія з повною базою 26k населених пунктів та 55k відділень.
